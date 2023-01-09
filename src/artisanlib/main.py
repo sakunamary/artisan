@@ -222,7 +222,8 @@ from artisanlib.util import (appFrozen, stringp, uchr, decodeLocal, encodeLocal,
         fromFtoC, fromCtoF, RoRfromFtoC, RoRfromCtoF, convertRoR, convertTemp, path2url, toInt, toString, toList, toFloat,
         toBool, toStringList, toMap, removeAll, application_name, application_viewer_name, application_organization_name,
         application_organization_domain, getDataDirectory, getAppPath, getResourcePath, getDirectory, debugLogLevelToggle,
-        debugLogLevelActive, setDebugLogLevel, abbrevString, createGradient, natsort, toGrey, toDim, setDeviceDebugLogLevel)
+        debugLogLevelActive, setDebugLogLevel, abbrevString, createGradient, natsort, toGrey, toDim, setDeviceDebugLogLevel,
+        scaleFloat2String)
 
 from artisanlib.qtsingleapplication import QtSingleApplication
 from artisanlib.filters import LiveMedian
@@ -266,6 +267,7 @@ class Artisan(QtSingleApplication):
 
     @pyqtSlot('QWidget*','QWidget*')
     def appRaised(self,oldFocusWidget,newFocusWidget):
+        _log.debug('appRaised')
         try:
             if aw is not None and not sip.isdeleted(aw): # sip not supported on older PyQt versions (eg. RPi)
                 if oldFocusWidget is None and newFocusWidget is not None and aw is not None and aw.centralWidget() == newFocusWidget and self.sentToBackground is not None:
@@ -1228,7 +1230,7 @@ class tgraphcanvas(FigureCanvas):
         # NOTE: stat. flavors not used anymore. The code has been removed.
         #       statisticsflags[5] area is not used anymore
         self.statisticsflags = [1,1,0,1,0,0,1]
-        self.statisticsmode = 1 # one of 0: standard computed values, 1: roast properties
+        self.statisticsmode = 1 # one of 0: standard computed values, 1: roast properties, 2: total energy/CO2 data, 3: just roast energy/CO2 data
 
         # Area Under Curve (AUC)
         self.AUCbegin = 1 # counting begins after 0: CHARGE, 1: TP (default), 2: DE, 3: FCs
@@ -3496,7 +3498,7 @@ class tgraphcanvas(FigureCanvas):
     def onclick(self,event):
         try:
             if not self.designerflag and not self.wheelflag and event.inaxes is None and not aw.qmc.flagstart and not aw.qmc.flagon and event.button == 3:
-                aw.qmc.statisticsmode = (aw.qmc.statisticsmode + 1)%2
+                aw.qmc.statisticsmode = (aw.qmc.statisticsmode + 1)%4
                 aw.qmc.writecharacteristics()
                 aw.qmc.fig.canvas.draw_idle()
                 return
@@ -7275,12 +7277,11 @@ class tgraphcanvas(FigureCanvas):
             self.autoDryIdx = 0
             self.autoFCsIdx = 0
 
-            if redraw: # only if redraw follows we remove the cached artists
-                self.l_annotations = [] # initiate the event annotations
-                # we initialize the annotation position dict of the foreground profile
-                self.deleteAnnoPositions(foreground=True, background=False)
-                self.l_event_flags_dict = {} # initiate the event id to temp/time annotation dict for flags
-                self.l_background_annotations = [] # initiate the background event annotations
+            self.l_annotations = [] # initiate the event annotations
+            # we initialize the annotation position dict of the foreground profile
+            self.deleteAnnoPositions(foreground=True, background=False)
+            self.l_event_flags_dict = {} # initiate the event id to temp/time annotation dict for flags
+            self.l_background_annotations = [] # initiate the background event annotations
 
             if not sampling:
                 aw.hideDefaultButtons()
@@ -8220,7 +8221,7 @@ class tgraphcanvas(FigureCanvas):
             bnr = self.roastbatchnr
         if bnr != 0 and title != '':
             title = f'{bprefix}{str(bnr)} {title}'
-        elif bnr == 0 and title != '' and bprefix != '':
+        elif bnr == 0 and title != '' and title != aw.qmc.title != QApplication.translate('Scope Title', 'Roaster Scope') and bprefix != '':
             title = f'{bprefix} {title}'
 
         if self.graphfont in [1,9]: # if selected font is Humor or Dijkstra we translate the unicode title into pure ascii
@@ -11868,8 +11869,12 @@ class tgraphcanvas(FigureCanvas):
                     aw.santoker.setLogging(self.device_logging)
                     aw.santoker.start(aw.santokerHost, aw.santokerPort,
                         connected_handler=lambda : aw.sendmessageSignal.emit(QApplication.translate('Message', 'Santoker connected'),True,None),
-                        disconnected_handler=lambda : aw.sendmessageSignal.emit(QApplication.translate('Message', 'Santoker disconnected'),True,None))
-
+                        disconnected_handler=lambda : aw.sendmessageSignal.emit(QApplication.translate('Message', 'Santoker disconnected'),True,None),
+                        charge_handler=lambda : (aw.marChargeSignal.emit() if (aw.qmc.timeindex[0] == -1) else None),
+                        dry_handler=lambda : (aw.markDRYSignal.emit() if (aw.qmc.timeindex[2] == 0) else None),
+                        fcs_handler=lambda : (aw.markFCsSignal.emit() if (aw.qmc.timeindex[1] == 0) else None),
+                        scs_handler=lambda : (aw.markSCsSignal.emit() if (aw.qmc.timeindex[4] == 0) else None),
+                        drop_handler=lambda : (aw.markDropSignal.emit() if (aw.qmc.timeindex[6] == 0) else None))
             aw.initializedMonitoringExtraDeviceStructures()
 
             #reset alarms
@@ -12617,6 +12622,12 @@ class tgraphcanvas(FigureCanvas):
                         except Exception: # pylint: disable=broad-except
                             pass
 
+                        try:
+                            # adjust endofx back to resetmaxtime (it might have been extended if "Expand" is ticked beyond the resetmaxtime at START)
+                            if not self.locktimex and not self.fixmaxtime and self.endofx != self.resetmaxtime:
+                                self.endofx = self.resetmaxtime
+                        except Exception: # pylint: disable=broad-except
+                            pass
                         self.xaxistosm(redraw=False) # need to fix uneven x-axis labels like -0:13
 
                         if self.BTcurve:
@@ -14134,7 +14145,7 @@ class tgraphcanvas(FigureCanvas):
                         if FCperiod is not None:
                             strline = strline + '   ' + QApplication.translate('Label', 'FC') + '=%smin' % FCperiod
                     self.set_xlabel(strline)
-                else:
+                elif aw.qmc.statisticsmode == 1:
                     sep = '   '
                     msg = aw.qmc.roastdate.date().toString(QLocale().dateFormat(QLocale.FormatType.ShortFormat))
                     tm = aw.qmc.roastdate.time().toString()[:-3]
@@ -14156,6 +14167,88 @@ class tgraphcanvas(FigureCanvas):
                     elif aw.qmc.ground_color:
                         msg += sep + '#' + str(aw.qmc.ground_color)
                     self.set_xlabel(msg)
+                elif aw.qmc.statisticsmode == 2:
+                    # total energy/CO2
+                    energy_label = QApplication.translate('GroupBox','Energy')
+                    CO2_label = QApplication.translate('GroupBox','CO2')
+                    if not (platf == 'Windows' and int(platform.release()) < 10):
+                         # no subscript for legacy Windows
+                        CO2_label = CO2_label.replace('CO2','CO₂')
+                    energy_unit = self.energyunits[self.energyresultunit_setup]
+                    energymetrics,_ = self.calcEnergyuse()
+                    KWH_per_green = energymetrics['KWH_batch_per_green_kg']
+                    CO2_per_green = energymetrics['CO2_batch_per_green_kg']
+
+                    # energy per kg
+                    if KWH_per_green > 0:
+                        if KWH_per_green < 1:
+                            scaled_energy_kwh = scaleFloat2String(KWH_per_green*1000.) + ' Wh/kg'
+                        else:
+                            scaled_energy_kwh = scaleFloat2String(KWH_per_green) + ' kWh/kg'
+                        energyPerKgCoffeeLabel = f'  ({scaled_energy_kwh})'
+                    # no weight is available
+                    else:
+                        energyPerKgCoffeeLabel = ''
+
+                    # CO2 per kg
+                    if CO2_per_green > 0:
+                        if CO2_per_green < 1000:
+                            scaled_co2_kg = scaleFloat2String(CO2_per_green) + 'g/kh'
+                        else:
+                            scaled_co2_kg = scaleFloat2String(CO2_per_green/1000.) + 'kg/kh'
+                        CO2perKgCoffeeLabel = f'  ({scaled_co2_kg})'
+                    # no weight is available
+                    else:
+                        CO2perKgCoffeeLabel = ''
+
+                    total_energy = scaleFloat2String(self.convertHeat(energymetrics['BTU_batch'],0,self.energyresultunit_setup))
+                    scaled_co2_batch = str(scaleFloat2String(energymetrics['CO2_batch']))+'g' if energymetrics['CO2_batch']<1000 else str(scaleFloat2String(energymetrics['CO2_batch']/1000.)) +'kg'
+
+
+                    msg = f'{energy_label}: {total_energy}{energy_unit}{energyPerKgCoffeeLabel}   {CO2_label}: {scaled_co2_batch}{CO2perKgCoffeeLabel}'
+                    self.set_xlabel(msg)
+                elif aw.qmc.statisticsmode == 3:
+                    # just roast energy/CO2
+                    energy_label = QApplication.translate('GroupBox','Energy')
+                    CO2_label = QApplication.translate('GroupBox','CO2')
+                    if not (platf == 'Windows' and int(platform.release()) < 10):
+                         # no subscript for legacy Windows
+                        CO2_label = CO2_label.replace('CO2','CO₂')
+                    energy_unit = self.energyunits[self.energyresultunit_setup]
+                    roast_label = QApplication.translate('Label','Roast')
+                    energymetrics,_ = self.calcEnergyuse()
+                    KWH_per_green_roast = energymetrics['KWH_roast_per_green_kg']
+                    CO2_per_green_roast = energymetrics['CO2_roast_per_green_kg']
+
+                    # energy per kg
+                    if KWH_per_green_roast > 0:
+                        if KWH_per_green_roast < 1:
+                            scaled_energy_kwh = scaleFloat2String(KWH_per_green_roast*1000.) + ' Wh/kg'
+                        else:
+                            scaled_energy_kwh = scaleFloat2String(KWH_per_green_roast) + ' kWh/kg'
+                        energyPerKgCoffeeLabel = f'  ({scaled_energy_kwh})'
+                    # no weight is available
+                    else:
+                        energyPerKgCoffeeLabel = ''
+
+                    # CO2 per kg
+                    if CO2_per_green_roast > 0:
+                        if CO2_per_green_roast < 1000:
+                            scaled_co2_kg = scaleFloat2String(CO2_per_green_roast) + 'g/kh'
+                        else:
+                            scaled_co2_kg = scaleFloat2String(CO2_per_green_roast/1000.) + 'kg/kh'
+                        CO2perKgCoffeeLabel = f'  ({scaled_co2_kg})'
+                    # no weight is available
+                    else:
+                        CO2perKgCoffeeLabel = ''
+
+                    total_energy = scaleFloat2String(self.convertHeat(energymetrics['BTU_roast'],0,self.energyresultunit_setup))
+                    scaled_co2_batch = str(scaleFloat2String(energymetrics['CO2_roast']))+'g' if energymetrics['CO2_roast']<1000 else str(scaleFloat2String(energymetrics['CO2_roast']/1000.)) +'kg'
+
+                    msg = f'{roast_label} {energy_label}: {total_energy}{energy_unit}{energyPerKgCoffeeLabel}   {roast_label} {CO2_label}: {scaled_co2_batch}{CO2perKgCoffeeLabel}'
+                    self.set_xlabel(msg)
+                else:
+                    self.set_xlabel('')
             else:
                 if aw.qmc.flagstart or self.xgrid == 0:
                     self.set_xlabel('')
@@ -15335,7 +15428,7 @@ class tgraphcanvas(FigureCanvas):
                 if res:
                     self.connect_designer()
                     aw.disableEditMenus(designer=True)
-                    self.redraw(True)
+                    self.redraw()
                 else:
                     aw.designerAction.setChecked(False)
             elif reply == QMessageBox.StandardButton.Cancel:
@@ -15445,9 +15538,13 @@ class tgraphcanvas(FigureCanvas):
         if not self.locktimex:
             self.xaxistosm(redraw=False)
 
-        # import UnivariateSpline needed to draw the curve in designer
-        from scipy.interpolate import UnivariateSpline # @UnusedImport # pylint: disable=import-error
-        global UnivariateSpline # pylint: disable=global-statement
+#        # import UnivariateSpline needed to draw the curve in designer
+#        from scipy.interpolate import UnivariateSpline # @UnusedImport # pylint: disable=import-error
+#        global UnivariateSpline # pylint: disable=global-statement
+        # init designer timez
+        self.designer_timez = numpy.arange(self.timex[0],self.timex[-1],self.time_step_size)
+        # set initial RoR z-axis limits
+        self.setDesignerDeltaAxisLimits(self.DeltaETflag, self.DeltaBTflag)
         self.redrawdesigner(force=True)
 
     #loads main points from a profile so that they can be edited
@@ -15500,21 +15597,78 @@ class tgraphcanvas(FigureCanvas):
             self.currentx = lptime
             self.currenty = lptemp2
             self.addpoint(manual=False)
+            # reset cursor coordinates
+            self.currentx = 0
+            self.currenty = 0
 
         if not self.locktimex:
             self.xaxistosm(redraw=False)
+#        # import UnivariateSpline needed to draw the curve in designer
+#        from scipy.interpolate import UnivariateSpline # @UnusedImport # pylint: disable=import-error
+#        global UnivariateSpline # pylint: disable=global-statement
+        # init designer timez
+        self.designer_timez = numpy.arange(self.timex[0],self.timex[-1],self.time_step_size)
+        # set initial RoR z-axis limits
+        self.setDesignerDeltaAxisLimits(self.DeltaETflag, self.DeltaBTflag)
         self.redrawdesigner(force=True)                                   #redraw the designer screen
         return True
+
+
+    def setDesignerDeltaAxisLimits(self, setET:bool, setBT:bool):
+        if setET or setBT:
+            from scipy.interpolate import UnivariateSpline
+            delta1_max = 0
+            delta2_max = 0
+            # we have first to calculate the delta data
+            # returns the max ET/BT RoR between CHARGE and DROP
+            if setET:
+                func1 = UnivariateSpline(self.timex,self.temp1, k = self.ETsplinedegree)
+                funcDelta1 = func1.derivative()
+                delta1_max = max(funcDelta1(self.designer_timez) * 60)
+            if setBT:
+                func2 = UnivariateSpline(self.timex,self.temp2, k = self.BTsplinedegree)
+                funcDelta2 = func2.derivative()
+                delta2_max = max(funcDelta2(self.designer_timez) * 60)
+            dmax = max(delta1_max, delta2_max)
+            # we only adjust the upper limit automatically
+            zlimit_org = aw.qmc.zlimit
+            if dmax > aw.qmc.zlimit_min:
+                self.zlimit = int(dmax) + 1
+            else:
+                self.zlimit = self.zlimit_min + 1
+            if zlimit_org != self.zlimit:
+                self.delta_ax.set_ylim(self.zlimit_min,self.zlimit)
+            if self.zgrid != 0:
+                d = self.zlimit - self.zlimit_min
+                steps = int(round(d/5))
+                if steps > 50:
+                    steps = int(round(steps/10))*10
+                elif steps > 10:
+                    steps = int(round(steps/5))*5
+                elif steps > 5:
+                    steps = 5
+                else:
+                    steps = int(round(steps/2))*2
+                auto_grid = max(2,steps)
+                if auto_grid != self.zgrid:
+                    self.zgrid = auto_grid
+                    if self.zgrid > 0:
+                        self.delta_ax.yaxis.set_major_locator(ticker.MultipleLocator(self.zgrid))
+                        self.delta_ax.yaxis.set_minor_locator(ticker.AutoMinorLocator())
+                        for i in self.delta_ax.get_yticklines():
+                            i.set_markersize(10)
+                        for i in self.delta_ax.yaxis.get_minorticklines():
+                            i.set_markersize(5)
+                        for label in self.delta_ax.get_yticklabels() :
+                            label.set_fontsize('small')
+                        if not self.LCDdecimalplaces:
+                            self.delta_ax.minorticks_off()
+
 
     #redraws designer
     def redrawdesigner(self,force=False): #if force is set the bitblit cache is ignored and a full redraw is triggered
         from scipy.interpolate import UnivariateSpline
         if aw.qmc.designerflag:
-
-            if not self.locktimex and self.timex[-1] > self.endofx:
-                self.endofx = self.timex[-1] + 120
-                self.xaxistosm()
-                self.ax_background_designer = None
 
             if self.ax_background_designer is None or force:
                 # we first initialize the background canvas and the bitblit cache
@@ -15534,6 +15688,9 @@ class tgraphcanvas(FigureCanvas):
                 fontprop_medium = aw.mpl_fontproperties.copy()
                 fontprop_medium.set_size('medium')
                 self.set_xlabel(aw.arabicReshape(QApplication.translate('Label', 'Designer')))
+
+                # update z-axis limits if autoDelta is enabled
+                self.setDesignerDeltaAxisLimits(self.DeltaETflag and self.autodeltaxET, self.DeltaBTflag and self.autodeltaxBT)
 
                 if not self.locktimex and self.timex[-1] > self.endofx:
                     self.endofx = self.timex[-1] + 120
@@ -20642,11 +20799,17 @@ class ApplicationWindow(QMainWindow):
 
     @pyqtSlot('QPoint')
     def setTareET(self,_):
-        self.setTare(0)
+        if not aw.qmc.swaplcds:
+            self.setTare(0)
+        else:
+            self.setTare(1)
 
     @pyqtSlot('QPoint')
     def setTareBT(self,_):
-        self.setTare(1)
+        if not aw.qmc.swaplcds:
+            self.setTare(1)
+        else:
+            self.setTare(0)
 
     @pyqtSlot('QPoint')
     def setTare_slot(self,_):
@@ -24437,20 +24600,15 @@ class ApplicationWindow(QMainWindow):
                                 except Exception as e: # pylint: disable=broad-except
                                     _log.exception(e)
 
-                            ##  santoker(<target>,<value> : the hex string or integer <target> indicates where <value> of type integer should be written to
+                            ##  santoker(<target>,<value> : the hex string indicates where <value> of type integer should be written to
                             elif cs_a[0] == 'santoker' and cs_len == 3:
                                 if aw.santoker is not None:
                                     try:
                                         v = int(round(float(eval(cs_a[2]))))  # pylint: disable=eval-used
-                                        try:
-                                            # interpret target as integer
-                                            b = int(cs_a[1])
-                                            aw.santokerSendMessageSignal.emit(b.to_bytes(1, 'big'), v)
-                                        except Exception: # pylint: disable=broad-except
-                                            # interpret target as hex string
-                                            b = bytes.fromhex(cs_a[1])
-                                            if len(b)>0:
-                                                aw.santokerSendMessageSignal.emit(b[0:1], v)
+                                        # interpret target as hex string
+                                        b = bytes.fromhex(cs_a[1])
+                                        if len(b)>0:
+                                            aw.santokerSendMessageSignal.emit(b[0:1], v)
                                     except Exception: # pylint: disable=broad-except
                                         _log.exception(e)
 
@@ -24954,7 +25112,7 @@ class ApplicationWindow(QMainWindow):
                                 try:
                                     cmds = eval(cs[len('tare'):]) # pylint: disable=eval-used
                                     if isinstance(cmds,int):
-                                        self.setTareSignal.emit()
+                                        self.setTareSignal.emit(cmds-1)
                                         self.sendmessage(f'Artisan Command: {cs}')
                                 except Exception as e: # pylint: disable=broad-except
                                     _log.exception(e)
@@ -26706,14 +26864,14 @@ class ApplicationWindow(QMainWindow):
                             aw.showControls()
                         self.releaseminieditor()
                 elif k == 16777234:               #MOVES CURRENT BUTTON LEFT
-                    if self.keyboardmoveflag:
+                    if self.keyboardmoveflag and self.qmc.flagstart:
                         self.moveKbutton('left')
                     elif aw.qmc.background and aw.qmc.backgroundKeyboardControlFlag:
                         aw.qmc.movebackground('left',aw.qmc.backgroundmovespeed)
                         self.qmc.backmoveflag = 0 # do not align background automatically during redraw!
                         aw.qmc.redraw(recomputeAllDeltas=True,sampling=aw.qmc.flagon)
                 elif k == 16777236:               #MOVES CURRENT BUTTON RIGHT
-                    if self.keyboardmoveflag:
+                    if self.keyboardmoveflag and self.qmc.flagstart:
                         self.moveKbutton('right')
                     elif aw.qmc.background and aw.qmc.backgroundKeyboardControlFlag:
                         aw.qmc.movebackground('right',aw.qmc.backgroundmovespeed)
@@ -31019,9 +31177,9 @@ class ApplicationWindow(QMainWindow):
             if not filename:
                 path = QDir()
                 path.setPath(self.getDefaultPath())
-                if aw.qmc.batchcounter > -1 and aw.qmc.roastbatchnr > 0:
+                if aw.qmc.batchcounter > -1 and aw.qmc.roastbatchnr > 0 and self.qmc.autosaveprefix == '':
                     prefix = aw.qmc.batchprefix + str(aw.qmc.roastbatchnr)
-                elif aw.qmc.roastbatchprefix != '':
+                elif aw.qmc.roastbatchprefix != '' and self.qmc.autosaveprefix == '':
                     prefix = aw.qmc.roastbatchprefix
                 else:
                     prefix = self.qmc.autosaveprefix
@@ -32891,18 +33049,32 @@ class ApplicationWindow(QMainWindow):
             #restore quantifier
             settings.beginGroup('Quantifiers')
             if settings.contains('quantifieractive'):
-                self.eventquantifieractive = [toInt(x) for x in toList(settings.value('quantifieractive',self.eventquantifieractive))]
-                self.eventquantifiersource = [toInt(x) for x in toList(settings.value('quantifiersource',self.eventquantifiersource))]
-                self.eventquantifiermin = [toInt(x) for x in toList(settings.value('quantifiermin',self.eventquantifiermin))]
-                self.eventquantifiermax = [toInt(x) for x in toList(settings.value('quantifiermax',self.eventquantifiermax))]
+                activequantifiers = [toInt(x) for x in toList(settings.value('quantifieractive',self.eventquantifieractive))]
+                if len(activequantifiers) == 4:
+                    self.eventquantifieractive = activequantifiers
+                quantifiersource = [toInt(x) for x in toList(settings.value('quantifiersource',self.eventquantifiersource))]
+                if len(quantifiersource) == 4:
+                    self.eventquantifiersource = quantifiersource
+                quantifiersmin =[toInt(x) for x in toList(settings.value('quantifiermin',self.eventquantifiermin))]
+                if len(quantifiersmin) == 4:
+                    self.eventquantifiermin = quantifiersmin
+                quantifiersmax =[toInt(x) for x in toList(settings.value('quantifiermax',self.eventquantifiermax))]
+                if len(quantifiersmax) == 4:
+                    self.eventquantifiermax = quantifiersmax
                 if settings.contains('quantifiercoarse'):
-                    self.eventquantifiercoarse = [toInt(x) for x in toList(settings.value('quantifiercoarse',self.eventquantifiercoarse))]
+                    eventquantifiercoarse = [toInt(x) for x in toList(settings.value('quantifiercoarse',self.eventquantifiercoarse))]
+                    if len(eventquantifiercoarse) == 4:
+                        self.eventquantifiercoarse = eventquantifiercoarse
                     if settings.contains('clusterEventsFlag'):
                         self.clusterEventsFlag = bool(toBool(settings.value('clusterEventsFlag',aw.clusterEventsFlag)))
                 if settings.contains('eventquantifieraction'):
-                    self.eventquantifieraction = [toInt(x) for x in toList(settings.value('eventquantifieraction',self.eventquantifieraction))]
+                    eventquantifieraction = [toInt(x) for x in toList(settings.value('eventquantifieraction',self.eventquantifieraction))]
+                    if len(eventquantifieraction) == 4:
+                        self.eventquantifieraction = eventquantifieraction
                 if settings.contains('eventquantifierSV'):
-                    self.eventquantifierSV = [toInt(x) for x in toList(settings.value('eventquantifierSV',self.eventquantifierSV))]
+                    eventquantifierSV = [toInt(x) for x in toList(settings.value('eventquantifierSV',self.eventquantifierSV))]
+                    if len(eventquantifierSV) == 4:
+                        self.eventquantifierSV = eventquantifierSV
             settings.endGroup()
             settings.beginGroup('Batch')
             if settings.contains('batchcounter'):
@@ -34532,6 +34704,7 @@ class ApplicationWindow(QMainWindow):
         try:
             unsaved_changes = bool(self.qmc.safesaveflag == True)
             if self.qmc.checkSaved(): # if not canceled
+                _log.info('QUIT')
                 flagKeepON = aw.qmc.flagKeepON
                 self.qmc.flagKeepON = False # temporarily turn keepOn off
                 self.stopActivities()
@@ -37482,7 +37655,7 @@ class ApplicationWindow(QMainWindow):
     @pyqtSlot()
     @pyqtSlot(bool)
     def helpAbout(self,_=False):
-        coredevelopers = '<br>Rafael Cobo, Marko Luther, &amp; Dave Baxter'
+        coredevelopers = '<br>Rafael Cobo, Marko Luther &amp; Dave Baxter'
         contribs = ['<br>' + uchr(199) + 'etin Barut, Marcio Carnerio, Bradley Collins, ',
                     'Sebastien Delgrande, Kalle Deligeorgakis, Jim Gall, ',
                     'Frans Goddijn, Rich Helms, Kyle Iseminger, Ingo, ',
@@ -37668,11 +37841,26 @@ class ApplicationWindow(QMainWindow):
             self.modbus.PID_ON_action = s2a(toString(dialog.modbus_pid_on.text()))
 
             for i in range(aw.modbus.channels):
-                self.modbus.inputSlaves[i] = int(str(dialog.modbus_inputSlaveEdits[i].text()))
-                self.modbus.inputRegisters[i] = int(str(dialog.modbus_inputRegisterEdits[i].text()))
-                self.modbus.inputCodes[i] = int(str(dialog.modbus_inputCodes[i].currentText()))
-                self.modbus.inputDivs[i] = dialog.modbus_inputDivs[i].currentIndex()
-                self.modbus.inputModes[i] = str(dialog.modbus_inputModes[i].currentText())
+                try:
+                    self.modbus.inputSlaves[i] = int(str(dialog.modbus_inputSlaveEdits[i].text()))
+                except Exception: # pylint: disable=broad-except
+                    self.modbus.inputSlaves[i] = 0
+                try:
+                    self.modbus.inputRegisters[i] = int(str(dialog.modbus_inputRegisterEdits[i].text()))
+                except Exception: # pylint: disable=broad-except
+                    self.modbus.inputRegisters[i] = 0
+                try:
+                    self.modbus.inputCodes[i] = int(str(dialog.modbus_inputCodes[i].currentText()))
+                except Exception: # pylint: disable=broad-except
+                    self.modbus.inputCodes[i] = 3
+                try:
+                    self.modbus.inputDivs[i] = dialog.modbus_inputDivs[i].currentIndex()
+                except Exception: # pylint: disable=broad-except
+                    self.modbus.inputDivs[i] = 0
+                try:
+                    self.modbus.inputModes[i] = str(dialog.modbus_inputModes[i].currentText())
+                except Exception: # pylint: disable=broad-except
+                    self.modbus.inputModes[i] = 'C'
                 if dialog.modbus_inputDecodes[i].currentIndex() == 4:
                     self.modbus.inputBCDsAsInt[i] = True
                     self.modbus.inputFloatsAsInt[i] = False
@@ -38464,11 +38652,11 @@ class ApplicationWindow(QMainWindow):
             self.startdesigner()
 
     def startdesigner(self):
-        self.qmc.designer()
         self.hideLCDs(False)
         self.hideSliders(False)
         self.hide_minieventline(False)
         self.hideExtraButtons()
+        self.qmc.designer()
 
     def stopdesigner(self):
         aw.enableEditMenus()

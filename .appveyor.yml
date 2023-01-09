@@ -12,7 +12,7 @@ environment:
   - job_name: windows_legacy
     appveyor_build_worker_image: Visual Studio 2019
   - job_name: windows
-    appveyor_build_worker_image: Visual Studio 2019
+    appveyor_build_worker_image: Visual Studio 2022
   - job_name: macos
     appveyor_build_worker_image: macos
   - job_name: linux
@@ -98,9 +98,9 @@ for:
     fast_finish: false
 
   environment:
-    QT_PATH: "C:\\qt\\6.2\\msvc2019_64"
+    QT_PATH: "C:\\qt\\6.4\\msvc2022_64"
     PYUIC: "pyuic6.exe"
-    BUILD_PYINSTALLER: "False"
+    BUILD_PYINSTALLER: "True"
     ARTISAN_LEGACY: "False"
     VC_REDIST: "https://aka.ms/vs/17/release/vc_redist.x64.exe"  #redistributable for VS 2015-2022
 

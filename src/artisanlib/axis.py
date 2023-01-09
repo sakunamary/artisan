@@ -80,7 +80,7 @@ class WindowsDlg(ArtisanDialog):
         step100Label = QLabel(QApplication.translate('Label', '100% Event Step'))
         self.step100Edit = QLineEdit()
         self.step100Edit.setMaximumWidth(55)
-        self.step100Edit.setValidator(QIntValidator(self.aw.qmc.ylimit_min_max, 999999, self.step100Edit))
+        self.step100Edit.setValidator(QIntValidator(int(self.aw.qmc.ylimit_min_max), 999999, self.step100Edit))
         self.step100Edit.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.step100Edit.setToolTip(QApplication.translate('Tooltip', '100% event values in step mode are aligned with the given y-axis value or the lowest phases limit if left empty'))
         self.step100Edit.editingFinished.connect(self.step100Changed)
@@ -99,16 +99,16 @@ class WindowsDlg(ArtisanDialog):
         self.ylimitEdit.setMaximumWidth(60)
         self.ylimitEdit_min = QLineEdit()
         self.ylimitEdit_min.setMaximumWidth(60)
-        self.ylimitEdit.setValidator(QIntValidator(self.aw.qmc.ylimit_min_max, self.aw.qmc.ylimit_max, self.ylimitEdit))
-        self.ylimitEdit_min.setValidator(QIntValidator(self.aw.qmc.ylimit_min_max, self.aw.qmc.ylimit_max, self.ylimitEdit_min))
+        self.ylimitEdit.setValidator(QIntValidator(int(self.aw.qmc.ylimit_min_max), int(self.aw.qmc.ylimit_max), self.ylimitEdit))
+        self.ylimitEdit_min.setValidator(QIntValidator(int(self.aw.qmc.ylimit_min_max), int(self.aw.qmc.ylimit_max), self.ylimitEdit_min))
         self.ylimitEdit.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
         self.ylimitEdit_min.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
         self.zlimitEdit = QLineEdit()
         self.zlimitEdit.setMaximumWidth(60)
         self.zlimitEdit_min = QLineEdit()
         self.zlimitEdit_min.setMaximumWidth(60)
-        self.zlimitEdit.setValidator(QIntValidator(self.aw.qmc.zlimit_min_max, self.aw.qmc.zlimit_max, self.zlimitEdit))
-        self.zlimitEdit_min.setValidator(QIntValidator(self.aw.qmc.zlimit_min_max, self.aw.qmc.zlimit_max, self.zlimitEdit_min))
+        self.zlimitEdit.setValidator(QIntValidator(int(self.aw.qmc.zlimit_min_max), int(self.aw.qmc.zlimit_max), self.zlimitEdit))
+        self.zlimitEdit_min.setValidator(QIntValidator(int(self.aw.qmc.zlimit_min_max), int(self.aw.qmc.zlimit_max), self.zlimitEdit_min))
         self.zlimitEdit.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
         self.zlimitEdit_min.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
         self.xlimitEdit.setText(stringfromseconds(self.aw.qmc.endofx))
@@ -561,19 +561,21 @@ class WindowsDlg(ArtisanDialog):
     @pyqtSlot()
     def zlimitChanged(self):
         try:
-            self.aw.qmc.autodeltaxET = False
-            self.aw.qmc.autodeltaxBT = False
-            self.autodeltaxETFlag.blockSignals(True)
-            self.autodeltaxBTFlag.blockSignals(True)
-            self.autodeltaxETFlag.setChecked(self.aw.qmc.autodeltaxET)
-            self.autodeltaxBTFlag.setChecked(self.aw.qmc.autodeltaxBT)
-            self.autodeltaxETFlag.blockSignals(False)
-            self.autodeltaxBTFlag.blockSignals(False)
-            self.aw.qmc.zlimit = int(self.zlimitEdit.text().strip())
-            if bool(self.aw.comparator):
-                self.aw.comparator.redraw()
-            else:
-                self.aw.qmc.redraw(recomputeAllDeltas=False)
+            new_value = int(self.zlimitEdit.text().strip())
+            if self.aw.qmc.zlimit != new_value:
+                self.aw.qmc.autodeltaxET = False
+                self.aw.qmc.autodeltaxBT = False
+                self.autodeltaxETFlag.blockSignals(True)
+                self.autodeltaxBTFlag.blockSignals(True)
+                self.autodeltaxETFlag.setChecked(self.aw.qmc.autodeltaxET)
+                self.autodeltaxBTFlag.setChecked(self.aw.qmc.autodeltaxBT)
+                self.autodeltaxETFlag.blockSignals(False)
+                self.autodeltaxBTFlag.blockSignals(False)
+                self.aw.qmc.zlimit = new_value
+                if bool(self.aw.comparator):
+                    self.aw.comparator.redraw()
+                else:
+                    self.aw.qmc.redraw(recomputeAllDeltas=False)
         except Exception: # pylint: disable=broad-except
             self.zlimitEdit.setText(str(self.aw.qmc.zlimit))
 
