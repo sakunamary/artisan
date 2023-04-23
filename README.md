@@ -4,16 +4,19 @@
 ==========
 Visual scope for coffee roasters
 
-[![Windows/Mac/Linux build](https://img.shields.io/appveyor/ci/roasterdave/artisan.svg?label=Windows/Mac/Linux%20builds)](https://ci.appveyor.com/project/roasterdave/artisan)
 [![Latest release](https://img.shields.io/github/release/artisan-roaster-scope/artisan.svg)](https://github.com/artisan-roaster-scope/artisan/releases/latest)
 [![Pre-release](https://img.shields.io/github/release-pre/artisan-roaster-scope/artisan.svg)](https://github.com/artisan-roaster-scope/artisan/releases/continuous)
 ![Github Latest Releases](https://img.shields.io/github/downloads/artisan-roaster-scope/artisan/latest/total)
 ![License](https://img.shields.io/github/license/artisan-roaster-scope/artisan.svg)
+[![Windows/Mac/Linux build](https://img.shields.io/appveyor/ci/roasterdave/artisan.svg?label=Windows/Mac/Linux%20builds)](https://ci.appveyor.com/project/roasterdave/artisan)
 [![pylint](https://github.com/artisan-roaster-scope/artisan/actions/workflows/pylint.yaml/badge.svg?branch=master&event=push)](https://github.com/artisan-roaster-scope/artisan/actions?query=workflow:pylint+event:push+branch:master)
+[![Mypy](https://github.com/artisan-roaster-scope/artisan/actions/workflows/mypy.yml/badge.svg?branch=master)](https://github.com/artisan-roaster-scope/artisan/actions/workflows/mypy.yml)
+[![Ruff](https://github.com/artisan-roaster-scope/artisan/actions/workflows/ruff.yaml/badge.svg?branch=master)](https://github.com/artisan-roaster-scope/artisan/actions/workflows/ruff.yaml)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 
 
 *WARNING: pre-release builds may not work.  Use at your own risk.*
+
 
 Summary
 -------
@@ -42,6 +45,8 @@ If you think Artisan is useful to you, contribute financially to its further dev
 PLEASE FOLLOW AND TAG US!
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="https://www.facebook.com/ArtisanScope"><img src="https://github.com/artisan-roaster-scope/artisan/blob/master/wiki/screenshots/facebook-square.svg?raw=true" width="30"></a>&nbsp;&nbsp;&nbsp;<a href="https://www.instagram.com/artisanscope/"><img src="https://github.com/artisan-roaster-scope/artisan/blob/master/wiki/screenshots/instagram-square.svg?raw=true" width="30"></a>&nbsp;&nbsp;&nbsp;<a href="https://www.youtube.com/channel/UCEp-DH_Y7sBR3-X3FWomgog"><img src="https://github.com/artisan-roaster-scope/artisan/blob/master/wiki/screenshots/youtube-svgrepo-com.svg?raw=true" width="30"></a>&nbsp;&nbsp;&nbsp;<a href="https://masto.ai/@artisan"><img src="https://github.com/artisan-roaster-scope/artisan/blob/master/wiki/screenshots/mastodon-icon-svgrepo-com.svg?raw=true" width="30"></a>&nbsp;&nbsp;&nbsp;<a href="https://www.linkedin.com/company/artisan-plus"><img src="https://github.com/artisan-roaster-scope/artisan/blob/master/wiki/screenshots/linkedin-svgrepo-com.svg?raw=true" width="30"></a>
 
+
+[![Star History Chart](https://api.star-history.com/svg?repos=artisan-roaster-scope/artisan&type=Date)](https://star-history.com/#artisan-roaster-scope/artisan&Date)
 
 <a id="version_history"></a>
 Version History

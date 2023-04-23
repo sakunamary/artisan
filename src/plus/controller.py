@@ -1,7 +1,7 @@
 #
 # controller.py
 #
-# Copyright (c) 2018, Paul Holleis, Marko Luther
+# Copyright (c) 2023, Paul Holleis, Marko Luther
 # All rights reserved.
 #
 #
@@ -22,26 +22,30 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 try:
-    #ylint: disable = E, W, R, C
+    #pylint: disable = E, W, R, C
+    from PyQt6.QtGui import QPixmap # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtCore import QSemaphore, QTimer, Qt # @UnusedImport @Reimport  @UnresolvedImport
-    from PyQt6.QtWidgets import QApplication, QMessageBox # @UnusedImport @Reimport  @UnresolvedImport
+    from PyQt6.QtWidgets import QWidget,QApplication, QMessageBox # @UnusedImport @Reimport  @UnresolvedImport
 except Exception: # pylint: disable=broad-except
-    #ylint: disable = E, W, R, C
-    from PyQt5.QtCore import QSemaphore, QTimer, Qt # @UnusedImport @Reimport  @UnresolvedImport
-    from PyQt5.QtWidgets import QApplication, QMessageBox # @UnusedImport @Reimport  @UnresolvedImport
+    #pylint: disable = E, W, R, C
+    from PyQt5.QtGui import QPixmap # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
+    from PyQt5.QtCore import QSemaphore, QTimer, Qt # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
+    from PyQt5.QtWidgets import QWidget, QApplication, QMessageBox # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
 
+
+import os
 import platform
 import threading
 import logging
-from typing import Final
+from typing import Optional
+from typing_extensions import Final  # Python <=3.7
 
-
-
+from artisanlib.util import getResourcePath
 from plus import config, connection, stock, queue, sync, roast
 
 
 
-_log: Final = logging.getLogger(__name__)
+_log: Final[logging.Logger] = logging.getLogger(__name__)
 
 connect_semaphore = QSemaphore(1)
 
@@ -63,10 +67,12 @@ def is_on() -> bool:
 # no profile is loaded currently
 def is_synced():
     aw = config.app_window
-    if aw.qmc.roastUUID is None:
-        return not bool(aw.curFile)
-    res = sync.getSync(aw.qmc.roastUUID)
-    return bool(res)
+    if aw is not None:
+        if aw.qmc.roastUUID is None:
+            return not bool(aw.curFile)
+        res = sync.getSync(aw.qmc.roastUUID)
+        return bool(res)
+    return False
 
 
 def start(app_window):
@@ -79,7 +85,7 @@ def start(app_window):
 def toggle(app_window):
     _log.debug('toggle()')
     config.app_window = app_window
-    if config.app_window.plus_account is None:  # @UndefinedVariable
+    if config.app_window is not None and config.app_window.plus_account is None:  # @UndefinedVariable
         connect()
         if (
             is_connected()
@@ -87,28 +93,26 @@ def toggle(app_window):
             and config.app_window.curFile is not None
         ):  # @UndefinedVariable
             sync.sync()
-    else:
-        if config.connected:
-            if is_synced():
-                # a CTR-click (COMMAND on macOS) logs out and
-                # discards the credentials
-                modifiers = QApplication.keyboardModifiers()
-                disconnect(
-                    interactive=True,
-                    remove_credentials=(modifiers == Qt.KeyboardModifier.ControlModifier),
-                    keepON=False,
-                )
-            else:
-                # we (manually) turn syncing for the current roast on
-                if app_window.qmc.checkSaved(allow_discard=False):
-                    queue.addRoast()
-        else:
+    elif config.connected:
+        if is_synced():
+            # a CTR-click (COMMAND on macOS) logs out and
+            # discards the credentials
+            modifiers = QApplication.keyboardModifiers()
             disconnect(
-                remove_credentials=False,
-                stop_queue=True,
                 interactive=True,
+                remove_credentials=(modifiers == Qt.KeyboardModifier.ControlModifier),
                 keepON=False,
             )
+        elif app_window.qmc.checkSaved(allow_discard=False):
+            # we (manually) turn syncing for the current roast on
+            queue.addRoast()
+    else:
+        disconnect(
+            remove_credentials=False,
+            stop_queue=True,
+            interactive=True,
+            keepON=False,
+        )
 
 
 # if clear_on_failure is set, credentials are removed if connect fails
@@ -136,7 +140,7 @@ def connect(clear_on_failure: bool =False, interactive: bool = True) -> None:
                     account = config.app_window.plus_email
                     if isinstance(
                         # pylint: disable=protected-access
-                        threading.current_thread(), threading._MainThread
+                        threading.current_thread(), threading._MainThread # type: ignore
                     ):  # this is dangerous and should only be done while
                         # running in the main GUI thread as a consequence are
                         # GUI actions which might crash in other threads
@@ -166,6 +170,7 @@ def connect(clear_on_failure: bool =False, interactive: bool = True) -> None:
                     import plus.login
 
                     login, passwd, remember, res = plus.login.plus_login(
+                        config.app_window,
                         config.app_window,
                         config.app_window.plus_email,
                         config.passwd,
@@ -211,40 +216,40 @@ def connect(clear_on_failure: bool =False, interactive: bool = True) -> None:
                                     )  # @UndefinedVariable
                         # remember password in memory for this session
                         config.passwd = passwd
-            if config.app_window.plus_account is None:  # @UndefinedVariable
-                if interactive:
-                    config.app_window.sendmessageSignal.emit(
-                        QApplication.translate('Plus', 'Login aborted'),
-                        True,
-                        None,
-                    )  # @UndefinedVariable
-            else:
-                success = connection.authentify()
-                if success:
-                    config.connected = success
-                    config.app_window.sendmessageSignal.emit(
-                        f'{config.app_window.plus_account} {QApplication.translate("Plus", "authentified")}',
-                        True,
-                        None,
-                    )  # @UndefinedVariable
-                    config.app_window.sendmessageSignal.emit(
-                        QApplication.translate(
-                            'Plus', 'Connected to artisan.plus'
-                        ),
-                        True,
-                        None,
-                    )  # @UndefinedVariable
-                    _log.info('artisan.plus connected')
-                    try:
-                        queue.start()  # start the outbox queue
-                    except Exception as e:  # pylint: disable=broad-except
-                        _log.exception(e)
-                    try:
-                        config.app_window.resetDonateCounter()
-                    except Exception as e:  # pylint: disable=broad-except
-                        _log.exception(e)
+            if config.app_window is not None:
+                if config.app_window.plus_account is None:  # @UndefinedVariable
+                    if interactive:
+                        config.app_window.sendmessageSignal.emit(
+                            QApplication.translate('Plus', 'Login aborted'),
+                            True,
+                            None,
+                        )  # @UndefinedVariable
                 else:
-                    if clear_on_failure:
+                    success = connection.authentify()
+                    if success:
+                        config.connected = success
+                        config.app_window.sendmessageSignal.emit(
+                            f'{config.app_window.plus_account} {QApplication.translate("Plus", "authentified")}',
+                            True,
+                            None,
+                        )  # @UndefinedVariable
+                        config.app_window.sendmessageSignal.emit(
+                            QApplication.translate(
+                                'Plus', 'Connected to artisan.plus'
+                            ),
+                            True,
+                            None,
+                        )  # @UndefinedVariable
+                        _log.info('artisan.plus connected')
+                        try:
+                            queue.start()  # start the outbox queue
+                        except Exception as e:  # pylint: disable=broad-except
+                            _log.exception(e)
+                        try:
+                            config.app_window.resetDonateCounter()
+                        except Exception as e:  # pylint: disable=broad-except
+                            _log.exception(e)
+                    elif clear_on_failure:
                         connection.clearCredentials()
                         config.app_window.sendmessageSignal.emit(
                             QApplication.translate(
@@ -271,7 +276,7 @@ def connect(clear_on_failure: bool =False, interactive: bool = True) -> None:
                 _log.debug(e)
             if clear_on_failure:
                 connection.clearCredentials()
-                if interactive:
+                if interactive and config.app_window is not None:
                     config.app_window.sendmessageSignal.emit(
                         QApplication.translate(
                             'Plus', 'artisan.plus turned off'
@@ -279,7 +284,7 @@ def connect(clear_on_failure: bool =False, interactive: bool = True) -> None:
                         True,
                         None,
                     )
-            else:
+            elif config.app_window is not None:
                 if interactive:
                     config.app_window.sendmessageSignal.emit(
                         QApplication.translate(
@@ -299,7 +304,8 @@ def connect(clear_on_failure: bool =False, interactive: bool = True) -> None:
         finally:
             if connect_semaphore.available() < 1:
                 connect_semaphore.release(1)
-        config.app_window.updatePlusStatusSignal.emit()  # @UndefinedVariable
+        if config.app_window is not None:
+            config.app_window.updatePlusStatusSignal.emit()  # @UndefinedVariable
         if interactive and is_connected():
             QTimer.singleShot(2500, stock.update)
 
@@ -308,13 +314,22 @@ def connect(clear_on_failure: bool =False, interactive: bool = True) -> None:
 def disconnect_confirmed() -> bool:
     string = QApplication.translate('Plus', 'Disconnect artisan.plus?')
     aw = config.app_window
-    reply = QMessageBox.question(
-        aw,
-        QApplication.translate('Plus', 'Disconnect?'),
-        string,
-        QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
-    )
-    return bool(reply == QMessageBox.StandardButton.Ok)
+    assert isinstance(aw, QWidget)
+#    reply = QMessageBox.question(
+#        aw,
+#        QApplication.translate('Plus', 'Disconnect?'),
+#        string,
+#        QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+#    )
+#    return QMessageBox.StandardButton.Ok == reply
+    mbox = QMessageBox(aw)
+    mbox.setText(string)
+    basedir = os.path.join(getResourcePath(),'Icons')
+    p = os.path.join(basedir, 'plus-notification.svg')
+    mbox.setIconPixmap(QPixmap(p))
+    mbox.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+    res = mbox.exec()
+    return QMessageBox.StandardButton.Yes == res
 
 
 # if keepON is set (the default), the credentials are not removed at all and
@@ -344,29 +359,31 @@ def disconnect(
                 connection.clearCredentials(
                     remove_from_keychain=remove_credentials
                 )
-            if remove_credentials:
-                config.app_window.sendmessageSignal.emit(
-                    QApplication.translate(
-                        'Plus', 'artisan.plus turned off'
-                    ),
-                    True,
-                    None,
-                )
-            else:
-                config.app_window.sendmessageSignal.emit(
-                    QApplication.translate(
-                        'Plus', 'artisan.plus disconnected'
-                    ),
-                    True,
-                    None,
-                )
+            if config.app_window is not None:
+                if remove_credentials:
+                    config.app_window.sendmessageSignal.emit(
+                        QApplication.translate(
+                            'Plus', 'artisan.plus turned off'
+                        ),
+                        True,
+                        None,
+                    )
+                else:
+                    config.app_window.sendmessageSignal.emit(
+                        QApplication.translate(
+                            'Plus', 'artisan.plus disconnected'
+                        ),
+                        True,
+                        None,
+                    )
             if stop_queue:
                 queue.stop()  # stop the outbox queue
             _log.info('artisan.plus disconnected')
         finally:
             if connect_semaphore.available() < 1:
                 connect_semaphore.release(1)
-        config.app_window.updatePlusStatusSignal.emit()  # @UndefinedVariable
+        if config.app_window is not None:
+            config.app_window.updatePlusStatusSignal.emit()  # @UndefinedVariable
 
 
 def reconnected() -> None:
@@ -378,6 +395,7 @@ def reconnected() -> None:
         finally:
             if connect_semaphore.available() < 1:
                 connect_semaphore.release(1)
+        assert config.app_window is not None
         config.app_window.updatePlusStatusSignal.emit()  # @UndefinedVariable
         if is_connected():
             queue.start()  # restart the outbox queue
@@ -388,7 +406,7 @@ def reconnected() -> None:
 # otherwise return None
 # this function is called by filesave() and returns the sync_record hash
 # to be added to the saved file
-def updateSyncRecordHashAndSync() -> None:
+def updateSyncRecordHashAndSync() -> Optional[str]:
     try:
         _log.debug('updateSyncRecordHashAndSync()')
         if is_on():

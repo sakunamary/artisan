@@ -13,23 +13,23 @@
 # the GNU General Public License for more details.
 
 # AUTHOR
-# Marko Luther, 2018
+# Marko Luther, 2023
 
-from bottle import default_app, request, abort, route, template, static_file, get, TEMPLATE_PATH
-from gevent import Timeout, kill
+from bottle import default_app, request, abort, route, template, static_file, get, TEMPLATE_PATH # type: ignore
+from gevent import Timeout, kill # type: ignore
 
 # what is the exact difference between the next too?
 #from gevent import signal as gsignal # works only up to gevent v1.4.0
 #from gevent.signal import signal as gsignal # works on gevent v1.4.0 and newer
-from gevent import signal_handler as gsignal # works on gevent v1.4.0 and newer
+from gevent import signal_handler as gsignal # type: ignore # works on gevent v1.4.0 and newer
 
-from gevent.pywsgi import WSGIServer
+from gevent.pywsgi import WSGIServer # type: ignore
 #from geventwebsocket import WebSocketError
-from geventwebsocket.handler import WebSocketHandler
+from geventwebsocket.handler import WebSocketHandler # type: ignore
 from platform import system as psystem
 
 if psystem() != 'Windows':
-    from signal import SIGQUIT
+    from signal import SIGQUIT # type: ignore[attr-defined] # pylint: disable=no-name-in-module # not available on Windows
 
 import multiprocessing as mp
 
@@ -37,9 +37,10 @@ from json import dumps as jdumps
 from requests import get as rget
 
 import time as libtime
+from typing import Any, List
 
 
-wsocks = [] # list of open web sockets
+wsocks: List[Any] = [] # list of open web sockets
 process = None
 port = None
 nonesymbol = '--'
@@ -98,7 +99,7 @@ def startWeb(p,resourcePath,nonesym,timec,timebg,btc,btbg,etc,etbg,showetflag,sh
         etc,
         etbg,
         showetflag,
-        showbtflag,))
+        showbtflag))
     process.start()
 
     libtime.sleep(4)
@@ -184,18 +185,9 @@ def status():
 # route to serve the static page
 @route('/artisan')
 def index():
-    if not (showbt and showet):
-        showspace_str = 'inline'
-    else:
-        showspace_str = 'none'
-    if showbt:
-        showbt_str = 'inline'
-    else:
-        showbt_str = 'none'
-    if showet:
-        showet_str = 'inline'
-    else:
-        showet_str = 'none'
+    showspace_str = 'inline' if not (showbt and showet) else 'none'
+    showbt_str = 'inline' if showbt else 'none'
+    showet_str = 'inline' if showet else 'none'
     return template('artisan.tpl',
         port=str(port),
         nonesymbol=nonesymbol,

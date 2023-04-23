@@ -13,7 +13,7 @@
 # the GNU General Public License for more details.
 
 # AUTHOR
-# Marko Luther, 2020
+# Marko Luther, 2023
 
 
 ###################################################################################
@@ -29,31 +29,32 @@
 import time as libtime
 import numpy
 import logging
-from typing import Final
+from typing import Union, List, Dict, Optional
+from typing_extensions import Final  # Python <=3.7
 
 from artisanlib.util import decs2string, fromCtoF, fromFtoC, hex2int, str2cmd, stringfromseconds, cmd2str
 
 try:
-    #ylint: disable = E, W, R, C
+    #pylint: disable = E, W, R, C
     from PyQt6.QtCore import pyqtSlot # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtWidgets import QApplication # @UnusedImport @Reimport  @UnresolvedImport
 except Exception: # pylint: disable=broad-except
-    #ylint: disable = E, W, R, C
-    from PyQt5.QtCore import pyqtSlot # @UnusedImport @Reimport  @UnresolvedImport
-    from PyQt5.QtWidgets import QApplication # @UnusedImport @Reimport  @UnresolvedImport
+    #pylint: disable = E, W, R, C
+    from PyQt5.QtCore import pyqtSlot # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
+    from PyQt5.QtWidgets import QApplication # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
 
 
-_log: Final = logging.getLogger(__name__)
+_log: Final[logging.Logger] = logging.getLogger(__name__)
 
 class FujiPID():
-    def __init__(self,aw):
+    def __init__(self,aw) -> None:
         self.aw = aw
 
         # follow background: if True, Artisan sends SV values taken from the current background profile if any
         self.followBackground = False
         self.lookahead = 0 # the lookahead in seconds
         self.rampsoak = False # True if RS is active
-        self.sv = None # the last sv send to the Fuji PID
+        self.sv:Optional[float] = None # the last sv send to the Fuji PID
 
         ## FUJI PXG input types
         ##0 (JPT 100'3f)
@@ -157,7 +158,7 @@ class FujiPID():
 
         #refer to Fuji PID instruction manual for more information about the parameters and channels
         #dictionary "KEY": [VALUE,MEMORY_ADDRESS]
-        self.PXG4={
+        self.PXG4:Dict[str, List[Union[float, int]]] = {
                   ############ CH1  Selects controller modes
                   # manual mode 0 = OFF(auto), 1 = ON(manual)
                   'manual': [0,41121],
@@ -237,7 +238,7 @@ class FujiPID():
                   }
 
         # "KEY": [VALUE,MEMORY_ADDRESS]
-        self.PXR = {'autotuning':[0,41005],
+        self.PXR:Dict[str, List[Union[float, int]]] = {'autotuning':[0,41005],
                     'segment1sv':[100.0,41057],'segment1ramp':[3,41065],'segment1soak':[0,41066], #PXR uses only HH:MM time format but stored as minutes in artisan
                     'segment2sv':[100.0,41058],'segment2ramp':[3,41067],'segment2soak':[0,41068],
                     'segment3sv':[100.0,41059],'segment3ramp':[3,41069],'segment3soak':[0,41070],
@@ -274,9 +275,9 @@ class FujiPID():
                     'segment?':[0,31009],
                     'mv1':[0,31004]   #duty cycle rx -300 to 10300  = -3.00% to 103.00%
                     }
-        self.PXF=dict(self.PXG4)
+        self.PXF:Dict[str, List[Union[float, int]]] = dict(self.PXG4)
         # initialize the PXF register numbers from the PXG and an offset of 1000
-        for k in self.PXF.keys():
+        for k in self.PXF: # pylint: disable=consider-iterating-dictionary,consider-using-dict-items
             if len(self.PXF[k]) > 1:
                 self.PXF[k] = [self.PXF[k][0],self.PXF[k][1]+1000]
             else:
@@ -373,13 +374,15 @@ class FujiPID():
                 self.aw.qmc.adderror(message)
 
     # updates and returns the current ramp soak mode
-    def getCurrentRampSoakMode(self):
+    def getCurrentRampSoakMode(self) -> Optional[int]:
         if self.aw.ser.controlETpid[0] == 0: # PXG
             register = self.aw.fujipid.PXG4['rampsoakmode'][1]
         elif self.aw.ser.controlETpid[0] == 1: # PXR
             register = self.aw.fujipid.PXR['rampsoakmode'][1]
         elif self.aw.ser.controlETpid[0] == 4: # PXF
             register = self.aw.fujipid.PXF['rampsoakmode'][1]
+        else:
+            return None
         if self.aw.ser.useModbusPort:
             reg = self.aw.modbus.address2register(register,3)
             currentmode = self.aw.modbus.readSingleRegister(self.aw.ser.controlETpid[1],reg,3)
@@ -528,6 +531,7 @@ class FujiPID():
 
     # returns Fuji duty signal in the range 0-100 or -1
     def readdutycycle(self):
+        v = None
         if self.aw.ser.useModbusPort:
             reg = None
             #if control pid is fuji PXG4
@@ -542,7 +546,7 @@ class FujiPID():
             if reg is not None:
                 v = self.aw.modbus.readSingleRegister(self.aw.ser.controlETpid[1],reg,4)
             else:
-                val = -1
+                return -1
         else:
             command = ''
             #if control pid is fuji PXG4
@@ -557,16 +561,14 @@ class FujiPID():
             elif self.aw.ser.controlETpid[0] == 4:
                 command = self.message2send(self.aw.ser.controlETpid[1],4,self.PXF['mv1'][1],1)
                 v = self.readoneword(command)
-        if v is None:
-            val = -1
-        elif v >= 65236: # -3% to 0%
-            val = 0
-        elif v <= 10300: # <= 103%
-            val = v/100.
-        else: # value out of range (possible a communication error)
-            val = -1
-        #val range -3 to 103%. Check for possible decimal digit user settings
-        return val
+        # value out of range (possible a communication error)
+        #return val range -3 to 103%. Check for possible decimal digit user settings
+        if v is not None:
+            if v >= 65236: # -3% to 0%
+                return 0
+            if v <= 10300: # <= 103%
+                return v/100.
+        return -1
 
     def getrampsoakmode(self):
         if self.aw.ser.controlETpid[0] == 0: #Fuji PXG
@@ -575,6 +577,8 @@ class FujiPID():
             register = self.PXR['rampsoakpattern'][1]
         elif self.aw.ser.controlETpid[0] == 4: #Fuji PXF
             register = self.PXF['rampsoakpattern'][1]
+        else:
+            return 0
         if self.aw.ser.useModbusPort:
             reg = self.aw.modbus.address2register(register,3)
             currentmode = self.aw.modbus.readSingleRegister(self.aw.ser.controlETpid[1],reg,3)
@@ -597,6 +601,8 @@ class FujiPID():
             register = self.PXR['rampsoakpattern'][1]
         elif self.aw.ser.controlETpid[0] == 4: #Fuji PXF
             register = self.PXF['rampsoakpattern'][1]
+        else:
+            return 0
         if self.aw.ser.useModbusPort:
             reg = self.aw.modbus.address2register(register,3)
             self.aw.modbus.writeSingleRegister(self.aw.ser.controlETpid[1],reg,mode)
@@ -669,6 +675,10 @@ class FujiPID():
             register = self.aw.fujipid.PXR['runstandby'][1]
         elif self.aw.ser.controlETpid[0] == 4:
             register = self.aw.fujipid.PXF['runstandby'][1]
+        else:
+            return 0
+        r = None
+        command = None
         if self.aw.ser.useModbusPort:
             reg = self.aw.modbus.address2register(register,6)
             self.aw.modbus.writeSingleRegister(self.aw.ser.controlETpid[1],reg,flag)
@@ -676,7 +686,7 @@ class FujiPID():
             command = self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],6,register,flag)
             #TX and RX
             r = self.aw.ser.sendFUJIcommand(command,8)
-        if self.aw.ser.useModbusPort or r == command:
+        if self.aw.ser.useModbusPort or (command is not None and r == command):
             if self.aw.ser.controlETpid[0] == 0:
                 self.aw.fujipid.PXG4['runstandby'][0] = flag
             elif self.aw.ser.controlETpid[0] == 1:
@@ -706,6 +716,8 @@ class FujiPID():
                 reg_dict = self.PXG4
             elif self.aw.ser.controlETpid[0] == 4:
                 reg_dict = self.PXF
+            else:
+                return
 
             #send command to the current sv (1-7)
 
@@ -722,6 +734,7 @@ class FujiPID():
 #            #-- experimental end
 
             svkey = 'sv'+ str(reg_dict['selectsv'][0]) #current sv
+            r = None
             if self.aw.ser.useModbusPort:
                 reg = self.aw.modbus.address2register(reg_dict[svkey][1],6)
                 self.aw.modbus.writeSingleRegister(self.aw.ser.controlETpid[1],reg,int(value*10))
@@ -731,14 +744,14 @@ class FujiPID():
                 command = self.message2send(self.aw.ser.controlETpid[1],6,reg_dict[svkey][1],int(value*10))
                 r = self.aw.ser.sendFUJIcommand(command,8)
             #check response
-            if self.aw.ser.useModbusPort or r == command:
+            if self.aw.ser.useModbusPort or (r is not None and r == command):
                 if not silent:
                     # [Not sure the following will translate or even format properly... Need testing!]
-                    message = QApplication.translate('Message','PXG/PXF sv#{0} set to {1}').format(reg_dict['selectsv'][0],'%.1f' % float(value))
+                    message = QApplication.translate('Message','PXG/PXF sv#{0} set to {1}').format(reg_dict['selectsv'][0],'%.1f' % float(value)) # pylint: disable=consider-using-f-string
                     self.aw.sendmessage(message)
                     reg_dict[svkey][0] = value
                     #record command as an Event
-                    strcommand = 'SETSV::' + str('%.1f'%float(value))
+                    strcommand = f'SETSV::{float(value):.1f}'
                     self.aw.qmc.DeviceEventRecord(strcommand)
                 self.sv = value
                 if move:
@@ -746,12 +759,13 @@ class FujiPID():
             else:
                 # error response
                 Rx = ''
-                if len(r):
+                if r is not None and len(r):
                     import binascii
                     Rx = cmd2str(binascii.hexlify(r))
                 self.aw.qmc.adderror(QApplication.translate('Error Message','Exception:') + ' setsv(): Rx = ' + Rx)
         #Fuji PXR
         elif self.aw.ser.controlETpid[0] == 1:
+            r = None
             if self.aw.ser.useModbusPort:
                 reg = self.aw.modbus.address2register(self.aw.fujipid.PXR['sv0'][1],6)
                 self.aw.modbus.writeSingleRegister(self.aw.ser.controlETpid[1],reg,int(value*10))
@@ -759,14 +773,14 @@ class FujiPID():
                 command = self.message2send(self.aw.ser.controlETpid[1],6,self.aw.fujipid.PXR['sv0'][1],int(value*10))
                 r = self.aw.ser.sendFUJIcommand(command,8)
             #check response
-            if self.aw.ser.useModbusPort or r == command:
+            if self.aw.ser.useModbusPort or (r is not None and r == command):
                 if not silent:
                     # [Not sure the following will translate or even format properly... Need testing!]
-                    message = QApplication.translate('Message','PXR sv set to {0}').format('%.1f' % float(value))
+                    message = QApplication.translate('Message','PXR sv set to {0}').format('%.1f' % float(value)) # pylint: disable=consider-using-f-string
                     self.aw.fujipid.PXR['sv0'][0] = value
                     self.aw.sendmessage(message)
                     #record command as an Event
-                    strcommand = 'SETSV::' + str('%.1f'%float(value))
+                    strcommand = f'SETSV::{float(value):.1f}'
                     self.aw.qmc.DeviceEventRecord(strcommand)
                 self.sv = value
                 if move:
@@ -786,6 +800,8 @@ class FujiPID():
                     reg_dict = self.PXG4
                 elif self.aw.ser.controlETpid[0] == 4:
                     reg_dict = self.PXF
+                else:
+                    return
                 # read the current svN (1-7) being used
 
                 #-- experimental begin
@@ -801,21 +817,21 @@ class FujiPID():
                 #-- experimental end
 
                 svkey = 'sv'+ str(reg_dict['selectsv'][0]) #current sv
-
+                r = None
                 if self.aw.ser.useModbusPort:
                     reg = self.aw.modbus.address2register(reg_dict[svkey][1],6)
                     self.aw.modbus.writeSingleRegister(self.aw.ser.controlETpid[1],reg,newsv)
                 else:
                     command = self.message2send(self.aw.ser.controlETpid[1],6,reg_dict[svkey][1],newsv)
                     r = self.aw.ser.sendFUJIcommand(command,8)
-                if self.aw.ser.useModbusPort or len(r) == 8:
+                if self.aw.ser.useModbusPort or (r is not None and len(r) == 8):
                     message = QApplication.translate('Message','SV{0} changed from {1} to {2})').format(str(N),str(currentsv),str(newsv/10.))
                     self.aw.sendmessage(message)
                     reg_dict[svkey][0] = newsv/10
                     #record command as an Event to replay (not binary as it needs to be stored in a text file)
-                    strcommand = 'SETSV::' + str('%.1f'%(newsv/10.))
+                    strcommand = f'SETSV::{newsv/10.:.1f}'
                     self.aw.qmc.DeviceEventRecord(strcommand)
-                    self.aw.lcd6.display('%.1f'%float(newsv/10.))
+                    self.aw.lcd6.display(f'{float(newsv/10.):.1f}')
                     if move:
                         self.aw.moveSVslider(newsv/10.,setValue=False)
                 else:
@@ -823,20 +839,21 @@ class FujiPID():
                     self.aw.sendmessage(msg)
             #   or if control pid is fuji PXR
             elif self.aw.ser.controlETpid[0] == 1:
+                r = None
                 if self.aw.ser.useModbusPort:
                     reg = self.aw.modbus.address2register(self.PXR['sv0'][1],6)
                     self.aw.modbus.writeSingleRegister(self.aw.ser.controlETpid[1],reg,newsv)
                 else:
                     command = self.message2send(self.aw.ser.controlETpid[1],6,self.PXR['sv0'][1],newsv)
                     r = self.aw.ser.sendFUJIcommand(command,8)
-                if self.aw.ser.useModbusPort or len(r) == 8:
+                if self.aw.ser.useModbusPort or (r is not None and len(r) == 8):
                     message = QApplication.translate('Message','SV changed from {0} to {1}').format(str(currentsv),str(newsv/10.))
                     self.aw.sendmessage(message)
                     self.PXR['sv0'][0] = newsv/10
                     #record command as an Event to replay (not binary as it needs to be stored in a text file)
-                    strcommand = 'SETSV::' + str('%.1f'%(newsv/10.))
+                    strcommand = f'SETSV::{newsv/10.:.1f}'
                     self.aw.qmc.DeviceEventRecord(strcommand)
-                    self.aw.lcd6.display('%.1f'%float(newsv/10.))
+                    self.aw.lcd6.display(f'{float(newsv/10.):.1f}')
                     if move:
                         self.aw.moveSVslider(newsv/10.,setValue=False)
                 else:
@@ -866,7 +883,7 @@ class FujiPID():
         n = len(segments)
         #if parts is < 4, make it compatible with Fuji PID (4 segments needed)
         if n < 4:
-            for i in range(4-n):
+            for _ in range(4-n):
                 #last temperature
                 lasttemp = segments[-1].split('::')[1]
                 #create a string with 4 segments ("SETRS" already removed)
@@ -929,6 +946,8 @@ class FujiPID():
             reg_dict = self.PXR
         elif self.aw.ser.controlETpid[0] == 4:
             reg_dict = self.PXF
+        else:
+            return
         svkey = 'segment' + str(idn) + 'sv'
         register = reg_dict[svkey][1]
         if self.aw.ser.useModbusPort:
@@ -978,10 +997,12 @@ class FujiPID():
                 reg1 = self.aw.modbus.address2register(self.PXG4[svkey][1],6)
                 reg2 = self.aw.modbus.address2register(self.PXG4[rampkey][1],6)
                 reg3 = self.aw.modbus.address2register(self.PXG4[soakkey][1],6)
-            elif  self.aw.ser.controlETpid[0] == 1:
+            elif self.aw.ser.controlETpid[0] == 1:
                 reg1 = self.aw.modbus.address2register(self.PXR[svkey][1],6)
                 reg2 = self.aw.modbus.address2register(self.PXR[rampkey][1],6)
                 reg3 = self.aw.modbus.address2register(self.PXR[soakkey][1],6)
+            else:
+                return
             self.aw.modbus.writeSingleRegister(self.aw.ser.controlETpid[1],reg1,int(sv*10))
             libtime.sleep(0.11) #important time between writings
             self.aw.modbus.writeSingleRegister(self.aw.ser.controlETpid[1],reg2,ramp)
@@ -997,6 +1018,8 @@ class FujiPID():
                 svcommand = self.message2send(self.aw.ser.controlETpid[1],6,self.PXR[svkey][1],int(sv*10))
                 rampcommand = self.message2send(self.aw.ser.controlETpid[1],6,self.PXR[rampkey][1],ramp)
                 soakcommand = self.message2send(self.aw.ser.controlETpid[1],6,self.PXR[soakkey][1],soak)
+            else:
+                return
             r1 = self.aw.ser.sendFUJIcommand(svcommand,8)
             libtime.sleep(0.11) #important time between writings
             r2 = self.aw.ser.sendFUJIcommand(rampcommand,8)
@@ -1023,10 +1046,7 @@ class FujiPID():
         # This method takes the arguments to compose a Fuji serial command and returns the complete raw string with crc16 included
         # memory must be given as the Resistor Number Engineering unit (example of memory = 41057 )
         #check to see if Nword is < 257. If it is, then add extra zero pad. 2^8 = 256 = 1 byte but 2 bytes always needed to send Nword
-        if Nword < 257:
-            pad1 = self.dec2HexRaw(0)
-        else:
-            pad1 = decs2string('')
+        pad1 = self.dec2HexRaw(0) if Nword < 257 else decs2string('')
         part1 = self.dec2HexRaw(stationNo)
         part2 = self.dec2HexRaw(FunctionCode)
         _,r = divmod(memory,10000)
@@ -1046,7 +1066,7 @@ class FujiPID():
         #now convert the crc16 from int to binary
         part5 = self.dec2HexRaw(crc16end)
         #return total sum of binary parts  (assembled message)
-        return (datastring + part5)
+        return datastring + part5
 
     #input string command. Output integer (not binary string); used for example to read temperature or to obtain the value of a variable
     def readoneword(self,command):
@@ -1096,53 +1116,53 @@ class FujiPID():
 ###################################################################################
 
 class PIDcontrol():
-    def __init__(self,aw):
+    def __init__(self,aw) -> None:
         self.aw = aw
         self.pidActive = False
-        self.sv = None # the last sv send to the Arduino
+        self.sv:Optional[float] = None # the last sv send to the Arduino
         #
         self.pidOnCHARGE = False
         self.loadRampSoakFromProfile = False
         self.loadRampSoakFromBackground = False
         self.svLen = 8 # should stay at 8 for compatibility reasons!
-        self.svLabel = ''
-        self.svValues = [0]*self.svLen # sv temp as int per 8 channels
-        self.svRamps = [0]*self.svLen  # seconds as int per 8 channels
-        self.svSoaks = [0]*self.svLen  # seconds as int per 8 channels
-        self.svActions = [-1]*self.svLen      # alarm action as int per 8 channels
-        self.svBeeps = [False]*self.svLen     # alarm beep as bool per 8 channels
-        self.svDescriptions = ['']*self.svLen # alarm descriptions as string per 8 channels
+        self.svLabel:str = ''
+        self.svValues: List[float]     = [0]*self.svLen      # sv temp as int per 8 channels
+        self.svRamps: List[int]        = [0]*self.svLen      # seconds as int per 8 channels
+        self.svSoaks: List[int]        = [0]*self.svLen      # seconds as int per 8 channels
+        self.svActions: List[int]      = [-1]*self.svLen     # alarm action as int per 8 channels
+        self.svBeeps: List[bool]       = [False]*self.svLen  # alarm beep as bool per 8 channels
+        self.svDescriptions: List[str] = ['']*self.svLen     # alarm descriptions as string per 8 channels
         #
         self.svTriggeredAlarms = [False]*self.svLen # set to true once the corresponding alarm was triggered
         # extra RS sets:
         self.RSLen = 3 # can be changed to have less or more RSn sets
-        self.RS_svLabels = ['']*self.RSLen # label of the RS set
-        self.RS_svValues = [[0]*self.svLen]*self.RSLen  # sv temp as int per 8 channels
-        self.RS_svRamps = [[0]*self.svLen]*self.RSLen  # seconds as int per 8 channels
-        self.RS_svSoaks = [[0]*self.svLen]*self.RSLen  # seconds as int per 8 channels
-        self.RS_svActions = [[-1]*self.svLen]*self.RSLen      # alarm action as int per 8 channels
-        self.RS_svBeeps = [[False]*self.svLen]*self.RSLen     # alarm beep as bool per 8 channels
-        self.RS_svDescriptions = [['']*self.svLen]*self.RSLen # alarm descriptions as string per 8 channels
+        self.RS_svLabels: List[str]       = ['']*self.RSLen                  # label of the RS set
+        self.RS_svValues: List[List[float]] = [[0]*self.svLen]*self.RSLen      # sv temp as int per 8 channels
+        self.RS_svRamps: List[List[int]]  = [[0]*self.svLen]*self.RSLen      # seconds as int per 8 channels
+        self.RS_svSoaks: List[List[int]]  = [[0]*self.svLen]*self.RSLen      # seconds as int per 8 channels
+        self.RS_svActions: List[List[int]]= [[-1]*self.svLen]*self.RSLen     # alarm action as int per 8 channels
+        self.RS_svBeeps: List[List[bool]] = [[False]*self.svLen]*self.RSLen  # alarm beep as bool per 8 channels
+        self.RS_svDescriptions: List[List[str]] = [['']*self.svLen]*self.RSLen     # alarm descriptions as string per 8 channels
         #
-        self.svSlider = False
-        self.svButtons = False
-        self.svMode = 0 # 0: manual, 1: Ramp/Soak, 2: Follow (background profile)
-        self.svLookahead = 0
-        self.dutySteps = 1
-        self.svSliderMin = 0
-        self.svSliderMax = 230
-        self.svValue = 180 # the value in the setSV textinput box of the PID dialog
-        self.dutyMin = -100
-        self.dutyMax = 100
-        self.pidKp = 15.0
-        self.pidKi = 0.01
-        self.pidKd = 20.0
+        self.svSlider:bool = False
+        self.svButtons:bool = False
+        self.svMode:int = 0 # 0: manual, 1: Ramp/Soak, 2: Follow (background profile)
+        self.svLookahead:int = 0
+        self.dutySteps:int = 1
+        self.svSliderMin:int = 0
+        self.svSliderMax:int = 230
+        self.svValue:float = 180 # the value in the setSV textinput box of the PID dialog
+        self.dutyMin:int = -100
+        self.dutyMax:int = 100
+        self.pidKp:float = 15.0
+        self.pidKi:float = 0.01
+        self.pidKd:float = 20.0
         # Proposional on Measurement mode see: http://brettbeauregard.com/blog/2017/06/introducing-proportional-on-measurement/
-        self.pOnE = True # True for Proposional on Error mode, False for Proposional on Measurement Mode
+        self.pOnE:bool = True # True for Proposional on Error mode, False for Proposional on Measurement Mode
         # pidSource
         #   either the TC4 input channel from [1,..,4] if self.qmc.device == 19 (Arduino/TC4)
         #   in all other cases (HOTTOP, MODBUS,..), 1 is interpreted as BT and 2 as ET, 3 as 0xT1, 4 as 0xT2, 5 as 1xT1, ...
-        self.pidSource = 1
+        self.pidSource:int = 1
         self.pidCycle = 1000
         # the positive target should increase with positive PID duty
         self.pidPositiveTarget = 0 # one of [0,1,..,4] with 0: None, 1,..,4: for slider event 1-4
@@ -1152,8 +1172,8 @@ class PIDcontrol():
         self.invertControl = False
         # PID sv smoothing
         self.sv_smoothing_factor = 0 # off if 0
-        self.sv_decay_weights = None
-        self.previous_svs = []
+        self.sv_decay_weights:Optional[List[float]] = None
+        self.previous_svs:List[float] = []
         # time @ PID ON
         self.time_pidON = 0 # in monitoring mode, ramp-soak times are interperted w.r.t. the time after the PID was turned on and not the time after CHARGE as during recording
         self.current_ramp_segment = 0 # the RS segment currently active. Note that this is 1 based, 0 indicates that no segment has started yet
@@ -1187,25 +1207,17 @@ class PIDcontrol():
         try:
             if self.aw.pidcontrol.pidPositiveTarget:
                 slidernr = self.aw.pidcontrol.pidPositiveTarget - 1
-                if self.aw.pidcontrol.invertControl:
-                    vp = abs(100 - v)
-                else:
-                    vp = v
-                vp = min(100,max(0,int(round(vp))))
+                vp = min(100,max(0,int(round(abs(100 - v) if self.aw.pidcontrol.invertControl else v))))
                 # we need to map the duty [0%,100%] to the [slidermin,slidermax] range
-                heat = int(round(numpy.interp(vp,[0,100],[self.aw.eventslidermin[slidernr],self.aw.eventslidermax[slidernr]])))
+                heat = int(round(float(numpy.interp(vp,[0,100],[self.aw.eventslidermin[slidernr],self.aw.eventslidermax[slidernr]]))))
                 self.aw.block_quantification_sampling_ticks[slidernr] = self.aw.sampling_ticks_to_block_quantifiction
                 self.aw.qmc.temporarymovepositiveslider = (slidernr,heat)
             if self.aw.pidcontrol.pidNegativeTarget:
                 slidernr = self.aw.pidcontrol.pidNegativeTarget - 1
-                if self.aw.pidcontrol.invertControl:
-                    vn = 0 - v
-                else:
-                    vn = v
-                vn = min(0,max(-100,int(vn)))
+                vn = min(0,max(-100,int(round(0 - v if self.aw.pidcontrol.invertControl else v))))
                 # we need to map the duty [0%,-100%] to the [slidermin,slidermax] range
                 self.aw.block_quantification_sampling_ticks[slidernr] = self.aw.sampling_ticks_to_block_quantifiction
-                cool = int(round(numpy.interp(vn,[-100,0],[self.aw.eventslidermax[slidernr],self.aw.eventslidermin[slidernr]])))
+                cool = int(round(float(numpy.interp(vn,[-100,0],[self.aw.eventslidermax[slidernr],self.aw.eventslidermin[slidernr]]))))
                 self.aw.qmc.temporarymovenegativeslider = (slidernr,cool)
         except Exception as e: # pylint: disable=broad-except
             _log.exception(e)
@@ -1222,10 +1234,10 @@ class PIDcontrol():
             self.pidKp = self.pidKp * (9/5.)
             self.pidKi = self.pidKi * (9/5.)
             self.pidKd = self.pidKd * (9/5.)
-            for i in range(len(self.svValues)):
+            for i in range(len(self.svValues)): # pylint: disable=consider-using-enumerate
                 if self.svValues[i] != 0:
                     self.svValues[i] = fromFtoC(self.svValues[i])
-            for n in range(len(self.RS_svValues)):
+            for n in range(len(self.RS_svValues)): # pylint: disable=consider-using-enumerate
                 for j in range(len(self.RS_svValues[n])):
                     if self.RS_svValues[n][j] != 0:
                         self.RS_svValues[n][j] = fromFtoC(self.RS_svValues[n][j])
@@ -1239,19 +1251,19 @@ class PIDcontrol():
         try:
             self.aw.qmc.rampSoakSemaphore.acquire(1)
             self.svValue = fromCtoF(self.svValue)
-            self.svSliderMin = fromCtoF(self.svSliderMin)
-            self.svSliderMax = fromCtoF(self.svSliderMax)
+            self.svSliderMin = int(round(fromCtoF(self.svSliderMin)))
+            self.svSliderMax = int(round(fromCtoF(self.svSliderMax)))
             # establish ne limits on sliders
             self.aw.sliderSV.setMinimum(int(round(self.svSliderMin)))
             self.aw.sliderSV.setMaximum(int(round(self.svSliderMax)))
             self.pidKp = self.pidKp / (9/5.)
             self.pidKi = self.pidKi / (9/5.)
             self.pidKd = self.pidKd / (9/5.)
-            for i in range(len(self.svValues)):
+            for i in range(len(self.svValues)): # pylint: disable=consider-using-enumerate
                 if self.svValues[i] != 0:
                     self.svValues[i] = fromCtoF(self.svValues[i])
-            for n in range(len(self.RS_svValues)):
-                for j in range(len(self.RS_svValues[n])):
+            for n in range(len(self.RS_svValues)): # pylint: disable=consider-using-enumerate
+                for j in range(len(self.RS_svValues[n])): # pylint: disable=consider-using-enumerate
                     if self.RS_svValues[n][j] != 0:
                         self.RS_svValues[n][j] = fromCtoF(self.RS_svValues[n][j])
         except Exception as e: # pylint: disable=broad-except
@@ -1411,18 +1423,18 @@ class PIDcontrol():
                 self.aw.qmc.setLCDtime(self.RS_total_time-t)
             segment_end_time = 0 # the (end) time of the segments
             prev_segment_end_time = 0 # the (end) time of the previous segment
-            segment_start_sv = 0 # the (target) sv of the segment
-            prev_segment_start_sv = 0 # the (target) sv of the previous segment
-            for i in range(len(self.svValues)):
+            segment_start_sv = 0. # the (target) sv of the segment
+            prev_segment_start_sv = 0. # the (target) sv of the previous segment
+            for i, v in enumerate(self.svValues):
                 # Ramp
                 if self.svRamps[i] != 0:
                     segment_end_time = segment_end_time + self.svRamps[i]
-                    segment_start_sv = self.svValues[i]
+                    segment_start_sv = v
                     if segment_end_time > t:
                         # t is within the current segment
                         k = float(segment_start_sv - prev_segment_start_sv) / float(segment_end_time - prev_segment_end_time)
                         if self.current_ramp_segment != i+1:
-                            self.aw.sendmessage(QApplication.translate('Message',f'Ramp {i+1}: in {stringfromseconds(self.svRamps[i])} to SV {self.svValues[i]}'))
+                            self.aw.sendmessage(QApplication.translate('Message',f'Ramp {i+1}: in {stringfromseconds(self.svRamps[i])} to SV {v}'))
                             self.current_ramp_segment = i+1
                         return prev_segment_start_sv + k*(t - prev_segment_end_time)
                 prev_segment_end_time = segment_end_time
@@ -1430,13 +1442,13 @@ class PIDcontrol():
                 # Soak
                 if self.svSoaks[i] != 0:
                     segment_end_time = segment_end_time + self.svSoaks[i]
-                    segment_start_sv = self.svValues[i]
+                    segment_start_sv = v
                     if segment_end_time > t:
                         prev_segment_start_sv = segment_start_sv # ensure that the segment sv is set even then the segments ramp is 00:00
                         # t is within the current segment
                         if self.current_soak_segment != i+1:
                             self.current_soak_segment = i+1
-                            self.aw.sendmessage(QApplication.translate('Message',f'Soak {i+1}: for {stringfromseconds(self.svSoaks[i])} at SV {self.svValues[i]}'))
+                            self.aw.sendmessage(QApplication.translate('Message',f'Soak {i+1}: for {stringfromseconds(self.svSoaks[i])} at SV {v}'))
                         return prev_segment_start_sv
                 prev_segment_end_time = segment_end_time
                 prev_segment_start_sv = segment_start_sv
@@ -1456,18 +1468,15 @@ class PIDcontrol():
         if self.sv_smoothing_factor:
             # create or update smoothing decay weights
             if self.sv_decay_weights is None or len(self.sv_decay_weights) != self.sv_smoothing_factor: # recompute only on changes
-                self.sv_decay_weights = numpy.arange(1,self.sv_smoothing_factor+1)
+                self.sv_decay_weights = list(numpy.arange(1,self.sv_smoothing_factor+1))
             # add new value
             self.previous_svs.append(sv)
             # throw away superfluous values
             self.previous_svs = self.previous_svs[-self.sv_smoothing_factor:]
             # compute smoothed output
-            if len(self.previous_svs) < self.sv_smoothing_factor:
-                res = sv # no smoothing yet
-            else:
-                res = numpy.average(self.previous_svs,weights=self.sv_decay_weights)
-            return res
-        return sv
+            if len(self.previous_svs) >= self.sv_smoothing_factor:
+                return numpy.average(self.previous_svs,weights=self.sv_decay_weights)
+        return sv # no smoothing yet
 
     # returns None if in manual mode or no other sv (via ramp/soak or follow mode) defined
     def calcSV(self,tx):
@@ -1479,9 +1488,9 @@ class PIDcontrol():
             # Follow Background mode
             if self.aw.qmc.device == 19 and self.aw.pidcontrol.externalPIDControl(): # in case we run TC4 with the PIDfirmware
                 if int(self.aw.ser.arduinoETChannel) == self.pidSource: # we observe the ET
-                    followCurveNr = 1
-                elif int(self.aw.ser.arduinoBTChannel) == self.pidSource: # we observe the BT
                     followCurveNr = 2
+                elif int(self.aw.ser.arduinoBTChannel) == self.pidSource: # we observe the BT
+                    followCurveNr = 1
                 else:
                     # we do not know which extra background device curve holds the selcted PID source temperatures
                     return None
@@ -1530,16 +1539,16 @@ class PIDcontrol():
             self.aw.qmc.pid.setDutySteps(dutySteps)
 
 
-    def setSV(self,sv,move=True,init=False):
+    def setSV(self,sv,move:bool = True, init:bool = False):
 #        if not move:
 #            self.aw.sendmessage(QApplication.translate("Message","SV set to %s"%sv))
-        if (self.aw.pidcontrol.externalPIDControl() == 1): # MODBUS PID and Control ticked
+        if self.aw.pidcontrol.externalPIDControl() == 1: # MODBUS PID and Control ticked
             self.sv = max(0,sv)
             if move:
                 self.aw.moveSVslider(sv,setValue=True)
             self.aw.modbus.setTarget(sv)
             self.sv = sv # remember last sv
-        elif (self.aw.pidcontrol.externalPIDControl() == 2): # S7 PID and Control ticked
+        elif self.aw.pidcontrol.externalPIDControl() == 2: # S7 PID and Control ticked
             self.sv = max(0,sv)
             if move:
                 self.aw.moveSVslider(sv,setValue=True)
@@ -1549,7 +1558,7 @@ class PIDcontrol():
             if self.aw.ser.ArduinoIsInitialized:
                 sv = max(0,self.aw.float2float(sv,2))
                 if self.sv != sv: # nothing to do (avoid loops via moveslider!)
-                    if move == True:
+                    if move:
                         self.aw.moveSVslider(sv,setValue=True) # only move the slider
                         self.sv = sv # remember last sv
                     try:
@@ -1602,7 +1611,7 @@ class PIDcontrol():
     def adjustsv(self,diff):
         if self.sv is None or self.sv<0:
             self.sv = 0
-        self.setSV(self.sv + diff,True)
+        self.setSV(self.sv + diff,move=True)
 
     def activateSVSlider(self,flag):
         if flag:
@@ -1656,13 +1665,13 @@ class PIDcontrol():
 
     # send conf to connected PID
     def confPID(self,kp,ki,kd,source=None,cycle=None,pOnE=True):
-        if (self.aw.pidcontrol.externalPIDControl() == 1): # MODBUS (external) Control active
+        if self.aw.pidcontrol.externalPIDControl() == 1: # MODBUS (external) Control active
             self.aw.modbus.setPID(kp,ki,kd)
             self.pidKp = kp
             self.pidKi = ki
             self.pidKd = kd
             self.aw.sendmessage(QApplication.translate('Message','p-i-d values updated'))
-        elif (self.aw.pidcontrol.externalPIDControl() == 2): # S7 (external) Control active
+        elif self.aw.pidcontrol.externalPIDControl() == 2: # S7 (external) Control active
             self.aw.s7.setPID(kp,ki,kd,self.aw.s7.PIDmultiplier)
             self.pidKp = kp
             self.pidKi = ki
@@ -1713,7 +1722,7 @@ class PIDcontrol():
 # documentation
 # http://www.deltaww.hu/homersekletszabalyozok/DTA_series_temperature_controller_instruction_sheet_English.pdf
 class DtaPID():
-    def __init__(self,aw):
+    def __init__(self,aw) -> None:
         self.aw = aw
 
         #refer to Delta instruction manual for more information
@@ -1755,8 +1764,7 @@ class DtaPID():
         string_NDATA = str(NDATA).zfill(4)
         cmd = string_unitID + string_FUNCTION + string_ADDRESS + string_NDATA
         checksum = hex(self.DTACalcChecksum(cmd))[2:].zfill(2).upper()
-        command = ':' + cmd + checksum + '\r\n'
-        return command
+        return ':' + cmd + checksum + '\r\n'
 
     @staticmethod
     def DTACalcChecksum(string):
@@ -1775,5 +1783,5 @@ class DtaPID():
         h2comp = twoscomp(h_bs)
         rval = int(h2comp,2)
         if (val & 0x80) == 0:
-            rval = rval | 0x80
+            return rval | 0x80
         return rval

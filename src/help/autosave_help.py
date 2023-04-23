@@ -1,14 +1,14 @@
 import prettytable
 import re
 try:
-  from PyQt5.QtWidgets import QApplication
-except Exception:
-  from PyQt6.QtWidgets import QApplication
+    from PyQt6.QtWidgets import QApplication # @Reimport @UnresolvedImport @UnusedImport # pylint: disable=import-error
+except Exception: # pylint: disable=broad-except
+    from PyQt5.QtWidgets import QApplication # type: ignore # @Reimport @UnresolvedImport @UnusedImport
 
 def content():
     strlist = []
-    helpstr = ''  #@UnusedVariable
-    newline = '\n'  #@UnusedVariable
+    helpstr = ''  # noqa: F841 #@UnusedVariable # pylint: disable=unused-variable
+    newline = '\n'  # noqa: F841 #@UnusedVariable  # pylint: disable=unused-variable
     strlist.append('<head><style> td, th {border: 1px solid #ddd;  padding: 6px;} th {padding-top: 6px;padding-bottom: 6px;text-align: left;background-color: #0C6AA6; color: white;} </style></head> <body>')
     strlist.append('<b>')
     strlist.append(QApplication.translate('HelpDlg','AUTOSAVE DIALOG'))
@@ -83,18 +83,24 @@ def content():
     tbl_AutosaveFields.add_row(['~dtr',QApplication.translate('HelpDlg','From Profile Statistics - DTR (in percent)'),22.1])
     tbl_AutosaveFields.add_row(['~auc',QApplication.translate('HelpDlg','From the Profile Statistics - AUC'),218])
     tbl_AutosaveFields.add_row(['~aucbase',QApplication.translate('HelpDlg','From the Profile Statistics - AUC Base'),300])
+    tbl_AutosaveFields.add_row(['~mode',QApplication.translate('HelpDlg','From Config>Temperature - the current temperature mode C or F.  '),'F'])
     tbl_AutosaveFields.add_row(['~chargeet',QApplication.translate('HelpDlg','From the Profile - ET at CHARGE'),379.4])
     tbl_AutosaveFields.add_row(['~chargebt',QApplication.translate('HelpDlg','From the Profile - BT at CHARGE'),375.2])
     tbl_AutosaveFields.add_row(['~fcset',QApplication.translate('HelpDlg','From the Profile - ET at FCs'),397.4])
     tbl_AutosaveFields.add_row(['~fcsbt',QApplication.translate('HelpDlg','From the Profile -BT at FCs'),386.7])
+    tbl_AutosaveFields.add_row(['~fcstime',QApplication.translate('HelpDlg','From the Profile - FCs time in seconds'),490])
+    tbl_AutosaveFields.add_row(['~fcstime_long',QApplication.translate('HelpDlg','From the Profile - FCs time in min_secs'),'08_10'])
     tbl_AutosaveFields.add_row(['~dropet',QApplication.translate('HelpDlg','From the Profile - ET at DROP'),378.6])
     tbl_AutosaveFields.add_row(['~dropbt',QApplication.translate('HelpDlg','From the Profile - BT at DROP'),412.5])
     tbl_AutosaveFields.add_row(['~droptime',QApplication.translate('HelpDlg','From the Profile - DROP time in seconds'),617])
     tbl_AutosaveFields.add_row(['~droptime_long',QApplication.translate('HelpDlg','From the Profile - DROP time in min_secs'),'10_17'])
+    tbl_AutosaveFields.add_row(['~dryphasedeltatemp',QApplication.translate('HelpDlg','From the Profile - BT temperature change from TP to DRY'),121.3])
+    tbl_AutosaveFields.add_row(['~midphasedeltatemp',QApplication.translate('HelpDlg','From the Profile - BT temperature change from DRY to FCs'),78.6])
+    tbl_AutosaveFields.add_row(['~finishphasedeltatemp',QApplication.translate('HelpDlg','From the Profile - BT temperature change from FCs to DROP'),19.8])
     tbl_AutosaveFields.add_row(['~roastingnotes_nn',QApplication.translate('HelpDlg','Replace “nn” with 10, 15, 20, 25, or 30 to show the first “nn” characters of the Roasting Notes field.\nFrom Roast>Properties>Roasting Notes'),'No crash, '])
     tbl_AutosaveFields.add_row(['~roastingnotes_line',QApplication.translate('HelpDlg','The entire first line From Roast>Properties>Roasting Notes'),'No crash, maintained RoR'])
-    tbl_AutosaveFields.add_row(['~cupptingnotes_nn',QApplication.translate('HelpDlg','Replace “nn” with 10, 15, 20, 25, or 30 to show the first “nn” characters of the Cupping Notes field.\nFrom Roast>Properties>Cupping Notes'),'Lots of be'])
-    tbl_AutosaveFields.add_row(['~cupptingnotes_line',QApplication.translate('HelpDlg','The entire first line From Roast>Properties>Cupping Notes'),'Lots of berries and chocolate'])
+    tbl_AutosaveFields.add_row(['~cuppingnotes_nn',QApplication.translate('HelpDlg','Replace “nn” with 10, 15, 20, 25, or 30 to show the first “nn” characters of the Cupping Notes field.\nFrom Roast>Properties>Cupping Notes'),'Lots of be'])
+    tbl_AutosaveFields.add_row(['~cuppingnotes_line',QApplication.translate('HelpDlg','The entire first line From Roast>Properties>Cupping Notes'),'Lots of berries and chocolate'])
     tbl_AutosaveFields.add_row(['~btubatch',QApplication.translate('HelpDlg','From the Profile Energy Use - Total energy used by the batch in BTU'),8943.2])
     tbl_AutosaveFields.add_row(['~co2batch',QApplication.translate('HelpDlg','From the Profile Energy Use - CO2 produced by the batch in g'),923.3])
     tbl_AutosaveFields.add_row(['~btupreheat',QApplication.translate('HelpDlg','From the Profile Energy Use - Energy used during preheat in BTU'),2538.8])
@@ -118,13 +124,13 @@ def content():
     strlist.append(tbl_Examplestop.get_html_string(attributes={'width':'100%','border':'1','padding':'1','border-collapse':'collapse'}))
     tbl_Examples = prettytable.PrettyTable()
     tbl_Examples.field_names = [QApplication.translate('HelpDlg','Autosave Field'),QApplication.translate('HelpDlg','Example File Name')]
-    tbl_Examples.add_row([QApplication.translate('HelpDlg','~title Roasted on ~date'),QApplication.translate('HelpDlg','Burundi Roasted on 20-04-25.alog')])
-    tbl_Examples.add_row([QApplication.translate('HelpDlg','~batchcounter ~title ~date_long'),QApplication.translate('HelpDlg','1380 Burundi 2020-04-25_1136.alog')])
-    tbl_Examples.add_row([QApplication.translate('HelpDlg','~beans ~machine ~drumspeedRPM ~weight~weightunits ~poisturePCT ~operator ~date ~batch(~batchposition)'),QApplication.translate('HelpDlg','Burundi Kiganda Murambi Lot44 SF-25 64RPM 10.3Kg 10.2PCT Roberto 20-04-25 Prod-1380(6).alog')])
-    tbl_Examples.add_row([QApplication.translate('HelpDlg','\u0027Recording ~batchcounter&#39; "~batch" ~title ~datetime_long'),QApplication.translate('HelpDlg','When OFF:\nProd-1380 Burundi Kiganda Murambi 2020-04-25_1136.alog\nWhile Recording:\nRecording 1380  Burundi KigandaMurambi 2020-04-25_1136.alog')])
-    tbl_Examples.add_row([QApplication.translate('HelpDlg','\u0027Recording ~batchcounter&#39; "~batch" ~title ~date_long_&#39;~currtime&#39;"~time"'),QApplication.translate('HelpDlg','Creates a unique filename for multiple saves while sampling by using ~currtime.\nWhen OFF:\nProd-1380 Burundi Kiganda Murambi 2020-04-25_1136.alog\nWhile Recording. \nRecording 1380  Burundi KigandaMurambi 2020-04-25_113809.alog')])
+    tbl_Examples.add_row(['~title Roasted on ~date','Burundi Roasted on 20-04-25.alog'])
+    tbl_Examples.add_row(['~batchcounter ~title ~date_long','1380 Burundi 2020-04-25_1136.alog'])
+    tbl_Examples.add_row(['~beans ~machine ~drumspeedRPM ~weight~weightunits ~poisturePCT ~operator ~date ~batch(~batchposition)','Burundi Kiganda Murambi Lot44 SF-25 64RPM 10.3Kg 10.2PCT Roberto 20-04-25 Prod-1380(6).alog'])
+    tbl_Examples.add_row(['~title ~weight~weightunits ~finishphase_deltatemp~mode','Burundi 454.0g 19.8F.alog'])
+    tbl_Examples.add_row(['\u0027Recording ~batchcounter&#39; "~batch" ~title ~datetime_long','When OFF:\nProd-1380 Burundi Kiganda Murambi 2020-04-25_1136.alog\nWhile Recording:\nRecording 1380  Burundi KigandaMurambi 2020-04-25_1136.alog'])
+    tbl_Examples.add_row(['\u0027Recording ~batchcounter&#39; "~batch" ~title ~date_long_&#39;~currtime&#39;"~time"','Creates a unique filename for multiple saves while sampling by using ~currtime.\nWhen OFF:\nProd-1380 Burundi Kiganda Murambi 2020-04-25_1136.alog\nWhile Recording. \nRecording 1380  Burundi KigandaMurambi 2020-04-25_113809.alog'])
     strlist.append(tbl_Examples.get_html_string(attributes={'width':'100%','border':'1','padding':'1','border-collapse':'collapse'}))
     strlist.append('</body>')
     helpstr = ''.join(strlist)
-    helpstr = re.sub(r'&amp;', r'&',helpstr)
-    return helpstr
+    return re.sub(r'&amp;', r'&',helpstr)

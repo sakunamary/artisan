@@ -1,5 +1,21 @@
 #
+# ABOUT
+# Artisan Utilities
 
+# LICENSE
+# This program or module is free software: you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as published
+# by the Free Software Foundation, either version 2 of the License, or
+# version 3 of the License, or (at your option) any later version. It is
+# provided for educational purposes and is distributed in the hope that
+# it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
+# the GNU General Public License for more details.
+
+# AUTHOR
+# Marko Luther, 2023
+
+import codecs
 import logging
 import platform
 import sys
@@ -9,39 +25,38 @@ import re
 import numpy
 import functools
 from pathlib import Path
-from typing import Optional,  Final
 from matplotlib import colors
-
+from typing import Optional, Tuple, List, Union, Any
+from typing_extensions import Final  # Python <=3.7
+from typing_extensions import TypeGuard  # Python <=3.10
 
 ##
 
-_log: Final = logging.getLogger(__name__)
+_log: Final[logging.Logger] = logging.getLogger(__name__)
 
-application_name: Final = 'Artisan'
-application_viewer_name: Final = 'ArtisanViewer'
-application_organization_name: Final = 'artisan-scope'
-application_organization_domain: Final = 'artisan-scope.org'
+application_name: Final[str] = 'Artisan'
+application_viewer_name: Final[str] = 'ArtisanViewer'
+application_organization_name: Final[str] = 'artisan-scope'
+application_organization_domain: Final[str] = 'artisan-scope.org'
 
 
 try:
-    #ylint: disable = E, W, R, C
+    #pylint: disable = E, W, R, C
     from PyQt6.QtCore import QStandardPaths, QCoreApplication # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtGui import QColor  # @UnusedImport @Reimport  @UnresolvedImport
 except Exception: # pylint: disable=broad-except
-    #ylint: disable = E, W, R, C
-    from PyQt5.QtCore import QStandardPaths, QCoreApplication # @UnusedImport @Reimport  @UnresolvedImport
-    from PyQt5.QtGui import QColor  # @UnusedImport @Reimport  @UnresolvedImport
+    #pylint: disable = E, W, R, C
+    from PyQt5.QtCore import QStandardPaths, QCoreApplication  # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
+    from PyQt5.QtGui import QColor  # type: ignore  # @UnusedImport @Reimport  @UnresolvedImport
 
 
-deltaLabelPrefix = '<html>&Delta;&thinsp;</html>' # prefix constant for labels to compose DeltaET/BT by prepending this prefix to ET/BT labels
-if platform.system() == 'Linux':
-    deltaLabelUTF8 = 'Delta'
-else:
-    deltaLabelUTF8 = '\u0394\u2009' # u("\u03B4") # prefix for non HTML Qt Widgets like QPushbuttons
-deltaLabelBigPrefix = '<big><b>&Delta;</b></big>&thinsp;<big><b>' # same as above for big/bold use cases
-deltaLabelMathPrefix = r'$\Delta\/$'  # prefix for labels in matplibgraphs to compose DeltaET/BT by prepending this prefix to ET/BT labels
+deltaLabelPrefix:Final[str] = '<html>&Delta;&thinsp;</html>' # prefix constant for labels to compose DeltaET/BT by prepending this prefix to ET/BT labels
+deltaLabelUTF8:Final[str] = 'Delta' if platform.system() == 'Linux' else '\u0394\u2009' # u("\u03B4") # prefix for non HTML Qt Widgets like QPushbuttons
 
-def appFrozen():
+deltaLabelBigPrefix:Final[str] = '<big><b>&Delta;</b></big>&thinsp;<big><b>' # same as above for big/bold use cases
+deltaLabelMathPrefix:Final[str] = r'$\Delta\/$'  # prefix for labels in matplibgraphs to compose DeltaET/BT by prepending this prefix to ET/BT labels
+
+def appFrozen() -> bool:
     ib = False
     try:
         platf = str(platform.system())
@@ -51,66 +66,71 @@ def appFrozen():
                 ib = True
         elif platf == 'Windows':
             ib = hasattr(sys, 'frozen')
-        elif platf == 'Linux':
-            if getattr(sys, 'frozen', False):
-                # The application is frozen
-                ib = True
+        elif platf == 'Linux' and getattr(sys, 'frozen', False):
+            # The application is frozen
+            ib = True
     except Exception as e: # pylint: disable=broad-except
         _log.exception(e)
     return ib
 
-def decs2string(x):
+def decs2string(x) -> bytes:
     if len(x) > 0:
         return bytes(x)
     return b''
-def stringp(x):
-    return isinstance(x, str)
-def uchr(x):
+def uchr(x:int) -> str:
     return chr(x)
-def decodeLocal(x):
+def decodeLocal(x:Optional[Any]) -> Optional[str]:
     if x is not None:
-        import codecs
         return codecs.unicode_escape_decode(x)[0]
     return None
-def encodeLocal(x):
+def decodeLocalStrict(x:Optional[Any], default:str = '') -> str:
+    if x is None:
+        return default
+    return codecs.unicode_escape_decode(x)[0]
+def encodeLocal(x:Optional[Any]) -> Optional[str]:
     if x is not None:
-        import codecs
         return codecs.unicode_escape_encode(str(x))[0].decode('utf8')
     return None
-def hex2int(h1,h2=None):
+def encodeLocalStrict(x:Optional[Any], default:str = '') -> str:
+    if x is None:
+        return default
+    return codecs.unicode_escape_encode(str(x))[0].decode('utf8')
+def hex2int(h1,h2=None) -> int:
     if h2 is not None:
         return int(h1*256 + h2)
     return int(h1)
-def str2cmd(s):
+def str2cmd(s:str) -> bytes:
     return bytes(s,'ascii')
-def cmd2str(c):
+def cmd2str(c:bytes) -> str:
     return str(c,'latin1')
 def s2a(s):
     return s.encode('ascii','ignore').decode('ascii')
 
-# returns the prefix of length l of s and adds eclipse
-def abbrevString(s,l):
-    if len(s) > l:
-        return f'{s[:l-1]}...'
+# returns the prefix of length ll of s and adds eclipse
+def abbrevString(s:str, ll:int) -> str:
+    if len(s) > ll:
+        return f'{s[:ll-1]}...'
     return s
 
 # used to convert time from int seconds to string (like in the LCD clock timer). input int, output string xx:xx
-def stringfromseconds(seconds_raw, leadingzero=True):
+def stringfromseconds(seconds_raw:float, leadingzero=True) -> str:
     # seconds = int(round(seconds_raw)) # note that round(1.5)=round(2.5)=2
     seconds = int(math.floor(seconds_raw + 0.5))
     if seconds >= 0:
+        d, m = divmod(seconds, 60)
         if leadingzero:
-            return '%02d:%02d'% divmod(seconds, 60)
-        return ('%d:%02d'% divmod(seconds, 60))
+            return f'{d:02d}:{m:02d}'
+        return f'{d:d}:{m:02d}'
     #usually the timex[timeindex[0]] is already taken away in seconds before calling stringfromseconds()
     negtime = abs(seconds)
+    d, m = divmod(negtime, 60)
     if leadingzero:
-        return f'-{("%02d:%02d"% divmod(negtime, 60))}'
-    return f'-{("%d:%02d"% divmod(negtime, 60))}'
+        return f'-{d:02d}:{m:02d}'
+    return f'-{d:d}:{m:02d}'
 
 #Converts a string into a seconds integer. Use for example to interpret times from Roaster Properties Dlg inputs
 #accepted formats: "00:00","-00:00"
-def stringtoseconds(string):
+def stringtoseconds(string:str) -> int:
     timeparts = string.split(':')
     if len(timeparts) != 2:
         return -1
@@ -122,22 +142,22 @@ def stringtoseconds(string):
     seconds -= int(timeparts[1])
     return seconds    #return negative number
 
-def fromFtoC(Ffloat):
+def fromFtoC(Ffloat) -> float:
     if Ffloat in [-1,None] or numpy.isnan(Ffloat):
         return Ffloat
     return (Ffloat-32.0)*(5.0/9.0)
 
-def fromCtoF(Cfloat):
+def fromCtoF(Cfloat) -> float:
     if Cfloat in [-1,None] or numpy.isnan(Cfloat):
         return Cfloat
     return (Cfloat*9.0/5.0)+32.0
 
-def RoRfromCtoF(CRoR):
+def RoRfromCtoF(CRoR) -> float:
     if CRoR in [-1,None] or numpy.isnan(CRoR):
         return CRoR
-    return (CRoR*9.0/5.0)
+    return CRoR*9.0/5.0
 
-def RoRfromFtoC(FRoR):
+def RoRfromFtoC(FRoR) -> float:
     if FRoR in [-1,None] or numpy.isnan(FRoR):
         return FRoR
     return FRoR*(5.0/9.0)
@@ -149,8 +169,8 @@ def convertRoR(r,source_unit,target_unit):
         return RoRfromCtoF(r)
     return RoRfromFtoC(r)
 
-def convertTemp(t,source_unit,target_unit):
-    if source_unit == target_unit:
+def convertTemp(t:float, source_unit:str, target_unit:str) -> float:
+    if source_unit == '' or target_unit == '' or source_unit == target_unit:
         return t
     if source_unit == 'C':
         return fromCtoF(t)
@@ -165,27 +185,27 @@ def path2url(path):
 # remaining artifacts from Qt4/5 compatibility layer:
 # note: those conversion functions are sometimes called with string arguments
 # thus a simple int(round(s)) won't work and a int(round(float(s))) needs to be applied
-def toInt(x):
+def toInt(x:Optional[Union[int,str,float]]) -> int:
     if x is None:
         return 0
     try:
         return int(round(float(x)))
     except Exception: # pylint: disable=broad-except
         return 0
-def toString(x):
+def toString(x) -> str:
     return str(x)
-def toList(x):
+def toList(x) -> List:
     if x is None:
         return []
     return list(x)
-def toFloat(x):
+def toFloat(x) -> float:
     if x is None:
         return 0.
     try:
         return float(x)
     except Exception: # pylint: disable=broad-except
         return 0.
-def toBool(x):
+def toBool(x) -> bool:
     if isinstance(x,str):
         if x == 'false':
             return False
@@ -196,15 +216,15 @@ def toBool(x):
         except Exception: # pylint: disable=broad-except
             return False
     return bool(x)
-def toStringList(x):
+def toStringList(x) -> List[str]:
     if x:
         return [str(s) for s in x]
     return []
 def toMap(x):
     return x
-def removeAll(l,s):
-    for _ in range(l.count(s)):  # @UndefinedVariable
-        l.remove(s)
+def removeAll(ll, s):
+    for _ in range(ll.count(s)):  # @UndefinedVariable
+        ll.remove(s)
 
 # fills in intermediate interpolated values replacing -1 values based on surrounding values
 # [1, 2, 3, -1, -1, -1, 10, 11] => [1, 2, 3, 4.75, 6.5, 8.25, 11]
@@ -212,16 +232,16 @@ def removeAll(l,s):
 # [-1,-1,2] => [2, 2, 2] # a prefix of -1 of max length 'interpolate_max' will be replaced by the first value in l that is not -1
 # INVARIANT: the resulting list has always the same length as l
 # only gaps of length interpolate_max (should be set to the global aw.qmc.interpolatemax), if not None, are interpolated
-def fill_gaps(l, interpolate_max=3):
+def fill_gaps(ll, interpolate_max:int=3):
     res = []
     last_val = -1
     skip = -1
-    for i,e in enumerate(l):
+    for i,e in enumerate(ll):
         if i >= skip:
             if i == 0 and e == -1 and last_val == -1: # only for the prefix
-                # a prefix of -1 will be replaced by the first value in l that is not -1
+                # a prefix of -1 will be replaced by the first value in ll that is not -1
                 s = -1
-                for ee in l[:5]:
+                for ee in ll[:5]:
                     if ee != -1:
                         s = ee
                         break
@@ -230,18 +250,18 @@ def fill_gaps(l, interpolate_max=3):
             elif e == -1 and last_val != -1:
                 next_val = None
                 next_idx = None # first index of an element beyond i of a value different to -1
-                for j in range(i+1,len(l)):
-                    if l[j] != -1:
-                        next_val = l[j]
+                for j in range(i+1,len(ll)):
+                    if ll[j] != -1:
+                        next_val = ll[j]
                         next_idx = j
                         break
                 if next_val is None or next_idx is None:
                     # no further valid values, we append the tail
-                    res.extend(l[i:])
+                    res.extend(ll[i:])
                     return res
                 if interpolate_max is not None and interpolate_max < (next_idx - i):
                     # gap too big
-                    res.extend(l[i:next_idx])
+                    res.extend(ll[i:next_idx])
                 else:
                     # gap small enough, we interpolate
                     # compute intermediate values
@@ -271,9 +291,7 @@ def fill_gaps(l, interpolate_max=3):
 # if creation or access of the path fails None is returned and memorized
 def getDataDirectory():
     app = QCoreApplication.instance()
-    if app is not None:
-        return _getAppDataDirectory(app)
-    return None
+    return _getAppDataDirectory(app)
 
 # internal function to return
 @functools.lru_cache(maxsize=None)  #for Python >= 3.9 can use @functools.cache
@@ -294,57 +312,45 @@ def _getAppDataDirectory(app):
 
 @functools.lru_cache(maxsize=None)  #for Python >= 3.9 can use @functools.cache
 def getAppPath():
-    res = ''
     platf = platform.system()
     if platf in ['Darwin','Linux']:
         if appFrozen():
-            res = QCoreApplication.applicationDirPath() + '/../../../'
-        else:
-            res = os.path.dirname(os.path.realpath(__file__)) + '/../'
-    elif platf == 'Windows':
+            return QCoreApplication.applicationDirPath() + '/../../../'
+        return os.path.dirname(os.path.realpath(__file__)) + '/../'
+    if platf == 'Windows':
         if appFrozen():
-            res = os.path.dirname(sys.executable) + '\\'
-        else:
-            res = os.path.dirname(os.path.realpath(__file__)) + '\\..\\'
-    else:
-        res = QCoreApplication.applicationDirPath() + '/'
-    return res
+            return os.path.dirname(sys.executable) + '\\'
+        return os.path.dirname(os.path.realpath(__file__)) + '\\..\\'
+    return QCoreApplication.applicationDirPath() + '/'
 
 @functools.lru_cache(maxsize=None)  #for Python >= 3.9 can use @functools.cache
 def getResourcePath():
-    res = ''
     platf = platform.system()
     if platf == 'Darwin':
         if appFrozen():
-            res = QCoreApplication.applicationDirPath() + '/../Resources/'
-        else:
-            res = os.path.dirname(os.path.realpath(__file__)) + '/../includes/'
-    elif platf == 'Linux':
+            return QCoreApplication.applicationDirPath() + '/../Resources/'
+        return os.path.dirname(os.path.realpath(__file__)) + '/../includes/'
+    if platf == 'Linux':
         if appFrozen():
-            res = QCoreApplication.applicationDirPath() + '/'
-        else:
-            res = os.path.dirname(os.path.realpath(__file__)) + '/../includes/'
-    elif platf == 'Windows':
+            return QCoreApplication.applicationDirPath() + '/'
+        return os.path.dirname(os.path.realpath(__file__)) + '/../includes/'
+    if platf == 'Windows':
         if appFrozen():
-            res = os.path.dirname(sys.executable) + '\\'
-        else:
-            res = os.path.dirname(os.path.realpath(__file__)) + '\\..\\includes\\'
-    else:
-        res = QCoreApplication.applicationDirPath() + '/'
-    return res
+            return os.path.dirname(sys.executable) + '\\'
+        return os.path.dirname(os.path.realpath(__file__)) + '\\..\\includes\\'
+    return QCoreApplication.applicationDirPath() + '/'
 
 # if share is True, the same (cache) file is shared between the Artisan and
 # ArtisanViewer apps
 # and locks have to be used to avoid race conditions
-def getDirectory(
-    filename: str, ext: Optional[str] = None, share: bool = False
-):
+def getDirectory(filename: str, ext: Optional[str] = None, share: bool = False) -> str:
     fn = filename
     if not share:
         app = QCoreApplication.instance()
-        if app.artisanviewerMode:
+        if app.artisanviewerMode: # type: ignore
             fn = filename + '_viewer'
-    fp = Path(getDataDirectory(), fn)
+    dd = getDataDirectory()
+    fp = Path(('' if dd is None else dd), fn)
     if ext is not None:
         fp = fp.with_suffix(ext)
     try:
@@ -380,11 +386,13 @@ def createGradient(rgb, tint_factor=0.1, shade_factor=0.1, reverse=False):
 
 def createRGBGradient(rgb, tint_factor=0.3, shade_factor=0.3):
     try:
+        rgb_tuple: Tuple[float, float, float]
         if isinstance(rgb, QColor):
             r,g,b,_ = rgb.getRgbF()
             rgb_tuple = (r,g,b)
         elif rgb[0:1] == '#':   # hex input like "#ffaa00"
-            rgb_tuple = tuple(int(rgb[i:i+2], 16)/255 for i in (1, 3 ,5))
+#            rgb_tuple = tuple(int(rgb[i:i+2], 16)/255 for i in (1, 3 ,5))
+            rgb_tuple = (float(int(rgb[1:3], 16)/255),float(int(rgb[3:5], 16)/255),float(int(rgb[5:7], 16)/255))
         else:                 # color name
             rgb_tuple = colors.hex2color(colors.cnames[rgb])
         #ref: https://stackoverflow.com/questions/6615002/given-an-rgb-value-how-do-i-create-a-tint-or-shade
@@ -409,12 +417,13 @@ def isOpen(ip: str, port: int) -> bool:
             return s.connect_ex((ip, port)) == 0
     except Exception as e: # pylint: disable=broad-except
         _log.info(e)
+    return False
 
 # Logging
 
 @functools.lru_cache(maxsize=None)  #for Python >= 3.9 can use @functools.cache
 def getLoggers():
-    return [logging.getLogger(name) for name in logging.root.manager.loggerDict if ('.' not in name)]  # @UndefinedVariable pylint: disable=no-member
+    return [logging.getLogger(name) for name in logging.root.manager.loggerDict if '.' not in name]  # @UndefinedVariable pylint: disable=no-member
 
 def debugLogLevelActive() -> bool:
     try:
@@ -423,13 +432,16 @@ def debugLogLevelActive() -> bool:
         return False
 
 def setDeviceDebugLogLevel(state: bool) -> None:
+    import pymodbus
     if state:
         # debug logging on
-        setFileLogLevels(logging.DEBUG, ['pymodbus'])
+        pymodbus.pymodbus_apply_logging_config(logging.DEBUG)
+        #setFileLogLevels(logging.DEBUG, ['pymodbus'])
         _log.info('device debug logging ON')
     else:
         # debug logging off
-        setFileLogLevels(logging.INFO, ['pymodbus'])
+        pymodbus.pymodbus_apply_logging_config(logging.INFO)
+        #setFileLogLevels(logging.INFO, ['pymodbus'])
         _log.info('device debug logging OFF')
 
 def setDebugLogLevel(state: bool) -> None:
@@ -468,13 +480,42 @@ def natsort(s):
 def scaleFloat2String(num):
     n = toFloat(num)
     if n == 0:
-        res = '0'
-    elif abs(n) < 1:
-        res = f'{n:.3f}'.rstrip('0').rstrip('.')
-    elif abs(n) >= 1000:
-        res = f'{n:.0f}'
-    elif abs(n) >= 100:
-        res = f'{n:.1f}'.rstrip('0').rstrip('.')
-    else:
-        res = f'{n:.2f}'.rstrip('0').rstrip('.')
-    return res
+        return '0'
+    if abs(n) < 1:
+        return f'{n:.3f}'.rstrip('0').rstrip('.')
+    if abs(n) >= 1000:
+        return f'{n:.0f}'
+    if abs(n) >= 100:
+        return f'{n:.1f}'.rstrip('0').rstrip('.')
+    return f'{n:.2f}'.rstrip('0').rstrip('.')
+
+
+# for use in widgets that expects a double via a self.createCLocalDoubleValidator that accepts both,
+# one dot and several commas. If there is no dot, the last comma is interpreted as decimal separator and the others removed
+# if there is a dot, the last one is used as a decimal separator and all other comma and dots are removed
+def comma2dot(s:str) -> str:
+    s = s.strip()
+    last_dot = s.rfind('.')
+    if last_dot > -1:
+        if last_dot + 1 == len(s):
+            # this is just a trailing dot, we remove this and all other dots and commas
+            return s.replace(',','').replace('.','')
+        # we just keep this one and remove all other comma and dots
+        return s[:last_dot].replace(',','').replace('.','') + s[last_dot:].replace(',','')
+    # there is no dot in the string
+    last_pos = s.rfind(',')
+    if last_pos > -1:
+        if last_pos + 1 == len(s):
+            # this is just a trailing comma, we remove this and all other dots and commas
+            return s.replace(',','').replace('.','')
+        # we turn the last comma into a dot and remove all others
+        return s[:last_pos].replace(',','') + '.' + s[last_pos+1:]
+    return s
+
+# typing tools
+
+def is_int_list(xs: List[Any]) -> TypeGuard[List[int]]:
+    return all(isinstance(x, int) for x in xs)
+
+def is_float_list(xs: List[Any]) -> TypeGuard[List[float]]:
+    return all(isinstance(x, float) for x in xs)

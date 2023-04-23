@@ -5,24 +5,31 @@
 import os
 import csv
 import logging
-from typing import Final
+from typing import List, Optional, TYPE_CHECKING
+from typing_extensions import Final  # Python <=3.7
+
+if TYPE_CHECKING:
+    from artisanlib.main import ApplicationWindow # pylint: disable=unused-import
+    from artisanlib.types import ProfileData # pylint: disable=unused-import
 
 try:
-    #ylint: disable = E, W, R, C
+    #pylint: disable = E, W, R, C
     from PyQt6.QtWidgets import QApplication # @UnusedImport @Reimport  @UnresolvedImport
 except Exception: # pylint: disable=broad-except
-    #ylint: disable = E, W, R, C
-    from PyQt5.QtWidgets import QApplication # @UnusedImport @Reimport  @UnresolvedImport
+    #pylint: disable = E, W, R, C
+    from PyQt5.QtWidgets import QApplication # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
 
 
-_log: Final = logging.getLogger(__name__)
+_log: Final[logging.Logger] = logging.getLogger(__name__)
+
+
 
 # returns a dict containing all profile information contained in the given Rubasse CSV file
-def extractProfileRubasseCSV(file,aw):
-    res = {} # the interpreted data set
+def extractProfileRubasseCSV(file:str, aw:'ApplicationWindow') -> 'ProfileData':
+    res:ProfileData = {} # the interpreted data set
 
     res['samplinginterval'] = 1.0
-    filename = os.path.basename(file)
+    filename:str = os.path.basename(file)
     res['title'] = filename
 
     with open(file, newline='',encoding='utf-8') as csvFile:
@@ -31,27 +38,27 @@ def extractProfileRubasseCSV(file,aw):
         header_row = next(data)
         header = ['time','BT','Fan','Heater','RoR','Drum','Humidity','ET','Pressure'] + ['DT', 'timeB', 'BTB', 'FanB', 'HeaterB', 'RoRB', 'DrumB', 'HumidityB', 'ETB', 'PressureB', 'DTB']
 
-        fan = None # holds last processed fan event value
-        fan_last = None # holds the fan event value before the last one
-        heater = None # holds last processed heater event value
-        heater_last = None # holds the heater event value before the last one
-        fan_event = False # set to True if a fan event exists
-        heater_event = False # set to True if a heater event exists
+        fan:Optional[float] = None # holds last processed fan event value
+        fan_last:Optional[float] = None # holds the fan event value before the last one
+        heater:Optional[float] = None # holds last processed heater event value
+        heater_last:Optional[float] = None # holds the heater event value before the last one
+        fan_event:bool = False # set to True if a fan event exists
+        heater_event:bool = False # set to True if a heater event exists
 
-        specialevents = []
-        specialeventstype = []
-        specialeventsvalue = []
-        specialeventsStrings = []
-        timex = []
-        temp1 = []
-        temp2 = []
-        extra1 = []
-        extra2 = []
-        extra3 = []
-        extra4 = []
-        extra5 = []
-        extra6 = []
-        timeindex = [-1,0,0,0,0,0,0,0] #CHARGE index init set to -1 as 0 could be an actal index used
+        specialevents:List[int] = []
+        specialeventstype:List[int] = []
+        specialeventsvalue:List[float] = []
+        specialeventsStrings:List[str] = []
+        timex:List[float] = []
+        temp1:List[float] = []
+        temp2:List[float] = []
+        extra1:List[float] = []
+        extra2:List[float] = []
+        extra3:List[float] = []
+        extra4:List[float] = []
+        extra5:List[float] = []
+        extra6:List[float] = []
+        timeindex:List[int] = [-1,0,0,0,0,0,0,0] #CHARGE index init set to -1 as 0 could be an actal index used
 
 
 
@@ -65,14 +72,14 @@ def extractProfileRubasseCSV(file,aw):
             # take i as time in seconds
             timex.append(i)
 
-            et = -1
+            et:float = -1.0
             try:
                 et = float(item['ET'])
             except Exception: # pylint: disable=broad-except
                 pass
             temp1.append(et)
 
-            bt = -1
+            bt:float = -1.0
             try:
                 bt = float(item['BT'])
                 # after 2min we mark DRY if not auto adjusted
@@ -82,42 +89,42 @@ def extractProfileRubasseCSV(file,aw):
                 pass
             temp2.append(bt)
 
-            heaterV = -1
+            heaterV:float = -1.0
             try:
                 heaterV = float(item['Heater'])
             except Exception: # pylint: disable=broad-except
                 pass
             extra1.append(heaterV)
 
-            fanV = -1
+            fanV:float = -1.0
             try:
                 fanV = float(item['Fan'])
             except Exception: # pylint: disable=broad-except
                 pass
             extra2.append(fanV)
 
-            humidity = -1
+            humidity:float = -1.0
             try:
                 humidity = float(item['Humidity'])
             except Exception: # pylint: disable=broad-except
                 pass
             extra3.append(humidity)
 
-            pressure = -1
+            pressure:float = -1.0
             try:
                 pressure = float(item['Pressure'])
             except Exception: # pylint: disable=broad-except
                 pass
             extra4.append(pressure)
 
-            drum = -1
+            drum:float = -1.0
             try:
                 drum = float(item['Drum'])
             except Exception: # pylint: disable=broad-except
                 pass
             extra5.append(drum)
 
-            DT = -1
+            DT:float = -1.0
             try:
                 DT = float(item['DT'])
             except Exception: # pylint: disable=broad-except
@@ -127,56 +134,60 @@ def extractProfileRubasseCSV(file,aw):
 
             if 'Fan' in item:
                 try:
-                    v = float(item['Fan'])
-                    if fan is None or v != fan:
-                        # fan value changed
-                        if fan_last is not None and v == fan_last:
-                            # just a fluctuation, we remove the last added fan value again
-                            fan_last_idx = next(i for i in reversed(range(len(specialeventstype))) if specialeventstype[i] == 0)
-                            del specialeventsvalue[fan_last_idx]
-                            del specialevents[fan_last_idx]
-                            del specialeventstype[fan_last_idx]
-                            del specialeventsStrings[fan_last_idx]
-                            fan = fan_last
-                            fan_last = None
+                    vf = item['Fan']
+                    if vf != '':
+                        v = float(vf)
+                        if fan is None or v != fan:
+                            # fan value changed
+                            if fan_last is not None and v == fan_last:
+                                # just a fluctuation, we remove the last added fan value again
+                                fan_last_idx = next(i for i in reversed(range(len(specialeventstype))) if specialeventstype[i] == 0)
+                                del specialeventsvalue[fan_last_idx]
+                                del specialevents[fan_last_idx]
+                                del specialeventstype[fan_last_idx]
+                                del specialeventsStrings[fan_last_idx]
+                                fan = fan_last
+                                fan_last = None
+                            else:
+                                fan_last = fan
+                                fan = v
+                                fan_event = True
+                                v = v/10. + 1
+                                specialeventsvalue.append(v)
+                                specialevents.append(i)
+                                specialeventstype.append(0)
+                                specialeventsStrings.append(f"{float(item['Fan'])}%")
                         else:
-                            fan_last = fan
-                            fan = v
-                            fan_event = True
-                            v = v/10. + 1
-                            specialeventsvalue.append(v)
-                            specialevents.append(i)
-                            specialeventstype.append(0)
-                            specialeventsStrings.append('{}'.format(float(item['Fan'])) + '%')
-                    else:
-                        fan_last = None
+                            fan_last = None
                 except Exception as e: # pylint: disable=broad-except
                     _log.exception(e)
             if 'Heater' in item:
                 try:
-                    v = int(round(float(item['Heater'])))
-                    if heater is None or v != heater:
-                        # heater value changed
-                        if heater_last is not None and v == heater_last:
-                            # just a fluctuation, we remove the last added heater value again
-                            heater_last_idx = next(i for i in reversed(range(len(specialeventstype))) if specialeventstype[i] == 3)
-                            del specialeventsvalue[heater_last_idx]
-                            del specialevents[heater_last_idx]
-                            del specialeventstype[heater_last_idx]
-                            del specialeventsStrings[heater_last_idx]
-                            heater = heater_last
-                            heater_last = None
+                    vh = item['Heater']
+                    if vh != '':
+                        v = float(vh)
+                        if heater is None or v != heater:
+                            # heater value changed
+                            if heater_last is not None and v == heater_last:
+                                # just a fluctuation, we remove the last added heater value again
+                                heater_last_idx = next(i for i in reversed(range(len(specialeventstype))) if specialeventstype[i] == 3)
+                                del specialeventsvalue[heater_last_idx]
+                                del specialevents[heater_last_idx]
+                                del specialeventstype[heater_last_idx]
+                                del specialeventsStrings[heater_last_idx]
+                                heater = heater_last
+                                heater_last = None
+                            else:
+                                heater_last = heater
+                                heater = v
+                                heater_event = True
+                                v = v/10. + 1
+                                specialeventsvalue.append(v)
+                                specialevents.append(i)
+                                specialeventstype.append(3)
+                                specialeventsStrings.append(f"{float(item['Heater'])}%")
                         else:
-                            heater_last = heater
-                            heater = v
-                            heater_event = True
-                            v = v/10. + 1
-                            specialeventsvalue.append(v)
-                            specialevents.append(i)
-                            specialeventstype.append(3)
-                            specialeventsStrings.append('{}'.format(float(item['Heater'])) + '%')
-                    else:
-                        heater_last = None
+                            heater_last = None
                 except Exception as e: # pylint: disable=broad-except
                     _log.exception(e)
             i = i + 1
@@ -212,7 +223,7 @@ def extractProfileRubasseCSV(file,aw):
     if timeindex[6] == 0:
         timeindex[6] = max(0,len(timex)-1)
 
-    res['mode'] = 'C'
+    res['mode']= 'C'
 
     res['timex'] = timex
     res['temp1'] = temp1

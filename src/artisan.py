@@ -18,12 +18,12 @@ try:
         #pylint: disable = E, W, R, C
         from PyQt6.QtWidgets import QApplication  # @UnusedImport @Reimport  @UnresolvedImport
         from PyQt6.QtCore import Qt     # @Reimport # @UnusedImport @Reimport  @UnresolvedImport
-    except:
+    except Exception: # pylint: disable=broad-except
         #pylint: disable = E, W, R, C
-        from PyQt5.QtWidgets import QApplication  # @UnusedImport @Reimport  @UnresolvedImport
-        from PyQt5.QtCore import Qt  # @UnusedImport @Reimport  @UnresolvedImport
-    QApplication.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling)
-    QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps)
+        from PyQt5.QtWidgets import QApplication # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
+        from PyQt5.QtCore import Qt # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
+        QApplication.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling) # type: ignore
+        QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps) # type: ignore
 #    os.environ["QT_SCALE_FACTOR"] = "1"
 except Exception: # pylint: disable=broad-except
     pass
@@ -44,7 +44,7 @@ if system().startswith('Windows'):
                 import site # @Reimport @UnusedImport
                 QApplication.addLibraryPath(site.getsitepackages()[1] + '\\PyQt6\\plugins')
         except Exception:  # pylint: disable=broad-except
-            from PyQt5.QtWidgets import QApplication  # @UnresolvedImport @Reimport @UnusedImport pylint: disable=import-error
+            from PyQt5.QtWidgets import QApplication # type: ignore # @UnresolvedImport @Reimport @UnusedImport pylint: disable=import-error
             if ib:
                 QApplication.addLibraryPath(os.path.join(os.path.dirname(os.path.realpath(sys.executable)), 'plugins'))
             else:
@@ -64,7 +64,7 @@ else: # Linux
                 import site # @Reimport
                 QApplication.addLibraryPath(os.path.dirname(site.getsitepackages()[0]) + '/PyQt6/qt_plugins')
         except Exception:  # pylint: disable=broad-except
-            from PyQt5.QtWidgets import QApplication  # @UnresolvedImport @Reimport @UnusedImport pylint: disable=import-error
+            from PyQt5.QtWidgets import QApplication # type: ignore # @UnresolvedImport @Reimport @UnusedImport pylint: disable=import-error
             if ib:
                 QApplication.addLibraryPath(os.path.join(os.path.dirname(__file__), 'Resources/qt_plugins'))
             else:
@@ -85,7 +85,7 @@ if system() == 'Windows' and hasattr(sys, 'frozen'): # tools/freeze
 if __name__ == '__main__':
 
     # Manage commands that does not need to start the whole application
-    if command_utility.handleCommands() == True:
+    if command_utility.handleCommands():
         freeze_support()
         main.main()
 
