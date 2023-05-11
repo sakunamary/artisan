@@ -25,15 +25,13 @@ from artisanlib.dialogs import ArtisanDialog
 from artisanlib.widgets import MyQComboBox
 
 try:
-    #pylint: disable = E, W, R, C
     from PyQt6.QtCore import Qt, pyqtSlot, QRegularExpression, QSettings # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtGui import QIntValidator, QRegularExpressionValidator # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtWidgets import (QApplication, QWidget, QLabel, QTableWidget, QPushButton, # @UnusedImport @Reimport  @UnresolvedImport
         QComboBox, QHBoxLayout, QVBoxLayout, QCheckBox, QGridLayout, QGroupBox, QLineEdit, # @UnusedImport @Reimport  @UnresolvedImport
         QMessageBox, QRadioButton, QSpinBox, QStatusBar, QTabWidget, QButtonGroup, QDoubleSpinBox, # @UnusedImport @Reimport  @UnresolvedImport
         QTimeEdit, QLayout, QSizePolicy, QHeaderView) # @UnusedImport @Reimport  @UnresolvedImport
-except Exception: # pylint: disable=broad-except
-    #pylint: disable = E, W, R, C
+except ImportError:
     from PyQt5.QtCore import Qt, pyqtSlot, QRegularExpression, QSettings # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtGui import QIntValidator, QRegularExpressionValidator # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QTableWidget, QPushButton, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
@@ -814,7 +812,6 @@ class PID_DlgControl(ArtisanDialog):
             self.aw.pidcontrol.svActions = rampsoaks['svActions']
             self.aw.pidcontrol.svBeeps = rampsoaks['svBeeps']
             self.aw.pidcontrol.svDescriptions = rampsoaks['svDescriptions']
-            self.setrampsoaks()
             self.aw.qmc.rsfile = filename
             self.rsfile.setText(self.aw.qmc.rsfile)
         except Exception as ex: # pylint: disable=broad-except
@@ -824,6 +821,7 @@ class PID_DlgControl(ArtisanDialog):
         finally:
             if self.aw.qmc.rampSoakSemaphore.available() < 1:
                 self.aw.qmc.rampSoakSemaphore.release(1)
+            self.setrampsoaks()
 
     @pyqtSlot(bool)
     def exportrampsoaks(self,_):
@@ -1614,8 +1612,6 @@ class PXRpidDlgControl(PXpidDlgControl):
                 self.status.showMessage(mssg,5000)
                 self.aw.qmc.adderror(mssg)
         except Exception as e: # pylint: disable=broad-except
-            #import traceback
-            #traceback.print_exc(file=sys.stdout)
             _, _, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message','Exception:') + ' setONOFFstandby() {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
 
@@ -2718,8 +2714,6 @@ class PXG4pidDlgControl(PXpidDlgControl):
                 self.aw.fujipid.PXG4[soakkey][0] = stringtoseconds(segments[soakkey])
             self.createsegmenttable()
         except Exception as ex: # pylint: disable=broad-except
-#            import traceback
-#            traceback.print_exc(file=sys.stdout)
             _, _, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message','Exception:',None) + ' loadPIDJSON() {0}').format(str(ex)),getattr(exc_tb, 'tb_lineno', '?'))
 
@@ -3784,8 +3778,6 @@ class PXG4pidDlgControl(PXpidDlgControl):
                 message = QApplication.translate('StatusBar','Unable',None)
                 self.status.showMessage(QApplication.translate('StatusBar','No data received',None),5000)
         except Exception as e: # pylint: disable=broad-except
-            #import traceback
-            #traceback.print_exc(file=sys.stdout)
             _, _, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message','Exception:',None) + ' setONOFFstandby() {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
 

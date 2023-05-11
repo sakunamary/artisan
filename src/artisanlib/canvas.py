@@ -169,6 +169,7 @@ class tgraphcanvas(FigureCanvas):
     alarmsetSignal = pyqtSignal(int)
     moveBackgroundSignal = pyqtSignal(str, int)
     eventRecordSignal = pyqtSignal(int)
+    eventRecordActionSignal = pyqtSignal(int,float,str)
     showCurveSignal = pyqtSignal(str, bool)
     showExtraCurveSignal = pyqtSignal(int, str, bool)
     showEventsSignal = pyqtSignal(int, bool)
@@ -825,7 +826,11 @@ class tgraphcanvas(FigureCanvas):
                        'Santoker BT/ET',            #134
                        '+Santoker Power/Fan',       #135
                        '+Santoker Drum',            #136
-                       'Phidget DAQ1500'            #137
+                       'Phidget DAQ1500',           #137
+                       'Kaleido BT/ET',             #138
+                       '+Kaleido SV/AT',            #139
+                       '+Kaleido Drum/AH',          #140
+                       '+Kaleido Heater/Fan'        #141
                        ]
 
         # ADD DEVICE:
@@ -877,7 +882,8 @@ class tgraphcanvas(FigureCanvas):
             131, # Yocto Voltage
             132, # Yocto Current
             133, # Yocto Sensor
-            134  # Santoker BT/ET
+            134, # Santoker BT/ET
+            138  # Kaleido BT/ET
         ]
 
         # ADD DEVICE:
@@ -928,7 +934,9 @@ class tgraphcanvas(FigureCanvas):
             133, # Yocto Sensor
             135, # Santoker Power/Fan
             136, # Santoker Drum
-            137  # Phidget DAQ1500
+            137, # Phidget DAQ1500
+            140, # Kaleido Drum/AH
+            141, # Kaleido Heater/Fan
         ]
 
         #extra devices
@@ -2181,6 +2189,7 @@ class tgraphcanvas(FigureCanvas):
         self.alarmsetSignal.connect(self.selectAlarmSet)
         self.moveBackgroundSignal.connect(self.moveBackgroundAndRedraw)
         self.eventRecordSignal.connect(self.EventRecordSlot)
+        self.eventRecordActionSignal.connect(self.EventRecordActionSlot)
         self.showCurveSignal.connect(self.showCurve)
         self.showExtraCurveSignal.connect(self.showExtraCurve)
         self.showEventsSignal.connect(self.showEvents)
@@ -2266,6 +2275,15 @@ class tgraphcanvas(FigureCanvas):
             else:
                 while len(self.ax.lines) > 0:
                     self.ax.lines[0].remove()
+
+    def ax_combo_text_annotations_clear(self):
+        if self.ax is not None:
+            for child in self.ax.get_children():
+                if isinstance(child, mpl.text.Annotation):
+                    try:
+                        child.remove()
+                    except Exception: # pylint: disable=broad-except
+                        pass
 
     def ax_annotations_clear(self):
         for la in self.l_annotations + self.l_background_annotations:
@@ -2856,7 +2874,7 @@ class tgraphcanvas(FigureCanvas):
                 QDesktopServices.openUrl(QUrl(roastLink(self.roastUUID), QUrl.ParsingMode.TolerantMode))
                 return
 
-            if not self.designerflag and not self.wheelflag and event.inaxes is None and not self.flagstart and not self.flagon and event.button == 1 and event.dblclick and event.x > event.y:
+            if not self.wheelflag and event.inaxes is None and not self.flagstart and not self.flagon and event.button == 1 and event.dblclick and event.x > event.y:
                 fig = self.ax.get_figure()
                 s = fig.get_size_inches()*fig.dpi
                 if event.x > s[0]*2/3 and event.y > s[1]*2/3:
@@ -3211,7 +3229,7 @@ class tgraphcanvas(FigureCanvas):
                 return self.aw.s7.type[6+c] != 1 and self.aw.s7.mode[6+c] == 0 and (self.aw.s7.div[6+c] == 0 or self.aw.s7.type[6+c] == 2) and no_math_formula_defined
             if self.extradevices[n] == 110: # S7_910
                 return self.aw.s7.type[8+c] != 1 and self.aw.s7.mode[8+c] == 0 and (self.aw.s7.div[8+c] == 0 or self.aw.s7.type[8+c] == 2) and no_math_formula_defined
-            if self.extradevices[n] in [54,90,91,135,136]: # Hottop Heater/Fan, Slider 12, Slider 34, Santoker Power / Fan
+            if self.extradevices[n] in [54,90,91,135,136,140,141]: # Hottop Heater/Fan, Slider 12, Slider 34, Santoker Power / Fan, Kaleido Fan/Drum, Kaleido Heater/AH
                 return True
             if self.extradevices[n] == 136 and c == 0: # Santoker Drum
                 return True
@@ -3358,7 +3376,7 @@ class tgraphcanvas(FigureCanvas):
             wait_period = 10 # on tight sampling rate we only wait 10ms
         gotlock = self.profileDataSemaphore.tryAcquire(1, wait_period) # we try to catch the lock, if we fail we just skip this sampling round (prevents stacking of waiting calls)
         if not gotlock:
-            _log.info('sample_processing(): failed to get profileDataSemaphore lock')
+            _log.debug('sample_processing(): failed to get profileDataSemaphore lock')
         else:
             try:
                 # duplicate system state flag flagstart locally and only refer to this copy within this function to make it behaving uniquely (either append or overwrite mode)
@@ -4281,25 +4299,6 @@ class tgraphcanvas(FigureCanvas):
                 if self.temporary_error is not None:
                     self.aw.sendmessage(self.temporary_error)
                     self.temporary_error = None # clear flag
-                    # update error dlg
-                    if self.aw.error_dlg:
-                        self.aw.error_dlg.update()
-
-                #update serial_dlg
-                if self.aw.serial_dlg:
-                    try:
-                        #### lock shared resources #####
-                        self.seriallogsemaphore.acquire(1)
-                        self.aw.serial_dlg.update()
-                    except Exception as e: # pylint: disable=broad-except
-                        _log.exception(e)
-                    finally:
-                        if self.seriallogsemaphore.available() < 1:
-                            self.seriallogsemaphore.release(1)
-
-                #update message_dlg
-                if self.aw.message_dlg:
-                    self.aw.message_dlg.update()
 
                 #check quantified events; do this before the canvas is redraw as additional annotations might be added here, but do not recursively call updategraphics
                 # NOTE: that EventRecordAction has to be called from outside the critical section protected by the profileDataSemaphore as it is itself accessing this section!!
@@ -6579,8 +6578,8 @@ class tgraphcanvas(FigureCanvas):
                     self.aw.setExtraEventButtonStyle(self.aw.lastbuttonpressed, style='normal')
                 # reset lastbuttonpressed
                 self.aw.lastbuttonpressed = -1
-            except Exception as e: # pylint: disable=broad-except
-                _log.exception(e)
+            except Exception: # pylint: disable=broad-except
+                pass
 
             #self.aw.pidcontrol.sv = None
             self.aw.fujipid.sv = None
@@ -10403,7 +10402,7 @@ class tgraphcanvas(FigureCanvas):
 
     # adjust min/max limits of temperature sliders to the actual temperature mode
     def adjustTempSliders(self):
-        if self.mode != self.mode_tempsliders:
+        if self.aw is not None and self.mode != self.mode_tempsliders:
             for i in range(4):
                 if self.aw.eventslidertemp[i]:
                     if self.mode == 'C':
@@ -10413,6 +10412,11 @@ class tgraphcanvas(FigureCanvas):
                         self.aw.eventslidermin[i] = int(round(fromCtoF(self.aw.eventslidermin[i])))
                         self.aw.eventslidermax[i] = int(round(fromCtoF(self.aw.eventslidermax[i])))
             self.aw.updateSliderMinMax()
+            # adjust SV slider limits
+            if self.mode == 'C':
+                self.aw.pidcontrol.conv2celsius()
+            else:
+                self.aw.pidcontrol.conv2fahrenheit()
             self.mode_tempsliders = self.mode
 
     #sets the graph display in Fahrenheit mode
@@ -10433,13 +10437,13 @@ class tgraphcanvas(FigureCanvas):
                 self.step100temp = int(round(fromCtoF(self.step100temp)))
             self.AUCbase = int(round(fromCtoF(self.AUCbase)))
             self.alarmtemperature = [(fromCtoF(t) if t != 500 else t) for t in self.alarmtemperature]
-            # conv Arduino mode
-            if self.aw:
-                self.aw.pidcontrol.conv2fahrenheit()
+#            # conv Arduino mode
+#            if self.aw:
+#                self.aw.pidcontrol.conv2fahrenheit()
         if self.ax is not None:
             self.ax.set_ylabel('F',size=16,color = self.palette['ylabel']) #Write "F" on Y axis
         self.mode = 'F'
-        if self.aw: # during initialization aw is still None!
+        if self.aw is not None: # during initialization aw is still None!
             self.aw.FahrenheitAction.setDisabled(True)
             self.aw.CelsiusAction.setEnabled(True)
             self.aw.ConvertToFahrenheitAction.setDisabled(True)
@@ -10467,12 +10471,12 @@ class tgraphcanvas(FigureCanvas):
                 self.step100temp = int(round(fromFtoC(self.step100temp)))
             self.AUCbase = int(round(fromFtoC(self.AUCbase)))
             self.alarmtemperature = [(fromFtoC(t) if t != 500 else t) for t in self.alarmtemperature]
-            # conv Arduino mode
-            self.aw.pidcontrol.conv2celsius()
+#            # conv Arduino mode
+#            self.aw.pidcontrol.conv2celsius()
         if self.ax is not None:
             self.ax.set_ylabel('C',size=16,color = self.palette['ylabel']) #Write "C" on Y axis
         self.mode = 'C'
-        if self.aw: # during initialization aw is still None
+        if self.aw is not None: # during initialization aw is still None
             self.aw.CelsiusAction.setDisabled(True)
             self.aw.FahrenheitAction.setEnabled(True)
             self.aw.ConvertToCelsiusAction.setDisabled(True)
@@ -11233,13 +11237,31 @@ class tgraphcanvas(FigureCanvas):
                                 'timeout': self.aw.ser.timeout}
                     self.aw.santoker.start(self.aw.santokerHost, self.aw.santokerPort,
                         santoker_serial,
-                        connected_handler=lambda : self.aw.sendmessageSignal.emit(QApplication.translate('Message', 'Santoker connected'),True,None),
-                        disconnected_handler=lambda : self.aw.sendmessageSignal.emit(QApplication.translate('Message', 'Santoker disconnected'),True,None),
+                        connected_handler=lambda : self.aw.sendmessageSignal.emit(QApplication.translate('Message', '{} connected').format('Santoker'),True,None),
+                        disconnected_handler=lambda : self.aw.sendmessageSignal.emit(QApplication.translate('Message', '{} disconnected').format('Santoker'),True,None),
                         charge_handler=lambda : (self.markChargeSignal.emit() if (self.timeindex[0] == -1) else None),
                         dry_handler=lambda : (self.markDRYSignal.emit() if (self.timeindex[2] == 0) else None),
                         fcs_handler=lambda : (self.markFCsSignal.emit() if (self.timeindex[1] == 0) else None),
                         scs_handler=lambda : (self.markSCsSignal.emit() if (self.timeindex[4] == 0) else None),
                         drop_handler=lambda : (self.markDropSignal.emit() if (self.timeindex[6] == 0) else None))
+                elif self.device == 138:
+                    # connect Kaleido
+                    from artisanlib.kaleido import KaleidoPort
+                    self.aw.kaleido = KaleidoPort()
+                    self.aw.kaleido.setLogging(self.device_logging)
+                    kaleido_serial:Optional[SerialSettings] = None
+                    if self.aw.kaleidoSerial:
+                        kaleido_serial = {
+                                'port': self.aw.ser.comport,
+                                'baudrate': self.aw.ser.baudrate,
+                                'bytesize': self.aw.ser.bytesize,
+                                'stopbits': self.aw.ser.stopbits,
+                                'parity': self.aw.ser.parity,
+                                'timeout': self.aw.ser.timeout}
+                    self.aw.kaleido.start(self.aw.qmc.mode, self.aw.kaleidoHost, self.aw.kaleidoPort,
+                        serial=kaleido_serial,
+                        connected_handler=lambda : self.aw.sendmessageSignal.emit(QApplication.translate('Message', '{} connected').format('Kaleido'),True,None),
+                        disconnected_handler=lambda : self.aw.sendmessageSignal.emit(QApplication.translate('Message', '{} disconnected').format('Kaleido'),True,None))
             self.aw.initializedMonitoringExtraDeviceStructures()
 
             #reset alarms
@@ -11284,11 +11306,22 @@ class tgraphcanvas(FigureCanvas):
             self.aw.pidcontrol.activateSVSlider(self.aw.pidcontrol.svSlider and self.aw.buttonONOFF.isVisible())
             self.block_update = False # unblock the updating of the bitblit canvas
             self.aw.updateReadingsLCDsVisibility() # this one triggers the resize and the recreation of the bitblit canvas
+
+            if self.device == 138:
+                # if Kaleido Serial or Network is selected we run the ON action before starting the sample thread
+                try:
+                    self.aw.eventactionx(self.extrabuttonactions[0],self.extrabuttonactionstrings[0])
+                except Exception as e: # pylint: disable=broad-except
+                    _log.error(e)
+                QApplication.processEvents()
             self.threadserver.createSampleThread()
-            try:
-                self.aw.eventactionx(self.extrabuttonactions[0],self.extrabuttonactionstrings[0])
-            except Exception as e: # pylint: disable=broad-except
-                _log.exception(e)
+            if self.device != 138:
+                # if not Kaleido Serial or Network we run the ON action after starting the sample thread which might start the connectin in the first place
+                try:
+                    self.aw.eventactionx(self.extrabuttonactions[0],self.extrabuttonactionstrings[0])
+                except Exception as e: # pylint: disable=broad-except
+                    _log.error(e)
+
             if not bool(self.aw.simulator):
                 QTimer.singleShot(300,self.StartAsyncSamplingAction)
             _log.info('ON MONITOR (sampling @%ss)', self.aw.float2float(self.delay/1000))
@@ -11315,6 +11348,7 @@ class tgraphcanvas(FigureCanvas):
                 # trigger event action before disconnecting from devices
                 if self.extrabuttonactions[1] != 18: # Artisan Commands are executed after the OFFMonitor action is fully executued as they might trigger another buttons
                     self.aw.eventactionx(self.extrabuttonactions[1],self.extrabuttonactionstrings[1])
+                    QApplication.processEvents()
             except Exception as e: # pylint: disable=broad-except
                 _log.exception(e)
 
@@ -11329,14 +11363,24 @@ class tgraphcanvas(FigureCanvas):
                 # we only reset the LCDs, but keep the readings
                 self.clearLCDs()
 
-            self.aw.pidcontrol.pidOff()
+            #if self.device != 138: # don't forward pidOff command to connected Kaleido machine
+            self.aw.pidcontrol.pidOff(send_command=self.device != 138)
 #            if self.device == 53:
 #                self.aw.HottopControlOff()
+
+            # we need to wait a moment and processEvents to give OFF actions using Qt signals the chance to still run correctly
+            libtime.sleep(0.2)
+            QApplication.processEvents()
 
             # disconnect Santoker
             if not bool(self.aw.simulator) and self.device == 134 and self.aw.santoker is not None:
                 self.aw.santoker.stop()
                 self.aw.santoker = None
+
+            # disconnect Kaleido
+            if not bool(self.aw.simulator) and self.device == 138 and self.aw.kaleido is not None:
+                self.aw.kaleido.stop()
+                self.aw.kaleido = None
 
             # at OFF we stop the follow-background on FujiPIDs and set the SV to 0
             if self.device == 0 and self.aw.fujipid.followBackground and self.aw.fujipid.sv and self.aw.fujipid.sv > 0:
@@ -13052,6 +13096,10 @@ class tgraphcanvas(FigureCanvas):
     def EventRecordSlot(self,ee):
         self.EventRecord(ee)
 
+    @pyqtSlot(int,float,str)
+    def EventRecordActionSlot(self,eventtype:int,eventvalue:float,description:str):
+        self.EventRecordAction(extraevent=1,eventtype=eventtype,eventvalue=eventvalue,eventdescription=description)
+
     def EventRecord(self,extraevent=None,takeLock=True,doupdategraphics=True,doupdatebackground=True):
         try:
             if extraevent is not None:
@@ -13113,7 +13161,8 @@ class tgraphcanvas(FigureCanvas):
                     #i = index number of the event (current length of the time list)
                     i = len(self.timex)-1
                     # if Description, Type and Value of the new event equals the last recorded one, we do not record this again!
-                    if not(self.specialeventstype) or not(self.specialeventsvalue) or not(self.specialeventsStrings) or not(eventtype != 4 and self.specialeventstype[-1] == eventtype and self.specialeventsvalue[-1] == eventvalue and self.specialeventsStrings[-1] == eventdescription):
+                    if (not(self.specialeventstype) or not(self.specialeventsvalue) or not(self.specialeventsStrings) or
+                            not(eventtype != 4 and self.specialeventstype[-1] == eventtype and self.specialeventsvalue[-1] == eventvalue and self.specialeventsStrings[-1] == eventdescription)):
                         fontprop_small = self.aw.mpl_fontproperties.copy()
                         fontsize = 'xx-small'
                         fontprop_small.set_size(fontsize)
@@ -13153,7 +13202,7 @@ class tgraphcanvas(FigureCanvas):
                             index = self.specialevents[-1]
                             if etype < 4  and (not self.renderEventsDescr or len(self.specialeventsStrings[-1].strip()) == 0):
                                 firstletter = self.etypesf(etype)[0]
-                                secondletter = self.eventsvaluesShort(float(etype))
+                                secondletter = self.eventsvaluesShort(sevalue)
                                 if self.aw.eventslidertemp[etype]:
                                     thirdletter = self.mode # postfix
                                 else:
@@ -14782,6 +14831,9 @@ class tgraphcanvas(FigureCanvas):
                 error = error.splitlines()[0]
             except Exception as e: # pylint: disable=broad-except
                 _log.exception(e)
+            # update the error dlg
+            if self.aw.error_dlg:
+                self.aw.updateErrorLogSignal.emit()
             if self.flagon: # don't send message here, but cache it and send it from updategraphics from within the GUI thread
                 self.temporary_error = error
             else:
@@ -14811,6 +14863,9 @@ class tgraphcanvas(FigureCanvas):
                 if res:
                     self.ax_lines_clear()
                     self.ax_annotations_clear() # remove background profiles annotations (has to be done before reset!)
+                    # we also have to remove those extra event annotations if in combo mode
+                    if self.eventsGraphflag == 4:
+                        self.ax_combo_text_annotations_clear()
                     self.connect_designer()
                     self.aw.disableEditMenus(designer=True)
                     self.redraw()
@@ -14831,6 +14886,9 @@ class tgraphcanvas(FigureCanvas):
             #reset (clear) plot
             self.ax_lines_clear()
             self.ax_annotations_clear() # remove background profiles annotations (has to be done before reset!)
+            # we also have to remove those extra event annotations if in combo mode
+            if self.eventsGraphflag == 4:
+                self.ax_combo_text_annotations_clear()
             self.reset(redraw=False,soundOn=False)
             self.connect_designer()
             self.aw.disableEditMenus(designer=True)

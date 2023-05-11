@@ -1,5 +1,7 @@
 #!/bin/sh
 
+echo $PATH
+
 #set -ex
 set -e  # reduced logging
 
@@ -17,12 +19,12 @@ else
 
 # for PyQt6:
     export QT_PATH=${PYTHONPATH}/site-packages/PyQt6/Qt6
-    export QT_SRC_PATH=~/Qt/6.4.1/macos
+    export QT_SRC_PATH=~/Qt6.5/6.5.0/macos
     export PYUIC=pyuic6
     export PYRCC=pyrcc6
     export PYLUPDATE=./pylupdate6pro
 
-    export MACOSX_DEPLOYMENT_TARGET=10.15
+    export MACOSX_DEPLOYMENT_TARGET=11.0
     export DYLD_LIBRARY_PATH=$PYTHON/lib:$DYLD_LIBRARY_PATH
     export PATH=$PYTHON/bin:$PYTHON/lib:$PATH
     export PATH=$QT_PATH/bin:$QT_PATH/lib:$PATH

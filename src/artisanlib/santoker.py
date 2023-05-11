@@ -24,7 +24,7 @@ from contextlib import suppress
 from threading import Thread
 
 from pymodbus.utilities import computeCRC
-from pymodbus.client.serial_asyncio import open_serial_connection
+from pymodbus.client.serial_asyncio import open_serial_connection # patched pyserial-asyncio
 
 from artisanlib.types import SerialSettings
 
@@ -166,6 +166,10 @@ class SantokerNetwork():
         else:
             _log.debug('unknown data target %s', target)
 
+
+    # asyncio loop
+
+
     # https://www.oreilly.com/library/view/using-asyncio-in/9781492075325/ch04.html
     async def read_msg(self, stream: asyncio.StreamReader,
                 charge_handler:Optional[Callable[[], None]] = None,
@@ -203,9 +207,6 @@ class SantokerNetwork():
         # full message decoded
         self.register_reading(target, value, charge_handler, dry_handler,
                         fcs_handler, scs_handler, drop_handler)
-
-
-    # asyncio loop
 
     async def handle_reads(self, reader: asyncio.StreamReader,
                 charge_handler:Optional[Callable[[], None]] = None,
@@ -255,6 +256,7 @@ class SantokerNetwork():
                 fcs_handler:Optional[Callable[[], None]] = None,
                 scs_handler:Optional[Callable[[], None]] = None,
                 drop_handler:Optional[Callable[[], None]] = None) -> None:
+        writer = None
         while True:
             try:
                 if serial is not None:
@@ -281,19 +283,34 @@ class SantokerNetwork():
                 read_handler = asyncio.create_task(self.handle_reads(reader, charge_handler,
                                     dry_handler, fcs_handler, scs_handler, drop_handler))
                 write_handler = asyncio.create_task(self.handle_writes(writer, self._write_queue))
-                await asyncio.wait([read_handler, write_handler], return_when=asyncio.FIRST_COMPLETED)
-                writer.close()
+                done, pending = await asyncio.wait([read_handler, write_handler], return_when=asyncio.FIRST_COMPLETED)
                 _log.debug('disconnected')
-                self.resetReadings()
-                if disconnected_handler is not None:
-                    try:
-                        disconnected_handler()
-                    except Exception as e: # pylint: disable=broad-except
-                        _log.exception(e)
+
+                for task in pending:
+                    task.cancel()
+                for task in done:
+                    exception = task.exception()
+                    if isinstance(exception, Exception):
+                        raise exception
+
             except asyncio.TimeoutError:
                 _log.debug('connection timeout')
             except Exception as e: # pylint: disable=broad-except
                 _log.error(e)
+            finally:
+                if writer is not None:
+                    try:
+                        writer.close()
+                    except Exception as e: # pylint: disable=broad-except
+                        _log.error(e)
+
+            self.resetReadings()
+            if disconnected_handler is not None:
+                try:
+                    disconnected_handler()
+                except Exception as e: # pylint: disable=broad-except
+                    _log.exception(e)
+
             await asyncio.sleep(1)
 
     @staticmethod

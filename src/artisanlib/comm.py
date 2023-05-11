@@ -49,21 +49,19 @@ if TYPE_CHECKING:
 from artisanlib.util import cmd2str, RoRfromCtoF, fromCtoF, fromFtoC, hex2int, str2cmd, toFloat
 
 try:
-    #pylint: disable = E, W, R, C
     from PyQt6.QtCore import Qt, QDateTime, QSemaphore, pyqtSlot # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtGui import QIntValidator # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtWidgets import (QApplication, QCheckBox, QDialog, QGridLayout, QHBoxLayout, QVBoxLayout, # @UnusedImport @Reimport  @UnresolvedImport
                                  QLabel, QLineEdit,QPushButton, QWidget) # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6 import sip  # @UnusedImport @Reimport  @UnresolvedImport
-except Exception: # pylint: disable=broad-except
-    #pylint: disable = E, W, R, C
+except ImportError:
     from PyQt5.QtCore import Qt, QDateTime, QSemaphore, pyqtSlot # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtGui import QIntValidator # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtWidgets import (QApplication, QCheckBox, QDialog, QGridLayout, QHBoxLayout, QVBoxLayout, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
                                  QLabel, QLineEdit,QPushButton, QWidget) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     try:
         from PyQt5 import sip # type: ignore # @Reimport @UnresolvedImport @UnusedImport
-    except Exception: # pylint: disable=broad-except
+    except ImportError:
         import sip  # type: ignore # @Reimport @UnresolvedImport @UnusedImport
 
 from Phidget22.DeviceID import DeviceID # type: ignore
@@ -242,7 +240,7 @@ class serialport():
         'Phidget1045semaphore','PhidgetBridgeSensor','Phidget1046values','Phidget1046lastvalues','Phidget1046semaphores',\
         'PhidgetIO','PhidgetIOvalues','PhidgetIOlastvalues','PhidgetIOsemaphores','PhidgetDigitalOut',\
         'PhidgetDigitalOutLastPWM','PhidgetDigitalOutLastToggle','PhidgetDigitalOutHub','PhidgetDigitalOutLastPWMhub',\
-        'PhidgetDigitalOutLastToggleHub','PhidgetAnalogOut','PhidgetDCMotor','PhidgetRCServo','PhidgetBinaryOut',\
+        'PhidgetDigitalOutLastToggleHub','PhidgetAnalogOut','PhidgetDCMotor','PhidgetRCServo',\
         'YOCTOlibImported','YOCTOsensor','YOCTOchan1','YOCTOchan2','YOCTOtempIRavg','YOCTOvalues','YOCTOlastvalues','YOCTOsemaphores',\
         'YOCTOthread','YOCTOvoltageOutputs','YOCTOcurrentOutputs','YOCTOrelays','YOCTOservos','YOCTOpwmOutputs','HH506RAid','MS6514PrevTemp1','MS6514PrevTemp2','DT301PrevTemp','EXTECH755PrevTemp',\
         'controlETpid','readBTpid','useModbusPort','showFujiLCDs','arduinoETChannel','arduinoBTChannel','arduinoATChannel',\
@@ -302,8 +300,6 @@ class serialport():
         self.PhidgetAnalogOut:Dict[Optional[str], List['Phidget']] = {} # a dict associating serials with lists of channels
         #store the servo objects
         self.PhidgetRCServo:Dict[Optional[str], List['Phidget']] = {} # a dict associating serials with lists of channels
-        #store the Phidget IO Binary Output objects
-        self.PhidgetBinaryOut:Dict[Optional[str], List['Phidget']] = {} # a dict associating binary out serials with lists of channels
         #store the Phidget DCMotor objects
         self.PhidgetDCMotor:Dict[Optional[str], List['Phidget']] = {} # a dict associating serials with lists of channels
         # Phidget Ambient Sensor Channels
@@ -501,7 +497,11 @@ class serialport():
                                    self.Santoker_BTET,        #134
                                    self.Santoker_PF,          #135
                                    self.Santoker_D,           #136
-                                   self.PHIDGET_DAQ1500       #137
+                                   self.PHIDGET_DAQ1500,      #137
+                                   self.Kaleido_BTET,         #138
+                                   self.Kaleido_SVAT,         #139
+                                   self.Kaleido_DrumAH,       #140
+                                   self.Kaleido_HeaterFan     #141
                                    ]
         #string with the name of the program for device #27
         self.externalprogram:str = 'test.py'
@@ -1513,6 +1513,57 @@ class serialport():
             t1 = t2 = -1
         return tx,t1,t2 # time, -1 (chan2), Drum (chan1)
 
+    def Kaleido_BTET(self) -> Tuple[float,float,float]:
+        tx = self.aw.qmc.timeclock.elapsedMilli()
+        if self.aw.kaleido is not None:
+            t1,t2 = self.aw.kaleido.getBTET()
+        else:
+            t1 = t2 = -1
+        return tx,t2,t1 # time, ET (chan2), BT (chan1)
+
+    def Kaleido_SVAT(self) -> Tuple[float,float,float]:
+        tx = self.aw.qmc.timeclock.elapsedMilli()
+        if self.aw.kaleido is not None:
+            t1,t2 = self.aw.kaleido.getSVAT()
+            # if in Kaleido PID mode, we turn adjust the SV if TS data changes to sync with the machine state
+            if self.aw.kaleidoPID:
+                try:
+                    ts = int(round(t1))
+                    self.aw.setSVSignal.emit(ts)
+                except Exception as e: # pylint: disable=broad-except
+                    _log.error(e)
+        else:
+            t1 = t2 = -1
+        return tx,t2,t1 # time, AT (chan2), SV (chan1)
+
+    def Kaleido_DrumAH(self) -> Tuple[float,float,float]:
+        tx = self.aw.qmc.timeclock.elapsedMilli()
+        if self.aw.kaleido is not None:
+            t1,t2 = self.aw.kaleido.getDrumAH()
+            # if in Kaleido PID mode, we turn ArtisanPID ON/OFF if AH signal changes to sync with the machine state
+            if self.aw.kaleidoPID:
+                try:
+                    ah = bool(round(t2))
+                    if ah and not self.aw.pidcontrol.pidActive:
+                        # machine says its PID is on, we reflect this on the Artisan side
+                        self.aw.pidOnSignal.emit()
+                    elif not ah and self.aw.pidcontrol.pidActive:
+                        # machine says its PID is off, we reflect this on the Artisan side
+                        self.aw.pidOffSignal.emit()
+                except Exception as e: # pylint: disable=broad-except
+                    _log.error(e)
+        else:
+            t1 = t2 = -1
+        return tx,t2,t1 # time), AH (chan2), Drum (chan1)
+
+    def Kaleido_HeaterFan(self) -> Tuple[float,float,float]:
+        tx = self.aw.qmc.timeclock.elapsedMilli()
+        if self.aw.kaleido is not None:
+            t1,t2 = self.aw.kaleido.getHeaterFan()
+        else:
+            t1 = t2 = -1
+        return tx,t2,t1 # time Fan (chan2), Heater (chan1)
+
     def TEVA18B(self) -> Tuple[float,float,float]:
         tx = self.aw.qmc.timeclock.elapsedMilli()
         t2,t1 = self.TEVA18Btemperature()
@@ -1859,8 +1910,6 @@ class serialport():
                     self.aw.addserial('serial port opened: ' + settings)
                 libtime.sleep(.2) # avoid possible hickups on startup
         except Exception: # pylint: disable=broad-except
-#            import traceback
-#            traceback.print_exc(file=sys.stdout)
             self.SP.close()
             libtime.sleep(0.7) # on OS X opening a serial port too fast after closing the port gets disabled
             error = QApplication.translate('Error Message','Serial Exception:') + ' ' + QApplication.translate('Error Message','Unable to open serial port')
@@ -2118,8 +2167,6 @@ class serialport():
             return self.aw.qmc.hottop_BT,self.aw.qmc.hottop_ET
         except Exception as ex: # pylint: disable=broad-except
             _log.exception(ex)
-#            import traceback
-#            traceback.print_exc(file=sys.stdout)
             _, _, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message','Exception:') + ' ser.HOTTOPtemperatures() {0}').format(str(ex)),getattr(exc_tb, 'tb_lineno', '?'))
             return -1,-1
@@ -3410,8 +3457,6 @@ class serialport():
             return -1,-1
         except Exception as ex: # pylint: disable=broad-except
             _log.exception(ex)
-#            import traceback
-#            traceback.print_exc(file=sys.stdout)
             try:
                 if self.PhidgetTemperatureSensor and self.PhidgetTemperatureSensor[0].getAttached():
                     self.PhidgetTemperatureSensor[0].close()
@@ -3698,8 +3743,6 @@ class serialport():
             return -1,-1
         except Exception as ex: # pylint: disable=broad-except
             _log.exception(ex)
-#            import traceback
-#            traceback.print_exc(file=sys.stdout)
             try:
                 if self.PhidgetBridgeSensor and self.PhidgetBridgeSensor[0].getAttached():
                     self.PhidgetBridgeSensor[0].close()
@@ -3779,7 +3822,7 @@ class serialport():
     # serial: optional Phidget HUB serial number with optional port number as string of the form "<serial>[:<port>]"
     def phidgetBinaryOUTattach(self, channel:'Phidget', serial:Optional[str]=None) -> None:
         _log.debug('phidgetBinaryOUTattach(%s,%s)',channel,serial)
-        if serial not in self.aw.ser.PhidgetBinaryOut:
+        if serial not in self.aw.ser.PhidgetDigitalOut:
             if self.aw.qmc.phidgetManager is None:
                 self.aw.qmc.startPhidgetManager()
             if self.aw.qmc.phidgetManager is not None:
@@ -3805,7 +3848,7 @@ class serialport():
                                 remote=self.aw.qmc.phidgetRemoteFlag,remoteOnly=self.aw.qmc.phidgetRemoteOnlyFlag,serial=s,hubport=p)
                     ports = 16
                 if ser is not None:
-                    self.aw.ser.PhidgetBinaryOut[serial] = []
+                    self.aw.ser.PhidgetDigitalOut[serial] = []
                     for i in range(ports):
                         do = DigitalOutput()
                         do.setChannel(i)
@@ -3816,12 +3859,12 @@ class serialport():
                         elif not self.aw.qmc.phidgetRemoteFlag:
                             do.setIsRemote(False)
                             do.setIsLocal(True)
-                        self.aw.ser.PhidgetBinaryOut[serial].append(do)
+                        self.aw.ser.PhidgetDigitalOut[serial].append(do)
                     if serial is None:
                         # we make this also accessible via its serial number
-                        self.aw.ser.PhidgetBinaryOut[str(ser)] = self.aw.ser.PhidgetBinaryOut[None]
+                        self.aw.ser.PhidgetDigitalOut[str(ser)] = self.aw.ser.PhidgetDigitalOut[None]
         try:
-            ch = self.aw.ser.PhidgetBinaryOut[serial][channel]
+            ch = self.aw.ser.PhidgetDigitalOut[serial][channel]
             ch.setOnAttachHandler(self.phidgetOUTattached)
             ch.setOnDetachHandler(self.phidgetOUTdetached)
             if not ch.getAttached():
@@ -3832,7 +3875,7 @@ class serialport():
                 if serial is None and ch.getAttached():
                     # we make this also accessible via its serial number + port
                     si = self.serialPort2serialString(ch.getDeviceSerialNumber(),ch.getHubPort()) # NOTE: ch.getHubPort() returns -1 if not yet attached
-                    self.aw.ser.PhidgetBinaryOut[str(si)] = self.aw.ser.PhidgetBinaryOut[None]
+                    self.aw.ser.PhidgetDigitalOut[str(si)] = self.aw.ser.PhidgetDigitalOut[None]
         except Exception: # pylint: disable=broad-except
             pass
 
@@ -3854,9 +3897,9 @@ class serialport():
         _log.debug('phidgetBinaryOUTset(%s,%s,%s)',channel,value,serial)
         res = False
         self.phidgetBinaryOUTattach(channel,serial)
-        if serial in self.aw.ser.PhidgetBinaryOut:
+        if serial in self.aw.ser.PhidgetDigitalOut:
             # set state of the given channel
-            out = self.aw.ser.PhidgetBinaryOut[serial]
+            out = self.aw.ser.PhidgetDigitalOut[serial]
             try:
                 if len(out) > channel and out[channel] and out[channel].getAttached():
                     out[channel].setState(value)
@@ -3871,9 +3914,9 @@ class serialport():
         _log.debug('phidgetBinaryOUTget(%s,%s)',channel,serial)
         self.phidgetBinaryOUTattach(channel,serial)
         res = False
-        if serial in self.aw.ser.PhidgetBinaryOut:
+        if serial in self.aw.ser.PhidgetDigitalOut:
             # get state of the given channel
-            out = self.aw.ser.PhidgetBinaryOut[serial]
+            out = self.aw.ser.PhidgetDigitalOut[serial]
             try:
                 if len(out) > channel and out[channel] and out[channel].getAttached():
                     res = out[channel].getState()
@@ -3888,8 +3931,8 @@ class serialport():
 
     def phidgetBinaryOUTclose(self) -> None:
         _log.debug('phidgetBinaryOUTclose')
-        for o in self.aw.ser.PhidgetBinaryOut:
-            out = self.aw.ser.PhidgetBinaryOut[o]
+        for o in self.aw.ser.PhidgetDigitalOut:
+            out = self.aw.ser.PhidgetDigitalOut[o]
             if out is not None:
                 for i, _ in enumerate(out):
                     try:
@@ -3898,7 +3941,7 @@ class serialport():
                         out[i].close()
                     except Exception as e: # pylint: disable=broad-except
                         _log.exception(e)
-        self.aw.ser.PhidgetBinaryOut = {}
+        self.aw.ser.PhidgetDigitalOut = {}
 
 
 #--- Phidget Digital PWM Output
@@ -5370,8 +5413,6 @@ class serialport():
             return -1,-1
         except Exception as ex: # pylint: disable=broad-except
             _log.exception(ex)
-#            import traceback
-#            traceback.print_exc(file=sys.stdout)
             try:
                 if self.PhidgetIO and self.PhidgetIO[0].getAttached():
                     self.PhidgetIO[0].close()
@@ -5809,8 +5850,6 @@ class serialport():
             return probe1, probe2
         except Exception as ex: # pylint: disable=broad-except
             _log.exception(ex)
-#            import traceback
-#            traceback.print_exc(file=sys.stdout)
             try:
                 if self.YOCTOthread is not None:
                     self.YOCTOthread.join()

@@ -16,12 +16,10 @@
 # Marko Luther, 2023
 
 try:
-    #pylint: disable = E, W, R, C
     from PyQt6.QtWidgets import QSystemTrayIcon, QApplication, QMenu # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtGui import QIcon, QDesktopServices, QAction # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtCore import QTimer, pyqtSlot, QUrl, QObject, QDateTime, QLocale # @UnusedImport @Reimport  @UnresolvedImport
-except Exception: # pylint: disable=broad-except
-    #pylint: disable = E, W, R, C
+except ImportError:
     from PyQt5.QtWidgets import QSystemTrayIcon, QApplication, QMenu, QAction # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtGui import QIcon, QDesktopServices # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtCore import QTimer, pyqtSlot, QUrl, QObject, QDateTime, QLocale # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
@@ -289,6 +287,13 @@ class NotificationManager(QObject): # pyright: ignore # Argument to class must b
             self.notification_menu_actions = []
             if len(self.notifications_queue)>0 and self.notifications_visible:
                 self.tray_icon.show()
+
+                try:
+                    app = QApplication.instance()
+                    app.setBadgeNumber(len(self.notifications_queue)) # type: ignore # "QCoreApplication" has no attribute "setBadgeNumber"
+                except Exception: # pylint: disable=broad-except
+                    pass # setBadgeNumber only supported by Qt 6.5 and newer
+
                 for n in reversed(self.notifications_queue):
                     title = n.formatedTitle()
                     menu_title = (title[:25] + '...') if len(title) > 25 else title
@@ -300,6 +305,11 @@ class NotificationManager(QObject): # pyright: ignore # Argument to class must b
                     self.tray_menu.addAction(action)
             else:
                 self.tray_icon.hide()
+                try:
+                    app = QApplication.instance()
+                    app.setBadgeNumber(0) # type: ignore # "QCoreApplication" has no attribute "setBadgeNumber"
+                except Exception: # pylint: disable=broad-except
+                    pass # setBadgeNumber only supported by Qt 6.5 and newer
         except Exception as e: # pylint: disable=broad-except
             _log.exception(e)
 
@@ -335,7 +345,7 @@ class NotificationManager(QObject): # pyright: ignore # Argument to class must b
             if addToQueue:
                 self.addNotificationItem(notification) # also shows tray_menu icon if self.notifications_visible
             # we set a timer to clear this notification after the presentation timeout
-            QTimer.singleShot(self.notification_timeout, lambda : self.clearNotification(notification))
+#            QTimer.singleShot(self.notification_timeout, lambda : self.clearNotification(notification))
             self.showNotification(notification)
         except Exception as e: # pylint: disable=broad-except
             _log.exception(e)

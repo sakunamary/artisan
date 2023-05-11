@@ -27,10 +27,8 @@ if TYPE_CHECKING:
     from Phidget22.Phidget import Phidget # type: ignore # pylint: disable=unused-import
 
 try:
-    #pylint: disable = E, W, R, C
     from PyQt6.QtCore import QSemaphore # @UnusedImport @Reimport  @UnresolvedImport
-except Exception: # pylint: disable=broad-except
-    #pylint: disable = E, W, R, C
+except ImportError:
     from PyQt5.QtCore import QSemaphore # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
 
 
@@ -113,7 +111,7 @@ class PhidgetManager():
                 self.managersemaphore.release(1)
 
     def deleteChannel(self,channel:'Phidget') -> None:
-        _log.debug('deleteChannel: %s', channel)
+#        _log.debug('deleteChannel: %s', channel)
         try:
             self.managersemaphore.acquire(1)
             # if channel is a VINT device, release all HUBport channels that were blocked by this VINT device
@@ -223,17 +221,17 @@ class PhidgetManager():
 
 #    def print_list(self,items):
 #        for k,v in items:
-#            print(v,k.getDeviceSerialNumber(),k.getDeviceClass(),k.getDeviceClassName(),k.getDeviceName(),k.getDeviceSKU(),k.getChannelClassName(),k.getDeviceID(),k.getIsHubPortDevice(),"port: ",k.getHubPort(),"ch: ", k.getChannel(), "local: ", k.getIsLocal())
+#            _log.info("v:%s, ser:%s, class:%s, classname:%s, device:%s, SKU:%s, chClassName:%s, id:%s,device:%s, port:%s, ch:%s, local:%s",v,k.getDeviceSerialNumber(),k.getDeviceClass(),k.getDeviceClassName(),k.getDeviceName(),k.getDeviceSKU(),k.getChannelClassName(),k.getDeviceID(),k.getIsHubPortDevice(),k.getHubPort(),k.getChannel(), k.getIsLocal())
 #
 #    def print_list2(self,items):
 #        for k in items:
-#            print(k.getDeviceSerialNumber(),k.getChannelClassName(),k.getDeviceID(),k.getIsHubPortDevice(),"port: ", k.getHubPort(),"ch: ",k.getChannel(), "local: ", k.getIsLocal())
+#            _log.info("ser:%s, class:%s, id:%s, device:%s, port:%s, ch:%s, local:%s",k.getDeviceSerialNumber(),k.getChannelClassName(),k.getDeviceID(),k.getIsHubPortDevice(),k.getHubPort(),k.getChannel(),k.getIsLocal())
 
     # returns the first matching Phidget channel (serial and port as integers) and reserves it
     def getFirstMatchingPhidget(self,
                 phidget_class_name:str,
                 device_id:int,
-                channel:Optional['Phidget']=None,
+                channel:Optional[int]=None,
                 remote:bool=False,
                 remoteOnly:bool=False,
                 serial:Optional[int]=None,

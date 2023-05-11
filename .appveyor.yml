@@ -5,8 +5,10 @@
 # Include "skip ci" in the commit message to prevent this build process from running
 
 environment:
-  # Set the Python version for windows, macos and linux here. Does not affect windows_legacy.
+  # Set the Appveyor Python version for windows, macos and linux here. Does not affect windows_legacy.
   PYTHON_V: 3.11
+  # Upgrade to specific version (for platforms supporting upgrade). Upgrade skipped if missing or blank.
+#  PYUPGRADE_V: 3.11.3
 
   matrix:
   - job_name: windows_legacy
@@ -14,7 +16,7 @@ environment:
   - job_name: windows
     appveyor_build_worker_image: Visual Studio 2022
   - job_name: macos
-    appveyor_build_worker_image: macos
+    appveyor_build_worker_image: macos-bigsur
   - job_name: linux
     appveyor_build_worker_image: Ubuntu2004
 
@@ -173,6 +175,7 @@ for:
 
     # run the install script
     - .ci/install-macos.sh
+    - export PATH=/Users/appveyor/venv${PYTHON_V}/bin:${PATH} # required after updating Python in venv
 
   build_script:
     - echo "MacOS Build"

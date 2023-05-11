@@ -78,10 +78,10 @@ from functools import reduce as freduce
 ## on import with importlib.metadata.PackageNotFoundError: prettytable on __version__ = importlib_metadata.version(__name__)
 try:
     import importlib.metadata as importlib_metadata # @UnresolvedImport
-    def md_version(pkg_name):
-        if pkg_name == 'prettytable':
+    def md_version(distribution_name:str) -> str:
+        if distribution_name == 'prettytable':
             return '2.1.0'
-        return importlib_metadata.version(pkg_name)
+        return importlib_metadata.version(distribution_name)
     importlib_metadata.version = md_version
 except Exception: # pylint: disable=broad-except
     pass
@@ -106,7 +106,6 @@ except Exception: # pylint: disable=broad-except
 QtWebEngineSupport:bool = False # set to True if the QtWebEngine was successfully imported
 
 try:
-    #pylint: disable-next = E, W, R, C
     from PyQt6.QtWidgets import (QApplication, QWidget, QMessageBox, QLabel, QMainWindow, QFileDialog, QGraphicsDropShadowEffect, # @Reimport @UnresolvedImport @UnusedImport # pylint: disable=import-error
                              QInputDialog, QGroupBox, QLineEdit, # @Reimport @UnresolvedImport @UnusedImport
                              QSizePolicy, QVBoxLayout, QHBoxLayout, QPushButton, # @Reimport @UnresolvedImport @UnusedImport
@@ -114,7 +113,7 @@ try:
                              QSlider, # @Reimport @UnresolvedImport @UnusedImport
                              QColorDialog, QFrame, QSplitter, QScrollArea, QProgressDialog, # @Reimport @UnresolvedImport @UnusedImport
                              QStyleFactory, QMenu, QLayout) # @Reimport @UnresolvedImport @UnusedImport
-    from PyQt6.QtGui import (QPageLayout, QAction, QImageReader, QWindow, # @Reimport @UnresolvedImport @UnusedImport
+    from PyQt6.QtGui import (QScreen, QPageLayout, QAction, QImageReader, QWindow, # @Reimport @UnresolvedImport @UnusedImport
                                 QKeySequence, QShortcut, # @Reimport @UnresolvedImport @UnusedImport
                                 QPixmap,QColor,QDesktopServices,QIcon, # @Reimport @UnresolvedImport @UnusedImport
                                 QRegularExpressionValidator,QDoubleValidator, QPainter, QCursor, QFont) # @Reimport @UnresolvedImport @UnusedImport
@@ -128,12 +127,11 @@ try:
     try:
         from PyQt6.QtWebEngineWidgets import QWebEngineView # @Reimport @UnresolvedImport @UnusedImport  # pylint: disable=import-error,no-name-in-module
         QtWebEngineSupport = True
-    except Exception: # pylint: disable=broad-except
+    except ImportError:
         # on the RPi platform there is no native package PyQt-WebEngine nor PyQt6-WebEngine for Raspebarry 32bit
         pass
     from PyQt6 import sip # @Reimport @UnresolvedImport @UnusedImport
-except Exception: # type: ignore # pylint: disable=broad-except
-    #pylint: disable = E, W, R, C
+except ImportError:
     from PyQt5.QtWidgets import (QAction, QApplication, QWidget, QMessageBox, QLabel, QMainWindow, QFileDialog, QGraphicsDropShadowEffect,  # type: ignore  # @Reimport @UnresolvedImport @UnusedImport
                              QInputDialog, QGroupBox, QLineEdit,  # type: ignore  # @Reimport @UnresolvedImport @UnusedImport
                              QSizePolicy, QVBoxLayout, QHBoxLayout, QPushButton, # type: ignore  # @Reimport @UnresolvedImport @UnusedImport
@@ -141,7 +139,7 @@ except Exception: # type: ignore # pylint: disable=broad-except
                              QSlider, # type: ignore # @Reimport @UnresolvedImport @UnusedImport
                              QColorDialog, QFrame, QSplitter, QScrollArea, QProgressDialog, # type: ignore # @Reimport @UnresolvedImport @UnusedImport
                              QStyleFactory, QMenu, QLayout, QShortcut) # type: ignore # @Reimport @UnresolvedImport @UnusedImport
-    from PyQt5.QtGui import (QPageLayout, QImageReader, QWindow,  # type: ignore # @Reimport @UnresolvedImport @UnusedImport
+    from PyQt5.QtGui import (QScreen, QPageLayout, QImageReader, QWindow,  # type: ignore # @Reimport @UnresolvedImport @UnusedImport
                                 QKeySequence, # type: ignore # @Reimport @UnresolvedImport @UnusedImport
                                 QPixmap,QColor,QDesktopServices,QIcon, # type: ignore # @Reimport @UnresolvedImport @UnusedImport
                                 QRegularExpressionValidator,QDoubleValidator, QPainter, QCursor, QFont) # type: ignore # @Reimport @UnresolvedImport @UnusedImport
@@ -155,12 +153,12 @@ except Exception: # type: ignore # pylint: disable=broad-except
     try:
         from PyQt5.QtWebEngineWidgets import QWebEngineView # type: ignore # @Reimport @UnresolvedImport @UnusedImport # pylint: disable=import-error,no-name-in-module
         QtWebEngineSupport = True
-    except Exception: # pylint: disable=broad-except
+    except ImportError:
         # on the RPi platform there is no native package PyQt-WebEngine nor PyQt6-WebEngine for Raspebarry 32bit
         pass
     try:
         from PyQt5 import sip # type: ignore # @Reimport @UnresolvedImport @UnusedImport
-    except Exception: # type: ignore # pylint: disable=broad-except
+    except ImportError:
         import sip # type: ignore # @Reimport @UnresolvedImport @UnusedImport
 
 
@@ -204,10 +202,12 @@ if TYPE_CHECKING:
     from artisanlib.comparator import roastCompareDlg # pylint: disable=unused-import
     from artisanlib.wheels import WheelDlg # pylint: disable=unused-import
     from artisanlib.santoker import SantokerNetwork # pylint: disable=unused-import
+    from artisanlib.kaleido import KaleidoPort # pylint: disable=unused-import
     from matplotlib.text import Annotation # pylint: disable=unused-import
     from openpyxl.worksheet.worksheet import Worksheet # pylint: disable=unused-import
     import numpy.typing as npt # pylint: disable=unused-import
     from matplotlib.backend_bases import Event # pylint: disable=unused-import
+    from PyQt6.QtWidgets import QTableWidget
 
 # fix socket.inet_pton on Windows (used by pymodbus TCP/UDP)
 try:
@@ -232,7 +232,7 @@ from artisanlib.qtsingleapplication import QtSingleApplication
 try:
     # spanning a second multiprocessing instance (Hottop server) on macOS falils to import the YAPI interface
     from yoctopuce.yocto_api import YAPI # type: ignore
-except Exception: # pylint: disable=broad-except
+except ImportError:
     pass
 
 # platform dependent imports:
@@ -274,7 +274,7 @@ class Artisan(QtSingleApplication):
         self.focusChanged.connect(self.appRaised)
 
     @pyqtSlot('QWidget*','QWidget*')
-    def appRaised(self,oldFocusWidget,newFocusWidget):
+    def appRaised(self, oldFocusWidget:QWidget, newFocusWidget:QWidget) -> None:
         try:
             aw = self.activationWindow()
             if aw is not None and not sip.isdeleted(aw): # sip not supported on older PyQt versions (eg. RPi)
@@ -304,7 +304,7 @@ class Artisan(QtSingleApplication):
     # file://<path>                  : loads file from path
     #                                  if query is "background" Artisan is not raised to the foreground
     #                                  if query is "template" and the file has an .alog extension, the profile is loaded as background profile
-    def open_url(self, url):
+    def open_url(self, url:QUrl) -> None:
         _log.debug('open_url(%s)', url)
         aw = self.activationWindow()
         if aw is not None and not aw.qmc.flagon and not aw.qmc.designerflag and not aw.qmc.wheelflag and aw.qmc.flavorchart_plot is None: # only if not yet monitoring
@@ -340,8 +340,8 @@ class Artisan(QtSingleApplication):
                 if url_query is None or url_query != 'background':
                     # by default we raise Artisan to the foreground
                     QTimer.singleShot(20,self.activateWindow)
-                url.setQuery(None) # remove any query to get a valid file path
-                url.setFragment(None) # remove also any potential fragment
+                url.setQuery(None) # type:ignore # Argument 1 to "setQuery" of "QUrl" has incompatible type "None"; expected "str" # remove any query to get a valid file path
+                url.setFragment(None) # type:ignore # Argument 1 to "setFragment" of "QUrl" has incompatible type "None"; expected "str" # remove also any potential fragment
                 filename = url.toString(QUrl.UrlFormattingOption.PreferLocalFile)
                 qfile = QFileInfo(filename)
                 file_suffix = qfile.suffix()
@@ -366,14 +366,14 @@ class Artisan(QtSingleApplication):
             self.sendMessage2ArtisanInstance(msg,self._viewer_id)
 
     @pyqtSlot(str)
-    def receiveMessage(self,msg):
+    def receiveMessage(self, msg:str) -> None:
         url = QUrl()
         url.setUrl(msg)
         self.open_url(url)
 
     # to send message to main Artisan instance: id = appGuid
     # to send message to viewer:                id = viewerAppGuid
-    def sendMessage2ArtisanInstance(self,message,instance_id):
+    def sendMessage2ArtisanInstance(self, message:str, instance_id:str) -> None:
         if platform.system() == 'Windows':
             try:
                 res = None
@@ -398,10 +398,10 @@ class Artisan(QtSingleApplication):
         else:
             self._sendMessage2ArtisanInstance(message,instance_id)
 
-    def _sendMessage2ArtisanInstanceShot(self,message,instance_id) -> None:
+    def _sendMessage2ArtisanInstanceShot(self, message:str, instance_id:str) -> None:
         self._sendMessage2ArtisanInstance(message, instance_id)
 
-    def _sendMessage2ArtisanInstance(self,message,instance_id) -> bool:
+    def _sendMessage2ArtisanInstance(self, message:str, instance_id:str) -> bool:
         try:
             self._outSocket = QLocalSocket()
             self._outSocket.connectToServer(instance_id)
@@ -418,13 +418,13 @@ class Artisan(QtSingleApplication):
             self._outSocket = None
             self._outStream = None
 
-    def event(self, event):
+    def event(self, event) -> bool:
         file_open = QEvent.Type.FileOpen
         if event.type() == file_open:
             try:
                 aw = self.activationWindow()
                 if aw is not None:
-                    url = event.url()
+                    url = event.url() # type: ignore # "QEvent" has no attribute "url"
                     # files cannot be opend while
                     # - sampling
                     # - in Designer mode
@@ -448,7 +448,7 @@ class Artisan(QtSingleApplication):
                             self.sendMessage2ArtisanInstance(message,self._viewer_id)
             except Exception as e: # pylint: disable=broad-except
                 _log.exception(e)
-            return 1
+            return True
         return super().event(event)
 
 # configure multiprocessing
@@ -652,7 +652,7 @@ import plus.stock
 #######################################################################################
 
 
-def my_get_icon(name):
+def my_get_icon(name:str) -> Optional[QIcon]:
     basedir = os.path.join(mpl.rcParams['datapath'], 'images')
     p = os.path.join(basedir, name.replace('.svg','.png'))
     if os.path.exists(p):
@@ -662,43 +662,6 @@ def my_get_icon(name):
 
 
 #####
-
-## monkey patching MPL 3.5.1 _formlayout.py:ColorButton to work on Qt6 (not relevant on Qt5)
-## (see https://github.com/matplotlib/matplotlib/issues/22471)
-## to be removed on upgrading to 3.5.2 which fixes this
-#class MPLColorButtonPatched(QPushButton):
-#    """
-#    Color choosing push button
-#    """
-#    colorChanged = pyqtSignal(QColor)
-#
-#    def __init__(self, parent=None) -> None:
-#        super().__init__(parent)
-#        self.setFixedSize(20, 20)
-#        self.setIconSize(QSize(12, 12))
-#        self.clicked.connect(self.choose_color)
-#        self._color = QColor()
-#
-#    def choose_color(self):
-#        color = QColorDialog.getColor(
-#            self._color, self.parentWidget(), '',
-#            QColorDialog.ColorDialogOption.ShowAlphaChannel)
-#        if color.isValid():
-#            self.set_color(color)
-#
-#    def get_color(self):
-#        return self._color
-#
-#    @pyqtSlot(QColor)
-#    def set_color(self, color):
-#        if color != self._color:
-#            self._color = color
-#            self.colorChanged.emit(self._color)
-#            pixmap = QPixmap(self.iconSize())
-#            pixmap.fill(color)
-#            self.setIcon(QIcon(pixmap))
-#
-#    color = pyqtProperty(QColor, get_color, set_color)
 
 
 class VMToolbar(NavigationToolbar): # pylint: disable=abstract-method
@@ -905,13 +868,13 @@ class VMToolbar(NavigationToolbar): # pylint: disable=abstract-method
             self.edit_curve_parameters_action.setEnabled(False)
 
     # monkey patch matplotlib navigationbar zoom and pan to update background cache
-    def release_pan_new(self, event):
+    def release_pan_new(self, event) -> None:
         self.release_pan_org(event)
         # as since MPL 3.5 release_pan calls self.canvas.draw_idle() instead of _draw() we just invalidate the background here instead of
         # updating it
         self.qmc.updateBackground()
         #self.qmc.ax_background = None
-    def release_zoom_new(self, event):
+    def release_zoom_new(self, event) -> None:
         self.release_zoom_org(event)
         # as since MPL 3.5 release_pan calls self.canvas.draw_idle() instead of _draw() we just invalidate the background here instead of
         # updating it
@@ -919,11 +882,11 @@ class VMToolbar(NavigationToolbar): # pylint: disable=abstract-method
         #self.qmc.ax_background = None
 
     # monkey patch matplotlib navigationbar zoom (release_zoom) and pan (release_pan) to update background cache
-    def update_view_new(self):
+    def update_view_new(self) -> None:
         self.update_view_org()
         self.qmc.updateBackground()
 
-    def getAxisRanges(self):
+    def getAxisRanges(self) -> List[float]:
         res = []
         for ax in self.canvas.figure.axes:
             xlim = ax.get_xlim()
@@ -932,34 +895,34 @@ class VMToolbar(NavigationToolbar): # pylint: disable=abstract-method
             res.append(ylim[1]-ylim[0])
         return res
 
-    def press_pan(self, event):
+    def press_pan(self, event) -> None:
         if self.qmc.ai is not None:
             # we remember the axis ranges before the pan-zoom to detect if it was zoomed
             self.axis_ranges = self.getAxisRanges()
         super().press_pan(event)
 
-    def release_pan(self, event):
+    def release_pan(self, event) -> None:
         if self.qmc.ai is not None and [round(r) for r in self.axis_ranges] != [round(r) for r in self.getAxisRanges()]:
             # only hide the background image if the axis ratio changed
             self.qmc.ai.set_visible(False)
         super().release_pan(event)
 
-    def release_zoom(self, event):
+    def release_zoom(self, event) -> None:
         if self.qmc.ai is not None:
             self.qmc.ai.set_visible(False)
         super().release_zoom(event)
 
-    def forward(self, *args):
+    def forward(self, *args) -> None:
         if self.qmc.ai is not None:
             self.qmc.ai.set_visible(False)  # whenever forward is pressed the image will be hidden
         super().forward(*args)
 
-    def back(self, *args):
+    def back(self, *args) -> None:
         if self.qmc.ai is not None and self._nav_stack._pos == 1: # pylint: disable=protected-access
             self.qmc.ai.set_visible(True)
         super().back(*args)
 
-    def home(self, *args):
+    def home(self, *args) -> None:
         """Restore the original view"""
         # show the background image again that was hidden on zoom-in
         if self.qmc.ai is not None:
@@ -978,7 +941,7 @@ class VMToolbar(NavigationToolbar): # pylint: disable=abstract-method
         if self.qmc.zoom_follow:
             self.push_current()
 
-    def _icon(self, name):
+    def _icon(self, name:str) -> QIcon:
         if self.aw is not None and name.startswith('plus'):
             basedir = os.path.join(getResourcePath(),'Icons')
         else:
@@ -1013,7 +976,7 @@ class VMToolbar(NavigationToolbar): # pylint: disable=abstract-method
         return QIcon(pm)
 
     @staticmethod
-    def recolorIcon(pixmap, color):
+    def recolorIcon(pixmap, color) -> QPixmap:
         tmp = pixmap.toImage()
         for y in range(tmp.height()):
             for x in range(tmp.width()):
@@ -1021,7 +984,7 @@ class VMToolbar(NavigationToolbar): # pylint: disable=abstract-method
                 tmp.setPixelColor(x,y,color)
         return QPixmap.fromImage(tmp)
 
-    def update_message(self):
+    def update_message(self) -> None:
         if not self.qmc.twoAxisMode():
             self.qmc.fmt_data_RoR = False
         xs = None
@@ -1125,7 +1088,7 @@ class VMToolbar(NavigationToolbar): # pylint: disable=abstract-method
                         _log.exception(e)
 
     # overwritten from MPL v3.2.2 to get rid of that extra data printed
-    def mouse_move(self, event):
+    def mouse_move(self, event) -> None:
         try:
             self._update_cursor(event) # not available in MPL v3.0.3 on Python3.5 for the RPi Stretch builds
         except Exception: # pylint: disable=broad-except
@@ -1137,7 +1100,7 @@ class VMToolbar(NavigationToolbar): # pylint: disable=abstract-method
         self.update_message()
 
 #PLUS
-    def plus(self):
+    def plus(self) -> None:
         modifiers = QApplication.keyboardModifiers()
         if modifiers in [(Qt.KeyboardModifier.AltModifier | Qt.KeyboardModifier.ControlModifier), (Qt.KeyboardModifier.AltModifier | Qt.KeyboardModifier.ShiftModifier)]:
             # ALT+CTR-CLICK (OPTION+COMMAND on macOS) toggles  or alternatively ALT-SHIFT-CLICK
@@ -1153,7 +1116,7 @@ class VMToolbar(NavigationToolbar): # pylint: disable=abstract-method
         else:
             plus.controller.toggle(self.aw)
 
-    def subscription(self):
+    def subscription(self) -> None:
         if self.aw.plus_paidUntil is not None: # after reset and authentication, it might still take a moment until the paidUntil is set via its signal
             try:
                 remaining_days = max(0,(self.aw.plus_paidUntil.date() - datetime.datetime.now(datetime.timezone.utc).date()).days)
@@ -1204,7 +1167,7 @@ class VMToolbar(NavigationToolbar): # pylint: disable=abstract-method
                 if percent_used_formatted != '':
                     percent_used_formatted = '\n' + percent_used_formatted
                 subscription_message_box.setText(QApplication.translate('Plus','Do you want to extend your subscription?'))
-                subscription_message_box.setInformativeText(QApplication.translate('Plus','Your subscription ends on') + f' {QDate(pu.year,pu.month,pu.day).toString(QLocale().dateFormat(QLocale.FormatType.ShortFormat))}\n{days}{percent_used_formatted}')
+                subscription_message_box.setInformativeText((QApplication.translate('Plus','Your subscription ends on') if remaining_days>0 else QApplication.translate('Plus','Your subscription ended on')) + f' {QDate(pu.year,pu.month,pu.day).toString(QLocale().dateFormat(QLocale.FormatType.ShortFormat))}\n{days}{percent_used_formatted}')
                 subscription_message_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 #                subscription_message_box.show()
                 res = subscription_message_box.exec()
@@ -1223,7 +1186,7 @@ class VMToolbar(NavigationToolbar): # pylint: disable=abstract-method
 
     @pyqtSlot()
     @pyqtSlot(bool)
-    def my_edit_parameters(self,_=False):
+    def my_edit_parameters(self,_:bool=False) -> None:
         try:
             if self.qmc.ax is not None and not self.qmc.designerflag: # deactivate figure_options in designer mode due to all kind of side effects
                 allaxes = self.canvas.figure.get_axes()
@@ -1256,15 +1219,13 @@ class VMToolbar(NavigationToolbar): # pylint: disable=abstract-method
 #                            line.set_drawstyle("steps-post")
 
                 except Exception: # pylint: disable=broad-except
-#                    import traceback
-#                    traceback.print_exc(file=sys.stdout)
                     pass
                 self.aw.fetchCurveStyles()
                 # the redraw is mostly necessary to force a redraw of the legend to reflect the changed colors/styles/labels
                 self.qmc.redraw(recomputeAllDeltas=False)
         except Exception as e: # pylint: disable=broad-except
             _log.exception(e)
-            _, _, exc_tb = sys.exc_info()
+            _type, _exc, exc_tb = sys.exc_info()
             self.qmc.adderror((QApplication.translate('Error Message','Exception:') + ' edit_parameters() {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
 
 
@@ -1275,17 +1236,17 @@ class VMToolbar(NavigationToolbar): # pylint: disable=abstract-method
 
 class EventActionThread(QThread): # pylint: disable=too-few-public-methods # pyright: ignore # Argument to class must be a base class (reportGeneralTypeIssues)
 
-    def __init__(self, aw:'ApplicationWindow', action, command) -> None:
+    def __init__(self, aw:'ApplicationWindow', action:int, command:str, eventtype:Optional[int]) -> None:
         super().__init__()
-        self.aw = aw
-        self.action = action
-        self.command = command
+        self.aw:'ApplicationWindow' = aw
+        self.action:int = action
+        self.command:str = command
+        self.eventtype:Optional[int] = eventtype
 
-    def run(self):
+    def run(self) -> None:
         # as eventaction_internal is not running in the GUI thread we avoid doing graphic updates and run them instead after thread termination within
         # the GUI thread
-        if self.aw is not None:
-            self.aw.eventaction_internal(self.action,self.command)
+        self.aw.eventaction_internal(self.action,self.command,self.eventtype)
 
 
 #########################################################################################################
@@ -1293,17 +1254,13 @@ class EventActionThread(QThread): # pylint: disable=too-few-public-methods # pyr
 # applies comma2dot as fixup to automatically turn numbers like "1,2" into valid numbers like "1.0" and the empty entry into "0.0"
 class MyQDoubleValidator(QDoubleValidator): # pylint: disable=too-few-public-methods  # pyright: ignore # Argument to class must be a base class (reportGeneralTypeIssues)
 
-    def __init__(self, bottom, top, decimals, lineedit) -> None:
+    def __init__(self, bottom:float, top:float, decimals:int, lineedit:QLineEdit) -> None:
         super().__init__(bottom, top, decimals, lineedit)
         self.lineedit = lineedit
 
-    def fixup(self, input_value):
+    def fixup(self, input_value:str):
         try:
-            if input_value is None or input_value == '':
-                input_value = '0'
-            else:
-                input_value = comma2dot(input_value)
-            self.lineedit.setText(input_value)
+            self.lineedit.setText('0' if input_value == '' else comma2dot(input_value))
 #            super().fixup(input_value)
         except Exception: # pylint: disable=broad-except
             pass
@@ -1328,11 +1285,12 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
     setCanvasColorSignal = pyqtSignal(str)
     resetCanvasColorSignal = pyqtSignal()
     setbuttonsfromSignal = pyqtSignal(int)
+    setExtraEventButtonStyleSignal = pyqtSignal(int,str)
     loadBackgroundSignal = pyqtSignal(str)
     clearBackgroundSignal = pyqtSignal()
     setTareSignal = pyqtSignal(int)
     adjustSVSignal = pyqtSignal(int)
-    updateSerialLogSignal = pyqtSignal()
+    setSVSignal = pyqtSignal(int)
     fireslideractionSignal = pyqtSignal(int)
     moveButtonSignal = pyqtSignal(str)
     sendnotificationMessageSignal = pyqtSignal(str,str,NotificationType)
@@ -1341,8 +1299,14 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
     updatePlaybackIndicatorSignal = pyqtSignal()
     pidOnSignal = pyqtSignal()
     pidOffSignal = pyqtSignal()
+    pidToggleSignal = pyqtSignal()
     notificationsSetEnabledSignal = pyqtSignal(bool)
     santokerSendMessageSignal = pyqtSignal(bytes,int)
+    kaleidoSendMessageSignal = pyqtSignal(str,str)
+    kaleidoSendMessageAwaitSignal = pyqtSignal(str,str,int,int)
+    updateMessageLogSignal = pyqtSignal()
+    updateSerialLogSignal = pyqtSignal()
+    updateErrorLogSignal = pyqtSignal()
 
     __slots__ = [ 'locale_str', 'app', 'superusermode', 'sample_loop_running', 'time_stopped', 'plus_account', 'plus_remember_credentials', 'plus_email', 'plus_language', 'plus_subscription',
         'plus_paidUntil', 'plus_rlimit', 'plus_used', 'plus_readonly', 'appearance', 'mpl_fontproperties', 'full_screen_mode_active', 'processingKeyEvent', 'quickEventShortCut',
@@ -1356,13 +1320,14 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         'simulator', 'simulatorpath', 'comparator', 'stack', 'eventsbuttonflag', 'minieventsflags', 'seriallogflag',
         'seriallog', 'ser', 'modbus', 'extraMODBUStemps', 'extraMODBUStx', 's7', 'ws', 'scale', 'color', 'extraser', 'extracomport', 'extrabaudrate',
         'extrabytesize', 'extraparity', 'extrastopbits', 'extratimeout', 'santokerHost', 'santokerPort', 'santokerSerial', 'santoker', 'fujipid', 'dtapid', 'pidcontrol', 'soundflag', 'recentRoasts', 'maxRecentRoasts',
+        'kaleidoHost', 'kaleidoPort', 'kaleidoSerial', 'kaleidoPID', 'kaleido',
         'lcdpaletteB', 'lcdpaletteF', 'extraeventsbuttonsflags', 'extraeventslabels', 'extraeventbuttoncolor', 'extraeventsactionstrings',
         'extraeventbuttonround', 'block_quantification_sampling_ticks', 'sampling_ticks_to_block_quantifiction', 'extraeventsactionslastvalue',
         'org_extradevicesettings', 'eventslidervalues', 'eventslidervisibilities', 'eventsliderKeyboardControl', 'eventslideractions', 'eventslidercommands', 'eventslideroffsets',
         'eventsliderfactors', 'eventslidermin', 'eventsMaxValue', 'eventslidermax', 'eventslidersflags', 'eventsliderBernoulli', 'eventslidercoarse',
         'eventslidertemp', 'eventsliderunits', 'eventslidermoved', 'SVslidermoved', 'eventquantifieractive', 'eventquantifiersource', 'eventquantifierSV',
         'eventquantifiermin', 'eventquantifiermax', 'eventquantifiercoarse', 'eventquantifieraction', 'clusterEventsFlag', 'eventquantifierlinspaces',
-        'eventquantifiersteps', 'eventquantifierthresholdfine', 'eventquantifierthresholdcoarse', 'lastdigitizedvalue', 'lastdigitizedtemp',
+        'eventquantifierthresholdfine', 'eventquantifierthresholdcoarse', 'eventquantifierthresholdmed', 'lastdigitizedvalue', 'lastdigitizedtemp',
         'readingslcdsflags', 'logoimgalpha', 'logoimgflag', 'logofilename', 'redrawOnResize', 'searchtextartisansettings', 'fileMenu', 'editMenu',
         'RoastMenu', 'ConfMenu', 'ToolkitMenu', 'viewMenu', 'helpMenu', 'newRoastMenu', 'fileLoadAction', 'openRecentMenu', 'importMenu',
         'fileSaveAction', 'fileSaveCopyAsAction', 'exportMenu', 'convMenu', 'saveGraphMenu', 'reportMenu', 'htmlAction', 'productionMenu',
@@ -1398,11 +1363,12 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         'extraeventsvisibility', 'fileSaveAction', 'fileSaveAsAction', 'keyboardButtonStyles', 'language_menu_actions', 'loadThemeAction', 'main_button_min_width_str',
         'minieventleft', 'minieventright', 'nLCDS', 'notificationManager', 'notificationsflag', 'ntb', 'pdf_page_layout', 'pdf_rendering', 'productionPDFAction',
         'rankingPDFAction', 'roastReportMenu', 'roastReportPDFAction', 'saveAsThemeAction', 'sliderGrpBox1x', 'sliderGrpBox2x', 'sliderGrpBox3x', 'sliderGrpBox4x',
-        'small_button_min_width_str', 'standard_button_min_width_px', 'tiny_button_min_width_str', 'recording_version', 'recording_revision', 'recording_build' ]
+        'small_button_min_width_str', 'standard_button_min_width_px', 'tiny_button_min_width_str', 'recording_version', 'recording_revision', 'recording_build',
+        'lastIOResult', 'max_palettes', 'palette_entries', 'eventsliders' ]
 
 
 
-    def __init__(self, parent = None, *, locale, WebEngineSupport, artisanviewerFirstStart) -> None:
+    def __init__(self, parent:Optional[QWidget] = None, *, locale:str, WebEngineSupport:bool, artisanviewerFirstStart:bool) -> None:
 
         self.locale_str = locale
         self.app = app
@@ -1461,7 +1427,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         self.applicationDirectory =  QDir().current().absolutePath()
 
         super().__init__(parent)
-        self.helpdialog = None
+        self.helpdialog:Optional[HelpDlg] = None
 
         self.setAcceptDrops(True) # enable drag-and-drop
 
@@ -1564,7 +1530,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         #self.qmc.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground)
 
         # PID control for Arduino, Hottop and generic MODBUS devices
-        self.pidcontrol = PIDcontrol(self)
+        self.pidcontrol:PIDcontrol = PIDcontrol(self)
 
         #### Hottop Control
         self.HottopControlActive:bool = False
@@ -1583,6 +1549,11 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         #events config
         self.eventsbuttonflag:int = 0
         self.minieventsflags:List[int] = [0,0,0] # minieditor visibility per state OFF, ON, START
+
+        # Last IO Command result
+        self.lastIOResult:Optional[float] = None
+        # Last Artisan Command result
+        self.lastArtisanResult:Optional[float] = None
 
         #records serial comm (Help menu)
         self.seriallogflag:bool = False
@@ -1619,6 +1590,13 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         self.santokerPort:int = 20001
         self.santokerSerial:bool = False # if True connection is via the main serial port
         self.santoker:Optional['SantokerNetwork'] = None # holds the Santoker instance created on connect; reset to None on disconnect
+
+        # Kaleido Network
+        self.kaleidoHost:str = '127.0.0.1'
+        self.kaleidoPort:int = 80
+        self.kaleidoSerial:bool = False # if True connection is via the main serial port
+        self.kaleidoPID:bool = True # if True the external Kaleido PID is operated, otherwise the internal Artisan PID is active
+        self.kaleido:Optional['KaleidoPort'] = None # holds the Kaleido instance created on connect; reset to None on disconnect
 
         # create a ET control objects
         self.fujipid = FujiPID(self)
@@ -1660,7 +1638,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         self.extraeventslabels: List[str] = []
         self.extraeventsdescriptions: List[str] = []
         self.extraeventstypes: List[int] = []
-        self.extraeventsvalues: List[float] = []
+        self.extraeventsvalues: List[float] = [] # internal eventvalues (see canvas.py:self.qmc.eventsExternal2InternalValue()/eventsInternal2ExternalValue()
         # extraeventtypes:
         #  0-3: custom event types (absolute value assignments)
         #  4: no event type assigned
@@ -1689,37 +1667,38 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         self.org_extradevicesettings:Optional[ExtraDeviceSettings] = None
 
         #event sliders
-        self.eventslidervalues:List[int] = [0,0,0,0]
-        self.eventslidervisibilities:List[int] = [0,0,0,0]
+        self.eventsliders:Final[int] = 4
+        self.eventslidervalues:List[int] = [0]*self.eventsliders
+        self.eventslidervisibilities:List[int] = [0]*self.eventsliders
         self.eventsliderKeyboardControl = True # if false sliders cannot be moved using up/down keys
-        self.eventslideractions:List[int] = [0,0,0,0] # 0: None, 1: Serial Command, 2: Modbus Command, 3: DTA Command, 4: Call Program, 5: Hottop Heater, 6: Hottop Fan
-        self.eventslidercommands:List[str] = ['','','','']
-        self.eventslideroffsets:List[float] = [0,0,0,0]
-        self.eventsliderfactors:List[float] = [1.0,1.0,1.0,1.0]
-        self.eventslidermin:List[int] = [0,0,0,0]
+        self.eventslideractions:List[int] = [0]*self.eventsliders # 0: None, 1: Serial Command, 2: Modbus Command, 3: DTA Command, 4: Call Program, 5: Hottop Heater, 6: Hottop Fan
+        self.eventslidercommands:List[str] = ['']*self.eventsliders
+        self.eventslideroffsets:List[float] = [0]*self.eventsliders
+        self.eventsliderfactors:List[float] = [1.0]*self.eventsliders
+        self.eventslidermin:List[int] = [0]*self.eventsliders
         self.eventsMaxValue:Final[int] = 999
-        self.eventslidermax:List[int] = [100,100,100,100]
+        self.eventslidermax:List[int] = [100]*self.eventsliders
         self.eventslidersflags:List[int] = [0,1,1] # slider visibility per state OFF, ON, START
-        self.eventsliderBernoulli:List[int] = [0,0,0,0] # if 1, sliders step in multiples of 10, otherwise 1
-        self.eventslidercoarse:List[int] = [0,0,0,0] # if 1, sliders step in multiples of 10, otherwise 1
-        self.eventslidertemp:List[int] = [0,0,0,0] # if 1, slider values are interpreted as temperatures and min/max limit are converted with the temp mode
-        self.eventsliderunits:List[str] = ['','','','']
-        self.eventslidermoved:List[int] = [0,0,0,0] # just set on move and reset on release to avoid imprecise slider moves
+        self.eventsliderBernoulli:List[int] = [0]*self.eventsliders # if 1, the bernoulli formula is applied to slider values
+        self.eventslidercoarse:List[int] = [0]*self.eventsliders # if 1, sliders step in multiples of 10, if 2, slider steps in 5, otherwise 1
+        self.eventslidertemp:List[int] = [0]*self.eventsliders # if 1, slider values are interpreted as temperatures and min/max limit are converted with the temp mode
+        self.eventsliderunits:List[str] = ['']*self.eventsliders
+        self.eventslidermoved:List[int] = [0]*self.eventsliders # just set on move and reset on release to avoid imprecise slider moves
         self.SVslidermoved = 0
 
         #event quantifiers
-        self.eventquantifieractive:List[int] = [0,0,0,0]
-        self.eventquantifiersource:List[int] = [0,0,0,0]
-        self.eventquantifierSV:List[int] = [0,0,0,0]
-        self.eventquantifiermin:List[int] = [0,0,0,0]
-        self.eventquantifiermax:List[int] = [100,100,100,100]
-        self.eventquantifiercoarse:List[int] = [0,0,0,0]
-        self.eventquantifieraction:List[int] = [0,0,0,0]
+        self.eventquantifieractive:List[int] = [0]*self.eventsliders
+        self.eventquantifiersource:List[int] = [0]*self.eventsliders
+        self.eventquantifierSV:List[int] = [0]*self.eventsliders
+        self.eventquantifiermin:List[int] = [0]*self.eventsliders
+        self.eventquantifiermax:List[int] = [100]*self.eventsliders
+        self.eventquantifiercoarse:List[int] = [0]*self.eventsliders
+        self.eventquantifieraction:List[int] = [0]*self.eventsliders
         self.clusterEventsFlag:bool = False
         self.eventquantifierlinspaces = [self.computeLinespace(0),self.computeLinespace(1),self.computeLinespace(2),self.computeLinespace(3)]
-        self.eventquantifiersteps:int = 10
-        self.eventquantifierthresholdfine:float = .5 # original: 1.5, changed to 0.5 for Probat Probatone
-        self.eventquantifierthresholdcoarse:float = .5
+        self.eventquantifierthresholdfine:float = .5 # original: 1.5, changed to 0.5 for Probat Probatone # for slider stepsize 1
+        self.eventquantifierthresholdmed:float = .5
+        self.eventquantifierthresholdcoarse:float = .5 # for slider stepsize 10
         self.lastdigitizedvalue:List[Optional[float]] = [None,None,None,None] # last digitized value per quantifier
         self.lastdigitizedtemp:List[Optional[float]] = [None,None,None,None] # last digitized temp value per quantifier
 
@@ -1816,10 +1795,12 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         importBulletAction = QAction('Aillio RoasTime...', self)
         importBulletAction.triggered.connect(self.importBullet)
         self.importMenu.addAction(importBulletAction)
+        importBulletAction.setEnabled(False)
 
         importBulletAction = QAction('Aillio Roast.World URL...', self)
         importBulletAction.triggered.connect(self.importBulletURL)
         self.importMenu.addAction(importBulletAction)
+        importBulletAction.setEnabled(False)
 
         importCropsterAction = QAction('Cropster XLS...', self)
         importCropsterAction.triggered.connect(self.importCropster)
@@ -3222,14 +3203,16 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
 
         #### CUSTOM events buttons
         self.buttonlist:List[QPushButton] = []
-        self.buttonStates:List[int] = []
+        self.buttonStates:List[int] = [] # per custom event button it holds a 0 or 1 if indicating its state as managed by button actions
         self.lastbuttonpressed:int = -1
         self.buttonlistmaxlen:int = 11
         self.buttonpalette_default_label:Final[str] = ''
         self.buttonpalette_label:str = self.buttonpalette_default_label
         #10 palettes of buttons
-        self.buttonpalette:List[Palette] = []
-        for _ in range(10):
+        self.max_palettes:Final[int] = 10
+        self.palette_entries:Final[int] = 28
+        self.buttonpalette:List[Palette] = [] # a list of Palettes, either valid, paletteValid(p), or empty, generated by makePalette(empty=True)
+        for _ in range(self.max_palettes):
             self.buttonpalette.append(self.makePalette())
         self.buttonpalettemaxlen:List[int] = [14]*10  #keeps max number of buttons per row per palette
         self.buttonpalette_shortcuts = True # if True palettes can be changed via the number keys
@@ -3861,11 +3844,12 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         self.setCanvasColorSignal.connect(self.setCanvasColor)
         self.resetCanvasColorSignal.connect(self.resetCanvasColor)
         self.setbuttonsfromSignal.connect(self.setbuttonsfromAction)
+        self.setExtraEventButtonStyleSignal.connect(self.setExtraEventButtonStyle)
         self.loadBackgroundSignal.connect(self.loadbackgroundRedraw)
         self.clearBackgroundSignal.connect(self.clearbackgroundRedraw)
         self.setTareSignal.connect(self.setTare)
         self.adjustSVSignal.connect(self.adjustPIDsv)
-        self.updateSerialLogSignal.connect(self.updateSerialLog)
+        self.setSVSignal.connect(self.setPIDsv)
         self.fireslideractionSignal.connect(self.fireslideraction)
         self.moveButtonSignal.connect(self.moveKbutton)
         self.sendnotificationMessageSignal.connect(self.sendNotificationMessage)
@@ -3873,11 +3857,17 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         self.updateLimitsSignal.connect(self.updateLimits)
         self.updatePlaybackIndicatorSignal.connect(self.updatePlaybackIndicator)
         self.pidOnSignal.connect(self.pidcontrol.pidOn)
-        self.pidOffSignal.connect(self.pidcontrol.pidOff)
+        self.pidOffSignal.connect(self.pidOff)
+        self.pidToggleSignal.connect(self.pidToggle)
         self.notificationsSetEnabledSignal.connect(self.notificationsSetEnabled)
         self.santokerSendMessageSignal.connect(self.santokerSendMessage)
+        self.kaleidoSendMessageSignal.connect(self.kaleidoSendMessage)
+        self.kaleidoSendMessageAwaitSignal.connect(self.kaleidoSendMessageAwait)
+        self.updateMessageLogSignal.connect(self.updateMessageLog)
+        self.updateSerialLogSignal.connect(self.updateSerialLog)
+        self.updateErrorLogSignal.connect(self.updateErrorLog)
 
-        self.notificationManager = None
+        self.notificationManager:Optional[NotificationManager] = None
         if not self.app.artisanviewerMode:
             self.notificationManager = NotificationManager()
 
@@ -3897,13 +3887,37 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         self.zoomOutShortcut = QShortcut(QKeySequence.StandardKey.ZoomOut, self)
         self.zoomOutShortcut.activated.connect(self.zoomOut)
 
-    def zoomIn(self):
+
+    @pyqtSlot()
+    def updateMessageLog(self) -> None:
+        if self.message_dlg:
+            self.message_dlg.update()
+    @pyqtSlot()
+    def updateSerialLog(self) -> None:
+        if self.serial_dlg:
+            self.serial_dlg.update()
+    @pyqtSlot()
+    def updateErrorLog(self) -> None:
+        if self.error_dlg:
+            self.error_dlg.update()
+
+    @pyqtSlot()
+    def pidOn(self) -> None:
+        self.pidcontrol.pidOn()
+    @pyqtSlot()
+    def pidOff(self) -> None:
+        self.pidcontrol.pidOff()
+    @pyqtSlot()
+    def pidToggle(self) -> None:
+        self.pidcontrol.togglePID()
+
+    def zoomIn(self) -> None:
         self.setdpi(self.dpi+10)
 
-    def zoomOut(self):
+    def zoomOut(self) -> None:
         self.setdpi(self.dpi-10)
 
-    def scrollingPhases(self, event):
+    def scrollingPhases(self, event) -> None:
         val = self.scroller.verticalScrollBar().value()
         if event.button =='down':
             self.scroller.verticalScrollBar().setValue(val+10)
@@ -3912,7 +3926,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
 
 
     # timer_color one of "timer" (black), "slowcoolingtimer" (red), "rstimer" (blue)
-    def setTimerColor(self, timer_color:str):
+    def setTimerColor(self, timer_color:str) -> None:
         self.lcd1.setStyleSheet(f'QLCDNumber {{ border-radius: 4; color: {self.lcdpaletteF[timer_color]}; background-color: {self.lcdpaletteB[timer_color]};}}')
         self.qmc.setTimerLargeLCDcolorSignal.emit(self.lcdpaletteF[timer_color], self.lcdpaletteB[timer_color])
         # HACK: PID/CONTROL button changes shape/shadow on setTimerColor() as triggered by RESET
@@ -3923,13 +3937,13 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         except Exception:  # pylint: disable=broad-except
             pass
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event) -> None:
         super().mousePressEvent(event)
         if event.button() == Qt.MouseButton.LeftButton:
             self.releaseminieditor()
             self.releaseSliderFocus()
 
-    def updateSubscription(self, subscription: str):
+    def updateSubscription(self, subscription: str) -> None:
         _log.debug('updateSubscription(%s)', subscription)
         if subscription:
             self.plus_subscription = subscription
@@ -3937,7 +3951,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             self.plus_subscription = None
 
     # if any of the parameters is <0 the corresponding variable is not updated
-    def updatePlusLimits(self, rlimit: float, used: float):
+    def updatePlusLimits(self, rlimit: float, used: float) -> None:
         _log.debug('updatePlusLimits(%s, %s)', rlimit, used)
         if rlimit > -1:
             self.plus_rlimit = rlimit
@@ -3945,7 +3959,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             self.plus_used = used
 
     # if pu is "" the corresponding variable is not updated
-    def updatePlusPaidUntil(self, pu: str):
+    def updatePlusPaidUntil(self, pu: str) -> None:
         _log.debug('updatePlusPaidUntil(%s)', pu)
         try:
             if pu != '':
@@ -3957,7 +3971,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
 
     # if rlimit = -1 or rused = -1 or pu = "", no update information is available and the state is not updated
     @pyqtSlot(float,float,str,int,list)
-    def updateLimits(self, rlimit:float, rused:float, pu:str, notifications:int, machines: List[str]):  #for Python >= 3.9 can replace 'List' with the generic type hint 'list'
+    def updateLimits(self, rlimit:float, rused:float, pu:str, notifications:int, machines: List[str]) -> None:  #for Python >= 3.9 can replace 'List' with the generic type hint 'list'
         _log.debug('updateLimits(%s,%s,%s,%s,%s)', rlimit, rused, pu, notifications, machines)
         self.updatePlusLimits(rlimit, rused)
         self.updatePlusPaidUntil(pu)
@@ -3965,7 +3979,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         plus.notifications.updateNotifications(notifications, machines)
 
     @pyqtSlot(str,str,NotificationType)
-    def sendNotificationMessage(self, title, message, notification_type):
+    def sendNotificationMessage(self, title:str, message:str, notification_type:NotificationType) -> None:
         if self.notificationManager:
             self.notificationManager.sendNotificationMessage(title.strip(), message.strip(), notification_type)
 
@@ -3991,7 +4005,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
              self.extraCurveVisibility2) = self.qmc.curveVisibilityCache
 
     @pyqtSlot()
-    def toggleETCurve(self):
+    def toggleETCurve(self) -> None:
         if self.qmc.swaplcds:
             self.qmc.BTcurve = not self.qmc.BTcurve
         else:
@@ -3999,7 +4013,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         self.qmc.redraw(recomputeAllDeltas=False)
 
     @pyqtSlot()
-    def toggleBTCurve(self):
+    def toggleBTCurve(self) -> None:
         if self.qmc.swaplcds:
             self.qmc.ETcurve = not self.qmc.ETcurve
         else:
@@ -4007,7 +4021,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         self.qmc.redraw(recomputeAllDeltas=False)
 
     @pyqtSlot()
-    def toggleDeltaETCurve(self):
+    def toggleDeltaETCurve(self) -> None:
         if self.qmc.swapdeltalcds:
             self.qmc.DeltaBTflag = not self.qmc.DeltaBTflag
         else:
@@ -4015,7 +4029,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         self.qmc.redraw(recomputeAllDeltas=False)
 
     @pyqtSlot()
-    def toggleDeltaBTCurve(self):
+    def toggleDeltaBTCurve(self) -> None:
         if self.qmc.swapdeltalcds:
             self.qmc.DeltaETflag = not self.qmc.DeltaETflag
         else:
@@ -4023,7 +4037,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         self.qmc.redraw(recomputeAllDeltas=False)
 
     @pyqtSlot()
-    def toggleExtraCurve1(self):
+    def toggleExtraCurve1(self) -> None:
         try:
             sender = self.sender()
             assert isinstance(sender, ClickableLCDFrame)
@@ -4034,7 +4048,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         self.qmc.redraw(recomputeAllDeltas=False)
 
     @pyqtSlot()
-    def toggleExtraCurve2(self):
+    def toggleExtraCurve2(self) -> None:
         try:
             sender = self.sender()
             assert isinstance(sender, ClickableLCDFrame)
@@ -4044,7 +4058,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             _log.exception(e)
         self.qmc.redraw(recomputeAllDeltas=False)
 
-    def addLanguage(self, locale, menu_entry):
+    def addLanguage(self, locale:str, menu_entry:str) -> None:
         languageAction = QAction(menu_entry, self)
         if locale in ['ru']:
             languageAction.setEnabled(False)
@@ -4132,7 +4146,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             gen.flatten(message)
         QDesktopServices.openUrl(QUrl.fromLocalFile(tmpfile))
 
-    def updateWindowTitle(self):
+    def updateWindowTitle(self) -> None:
         try:
             appTitle = f'{(application_viewer_name if self.app.artisanviewerMode else application_name)} {str(__version__)}'
             dirtySign = '* ' if self.qmc.safesaveflag else ''
@@ -4152,7 +4166,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             _log.exception(e)
 
     @staticmethod
-    def resetDonateCounter():
+    def resetDonateCounter() -> None:
         settings = QSettings()
         settings.setValue('lastdonationpopup',int(libtime.time()))
         settings.setValue('starts',0)
@@ -4160,7 +4174,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         if settings.status() != QSettings.Status.NoError:
             _log.error('Failed to save lastdonationpopup settings')
 
-    def donate(self):
+    def donate(self) -> None:
         try:
             everytime = 4*30*24*60*60 # 4 month in seconds
             everystarts = 30 # number of recordings
@@ -4194,7 +4208,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             _log.exception(e)
 
     @pyqtSlot(str)
-    def setCanvasColor(self, c): # pylint: disable=no-self-use # used as slot
+    def setCanvasColor(self, c:str) -> None: # pylint: disable=no-self-use # used as slot
         try:
             QColor(c) # test if color is valid
             self.qmc.palette['canvas_alt'] = self.qmc.palette['canvas']
@@ -4205,7 +4219,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             _log.exception(e)
 
     @pyqtSlot()
-    def resetCanvasColor(self): # pylint: disable=no-self-use # used as slot
+    def resetCanvasColor(self) -> None: # pylint: disable=no-self-use # used as slot
         try:
             if 'canvas_alt' in self.qmc.palette:
                 self.qmc.palette['canvas'] = self.qmc.palette['canvas_alt']
@@ -4218,20 +4232,20 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
 
     # takes an "Arduino" float time in seconds and returns the corresponding QTime() object
     @staticmethod
-    def time2QTime(t: float):
+    def time2QTime(t: float) -> QTime:
         return QTime(0,int(t//60),int(t%60))
 
     @staticmethod
-    def QTime2time(t: QTime):
+    def QTime2time(t: QTime) -> float:
         return t.minute() * 60 + t.second()
 
-    def dragEnterEvent(self, event): # pylint: disable=no-self-use # class method
+    def dragEnterEvent(self, event) -> None: # pylint: disable=no-self-use # class method
         if event.mimeData().hasUrls():
             event.accept()
         else:
             event.ignore()
 
-    def dropEvent(self, event): # pylint: disable=no-self-use # class method
+    def dropEvent(self, event) -> None: # pylint: disable=no-self-use # class method
         urls = event.mimeData().urls()
         if urls and len(urls)>0:
             self.app.open_url(urls[0])
@@ -4239,9 +4253,9 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                 for url in urls[0:]:
                     self.app.open_url(url)
 
-    def showHelpDialog(self,parent,dialog,title,content):
+    def showHelpDialog(self, parent:QWidget, dialog:Optional[HelpDlg], title:str, content:str) -> Optional[HelpDlg]:
         try: # sip not supported on older PyQt versions (RPi!)
-            if sip.isdeleted(dialog):
+            if dialog is not None and sip.isdeleted(dialog):
                 dialog = None
         except Exception: # pylint: disable=broad-except
             pass
@@ -4253,7 +4267,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         return dialog
 
     @staticmethod
-    def closeHelpDialog(dialog):
+    def closeHelpDialog(dialog:Optional[HelpDlg]) -> None:
         if dialog is not None:
             try:
                 if not sip.isdeleted(dialog):
@@ -4302,7 +4316,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
     # search the given QTable table for a row with the given widget as cellWidget or item in column col or as a sub-widget contained in the layout of a widget in place
     # returns the row number if the widget was found or None
     @staticmethod
-    def findWidgetsRow(table,widget,col):
+    def findWidgetsRow(table:'QTableWidget', widget:QWidget, col:int) -> Optional[int]:
         for r in range(table.rowCount()):
             if table.cellWidget(r,col) == widget or table.item(r,col) == widget or \
                 (table.cellWidget(r,col) is not None and table.cellWidget(r,col).layout() is not None and table.cellWidget(r,col).layout().indexOf(widget) > -1):
@@ -4312,7 +4326,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
     # search the given QTable table for a column with the given widget in row
     # returns the column number if the widget was found or None
     @staticmethod
-    def findWidgetsColumn(table,widget,row):
+    def findWidgetsColumn(table:'QTableWidget', widget:QWidget, row:int) -> Optional[int]:
         for c in range(table.columnCount()):
             if table.cellWidget(row,c) == widget or table.item(row,c) == widget or \
                 (table.cellWidget(row,c) is not None and table.cellWidget(row,c).layout() is not None and table.cellWidget(row,c).layout().indexOf(widget) > -1):
@@ -4320,7 +4334,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         return None
 
     @pyqtSlot()
-    def redraw_action(self):
+    def redraw_action(self) -> None:
         try:
             self.qmc.redraw(False,False)
         except Exception: # pylint: disable=broad-except
@@ -4336,7 +4350,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
 
     # this is important to have . as decimal separator independent of the systems locale
     @staticmethod
-    def createCLocaleDoubleValidator(bot,top,dec,w):
+    def createCLocaleDoubleValidator(bot:float, top:float, dec:int, w:QLineEdit) -> MyQDoubleValidator:
         validator = MyQDoubleValidator(bot,top,dec,w)
         validator.setLocale(QLocale.c())
         validator.setNotation(QDoubleValidator.Notation.StandardNotation)
@@ -4351,21 +4365,21 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
 #        self.sender().setGraphicsEffect(self.makeShadow())
 
     @pyqtSlot(QPoint)
-    def setTareET(self,_):
+    def setTareET(self,_:QPoint) -> None:
         if not self.qmc.swaplcds:
             self.setTare(0)
         else:
             self.setTare(1)
 
     @pyqtSlot(QPoint)
-    def setTareBT(self,_):
+    def setTareBT(self,_:QPoint) -> None:
         if not self.qmc.swaplcds:
             self.setTare(1)
         else:
             self.setTare(0)
 
     @pyqtSlot(QPoint)
-    def setTare_slot(self,_):
+    def setTare_slot(self,_:QPoint) -> None:
         sender = self.sender()
         try:
             assert isinstance(sender, ClickableLCDFrame)
@@ -4382,7 +4396,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
 
     # set the tare values per channel (0: ET, 1:BT, 2:E1c0, 3:E1c1, 4:E1c0, 5:E1c1,...)
     @pyqtSlot(int)
-    def setTare(self,n:int):
+    def setTare(self,n:int) -> None:
         if self.qmc.flagon: # we set the tare value
             if n == 0:
                 temp = (self.qmc.temp1 if self.qmc.flagstart else self.qmc.on_temp1)
@@ -4410,10 +4424,10 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
 
 #PLUS
     @pyqtSlot()
-    def updatePlusStatusSlot(self):
+    def updatePlusStatusSlot(self) -> None:
         self.updatePlusStatus()
 
-    def updatePlusStatus(self,ntb=None):
+    def updatePlusStatus(self,ntb:Optional[VMToolbar]=None) -> None:
         if ntb is None:
             ntb = self.ntb
         try:
@@ -4980,8 +4994,15 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                         QApplication.translate('Message', 'Network name or IP address'),text=self.ws.host) #"127.0.0.1"
                     if res:
                         self.ws.host = host
+                elif self.qmc.device == 138 and not self.kaleidoSerial: # Kaleido Network
+                    host,res = QInputDialog.getText(self,
+                        QApplication.translate('Message', 'Machine'),
+                        QApplication.translate('Message', 'Network name or IP address'),text=self.kaleidoHost) #"127.0.0.1"
+                    if res:
+                        self.kaleidoHost = host
                 elif (self.qmc.device in [0,9,19,53,101,115,126] or (self.qmc.device == 29 and self.modbus.type in [0,1,2]) or
-                        (self.qmc.device == 134 and self.santokerSerial)): # Fuji, Center301, TC4, Hottop, Behmor or MODBUS serial, HB/ARC
+                        (self.qmc.device == 134 and self.santokerSerial) or
+                        (self.qmc.device == 138 and self.kaleidoSerial)): # Fuji, Center301, TC4, Hottop, Behmor or MODBUS serial, HB/ARC
                     select_device_name = None
                     if self.qmc.device == 53: # Hottop 2k+:
                         select_device_name = 'FT230X Basic UART'
@@ -5493,10 +5514,13 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                     temp,_ = self.quantifier2tempandtime(i)
                     if temp is not None and len(temp)>0: # corresponding curve is available
                         linespace = self.eventquantifierlinspaces[i]
-                        if self.eventquantifiercoarse[i]:
-                            linespacethreshold = abs(linespace[1] - linespace[0]) * self.eventquantifierthresholdcoarse
-                        else:
-                            linespacethreshold = abs(linespace[1] - linespace[0]) * self.eventquantifierthresholdfine
+                        if self.eventquantifiercoarse[i] == 1: # slider step size 10
+                            threshold = self.eventquantifierthresholdcoarse
+                        elif self.eventquantifiercoarse[i] == 2: # slider step size 5
+                            threshold = self.eventquantifierthresholdmed
+                        else:  # slider step size 1
+                            threshold = self.eventquantifierthresholdfine
+                        linespacethreshold = abs(linespace[1] - linespace[0]) * threshold
                         t = temp[-1]
                         if t != -1: # -1 is an error value
                             d = self.digitize(t,linespace,self.eventquantifiercoarse[i],i)
@@ -5943,12 +5967,19 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         return QColorDialog.getColor(c)
 
     @pyqtSlot(int)
-    def adjustPIDsv(self,x):
+    def adjustPIDsv(self, x:int) -> None:
         if self.qmc.device == 0: # Fuji PID
             self.fujipid.adjustsv(x)
 #        elif self.qmc.device == 19: # Arduino TC4
         else: # Arduino TC4, internal Software PID or MODBUS/S7 external PID
             self.pidcontrol.adjustsv(x)
+
+    @pyqtSlot(int)
+    def setPIDsv(self, sv:int) -> None:
+        if self.qmc.device == 0 and sv != self.fujipid.sv: # Fuji PID
+            self.fujipid.setsv(sv,silent=True)
+        elif sv != self.pidcontrol.sv:
+            self.pidcontrol.setSV(sv,init=False)
 
     @pyqtSlot(bool)
     def adjustPIDsv5(self,_=False):
@@ -5974,11 +6005,13 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
     def adjustPIDsv5m(self,_=False):
         self.adjustPIDsv(-5)
 
-    # compute the 12 or 102 event quantifier linespace for type n in [0,3]
+    # compute the 12 (if step size is 10) or 21 (if step size is 5) or 102 (if step size is 1) event quantifier linespace for type n in [0,3]
     def computeLinespace(self,n):
-        if self.eventquantifiercoarse[n]:
+        if self.eventquantifiercoarse[n] == 1: # step size 10
             num = int(round((self.eventslidermax[n] - self.eventslidermin[n])/10.)) + 1
-        else:
+        elif self.eventquantifiercoarse[n] == 2: # step size 5
+            num = int(round((self.eventslidermax[n] - self.eventslidermin[n])/5.)) + 1
+        else: # step size 1
             num = self.eventslidermax[n] - self.eventslidermin[n] + 1
         return numpy.linspace(self.eventquantifiermin[n], self.eventquantifiermax[n], num=num)
 
@@ -6030,14 +6063,16 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                 pass
         return temp,timex
 
-    # returns min/max 0/(self.eventsMaxValue / 10) for values outside of the given linespace ls defining the interval
-    # note that the value returned is the event value divided by 10, but not with the internal offset of +1 !!
-    # otherwise the bin number from [0-self.eventquantifiersteps]
+    # returns as min/max the values  (self.eventslidermin / 10) and (self.eventslidermax / 10) for values outside of the given linespace ls defining the interval
+    # otherwise the bin number
+    # NOTE: the value returned is the event value divided by 10, but not with the internal offset of +1 !!
     def digitize(self, v, ls, coarse, i):
-        if coarse:
-            r = ((numpy.digitize([v],ls)[0] - 1) * 10. + self.eventslidermin[i]) / 10.
-        else:
-            r = (numpy.digitize([v],ls)[0]+self.eventslidermin[i] - 1) / 10.
+        factor:int = 1 # slider step size 1
+        if coarse == 1: # slider step size 10
+            factor = 10
+        elif coarse == 2: # slider step size 5
+            factor = 5
+        r = ((numpy.digitize([v],ls)[0] - 1) * factor + self.eventslidermin[i]) / 10.
         return max(self.eventslidermin[i]/10., min(self.eventslidermax[i] / 10.,r))
 
     def curveSimilarity2(self,exp:int=-1,analysis_starttime:float=0,analysis_endtime:float=0) -> 'CurveSimilarity': # pylint: disable=no-self-use
@@ -7234,12 +7269,28 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
     def slider4released(self):
         self.sliderReleased(3,force=True,updateLCD=False)
 
+    # returns the step size (1, 5 or 10) of the eventslider of the given number n [0,..,3]
+    def eventSliderStepSize(self, n:int) -> int:
+        if self.eventslidercoarse[n] == 1:
+            return 10
+        if self.eventslidercoarse[n] == 2:
+            return 5
+        return 1
+
+    # n the slider number 0,..,3; v the slider value
+    # returns the slider value quantified by the sliders step size
+    def applySliderStepSize(self, n:int, v:int) -> int:
+        if self.eventslidercoarse[n] == 1: # step size is 10
+            return int(round(v / 10.))*10
+        if self.eventslidercoarse[n] == 2: # step size is 5
+            return int(round(v / 5.))*5
+        # otherwise slider step size is 1 and no quantification is applied
+        return v
+
 # required for the default tracking sliders
     @pyqtSlot(int)
-    def updateSlider1LCD(self,v):
-        if self.eventslidercoarse[0]:
-            v = int(round(v / 10.))*10
-        self.updateSliderLCD(0,v)
+    def updateSlider1LCD(self, v:int) -> None:
+        self.updateSliderLCD(0, self.applySliderStepSize(0,v))
         if self.eventslidermoved[0]:
             # if slider was moved by a keyboard action, we have to explicitly update the value and send the signals
             if self.sliderLCD1.intValue() != self.slider1.value():
@@ -7247,10 +7298,8 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             self.slider1released()
             self.eventslidermoved[0] = 0
     @pyqtSlot(int)
-    def updateSlider2LCD(self,v):
-        if self.eventslidercoarse[1]:
-            v = int(round(v / 10.))*10
-        self.updateSliderLCD(1,v)
+    def updateSlider2LCD(self,v:int) -> None:
+        self.updateSliderLCD(1, self.applySliderStepSize(1,v))
         if self.eventslidermoved[1]:
             # if slider was moved by a keyboard action, we have to explicitly update the value and send the signals
             if self.sliderLCD2.intValue() != self.slider2.value():
@@ -7258,10 +7307,8 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             self.slider2released()
             self.eventslidermoved[1] = 0
     @pyqtSlot(int)
-    def updateSlider3LCD(self,v):
-        if self.eventslidercoarse[2]:
-            v = int(round(v / 10.))*10
-        self.updateSliderLCD(2,v)
+    def updateSlider3LCD(self,v:int) -> None:
+        self.updateSliderLCD(2, self.applySliderStepSize(2,v))
         if self.eventslidermoved[2]:
             # if slider was moved by a keyboard action, we have to explicitly update the value and send the signals
             if self.sliderLCD3.intValue() != self.slider3.value():
@@ -7269,10 +7316,8 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             self.slider3released()
             self.eventslidermoved[2] = 0
     @pyqtSlot(int)
-    def updateSlider4LCD(self,v):
-        if self.eventslidercoarse[3]:
-            v = int(round(v / 10.))*10
-        self.updateSliderLCD(3,v)
+    def updateSlider4LCD(self,v:int) -> None:
+        self.updateSliderLCD(3, self.applySliderStepSize(3,v))
         if self.eventslidermoved[3]:
             # if slider was moved by a keyboard action, we have to explicitly update the value and send the signals
             if self.sliderLCD4.intValue() != self.slider4.value():
@@ -7315,9 +7360,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             sv1 = self.slider1.value()
             if force or (self.eventslidermoved[0] and sv1 != self.eventslidervalues[0]) or abs(sv1-self.eventslidervalues[0]) > 3:
                 self.eventslidermoved[0] = 0
-                if self.eventslidercoarse[0]:
-                    sv1 = int(round(sv1 / 10.))*10
-                self.eventslidervalues[0] = sv1
+                self.eventslidervalues[0] = self.applySliderStepSize(0,sv1)
                 if updateLCD or (self.eventslidercoarse[0] and sv1 != self.slider1.value()):
                     self.moveslider(0,sv1,forceLCDupdate=True) # move slider if need and update slider LCD
                 self.recordsliderevent(n)
@@ -7325,9 +7368,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             sv2 = self.slider2.value()
             if force or (self.eventslidermoved[1] and sv2 != self.eventslidervalues[1]) or abs(sv2-self.eventslidervalues[1]) > 3:
                 self.eventslidermoved[1] = 0
-                if self.eventslidercoarse[1]:
-                    sv2 = int(round(sv2 / 10.))*10
-                self.eventslidervalues[1] = sv2
+                self.eventslidervalues[1] = self.applySliderStepSize(1,sv2)
                 if updateLCD or (self.eventslidercoarse[1] and sv2 != self.slider2.value()):
                     self.moveslider(1,sv2,forceLCDupdate=True) # move slider if need and update slider LCD
                 self.recordsliderevent(n)
@@ -7335,9 +7376,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             sv3 = self.slider3.value()
             if force or (self.eventslidermoved[2] and sv3 != self.eventslidervalues[2]) or abs(sv3-self.eventslidervalues[2]) > 3:
                 self.eventslidermoved[2] = 0
-                if self.eventslidercoarse[2]:
-                    sv3 = int(round(sv3 / 10.))*10
-                self.eventslidervalues[2] = sv3
+                self.eventslidervalues[2] = self.applySliderStepSize(2,sv3)
                 if updateLCD or (self.eventslidercoarse[2] and sv3 != self.slider3.value()):
                     self.moveslider(2,sv3,forceLCDupdate=True) # move slider if need and update slider LCD
                 self.recordsliderevent(n)
@@ -7345,9 +7384,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             sv4 = self.slider4.value()
             if force or (self.eventslidermoved[3] and sv4 != self.eventslidervalues[3]) or abs(sv4-self.eventslidervalues[3]) > 3:
                 self.eventslidermoved[3] = 0
-                if self.eventslidercoarse[3]:
-                    sv4 = int(round(sv4 / 10.))*10
-                self.eventslidervalues[3] = sv4
+                self.eventslidervalues[3] = self.applySliderStepSize(3,sv4)
                 if updateLCD or (self.eventslidercoarse[3] and sv4 != self.slider4.value()):
                     self.moveslider(3,sv4,forceLCDupdate=True) # move slider if need and update slider LCD
                 self.recordsliderevent(n)
@@ -7483,11 +7520,6 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
     def setLabelColor(label,color):
         label.setStyleSheet(f'QLabel {{ color: {color.name()}; }}')
 
-    @pyqtSlot()
-    def updateSerialLog(self):
-        if self.serial_dlg is not None:
-            self.serial_dlg.update()
-
     #adds to serial log
     def addserial(self,serialstring):
         if self.seriallogflag:
@@ -7500,7 +7532,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                     self.seriallog = self.seriallog[1:]
                 self.seriallog.append(timez + ' ' + serialstring)
                 # if logging is not on, we have to update the serial log here:
-                if not self.qmc.flagon and self.serial_dlg is not None:
+                if self.serial_dlg is not None:
                     self.updateSerialLogSignal.emit() # as addserial might be called from another (samplinig) thread we need to ensure that this is processed this within the GUI thread via a signal
             except Exception as e: # pylint: disable=broad-except
                 _log.exception(e)
@@ -7559,14 +7591,18 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
     #         7= Call Program with argument (slider action); 8= HOTTOP Heater; 9= HOTTOP Main Fan; 10= HOTTOP Command; 11= p-i-d; 12= Fuji Command;
     #         13= PWM Command; 14= VOUT Command; 15= S7 Command; 16= Aillio R1 Heater; 17= Aillio R1 Fan; 18= Aillio R1 Drum; 19= Aillio R1 Command;
     #         20= Artisan Command; 21= RC Command; 22= WebSocket Command
-    def eventaction(self,action,cmd,parallel=True):
+    # eventtype is one of the custom event types (0-3), only given if called for a button action with relative event type and event value 0
+    # in this case the event button is not generating an event entry during recording, but a button action could receive an event value from calling its action
+    # and generate a corresponding event entry via a self.qmc.EventRecordActionSignal as done by the kaleido button IO Command action
+    # eventtrype is -1 if the even action should await a result to be bound to _
+    def eventaction(self, action:int, cmd:str, parallel=True,eventtype:Optional[int]=None):
         # split on an octothorpe '#' that is not inside parentheses '()'
         cmd = re.split(r'\#(?![^\(]*\))',cmd)[0].strip()
         if action:
             if not parallel:# or action==3: # subactions of multiple event actions, may crash if run in parallel, especially if they update the UI like button shape!
-                self.eventaction_internal(action,cmd)
+                self.eventaction_internal(action,cmd,eventtype)
             else:
-                eventActionThread = EventActionThread(self, action, cmd)
+                eventActionThread = EventActionThread(self, action, cmd, eventtype)
                 eventActionThread.finished.connect(self.eventactionThreadDone_slot)
                 try:
                     self.qmc.eventactionsemaphore.acquire(1)
@@ -7594,7 +7630,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
 
     # NOTE: this may runs in a separate EventActionThread and not in the GUI thread thus actions modifying the GUI might need to use signals to
     # ensure that they run in the GUI thread to avoid hard crashes (see pidON/pidOFF)
-    def eventaction_internal(self,action,cmd): # pyright: ignore # Code is too complex to analyze; reduce complexity by refactoring into subroutines or reducing conditional code paths (reportGeneralTypeIssues)
+    def eventaction_internal(self,action,cmd,eventtype:Optional[int]): # pyright: ignore # Code is too complex to analyze; reduce complexity by refactoring into subroutines or reducing conditional code paths (reportGeneralTypeIssues)
         if action:
             try:
                 if self.simulator and action not in [2,3,20]:  # 2 (Call Program) 3 (Multiple Event), 20 (Artisan Command)
@@ -7646,7 +7682,8 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                     except Exception as e: # pylint: disable=broad-except
                         _log.exception(e)
 
-                if action == 1:
+                lastbuttonpressed = self.lastbuttonpressed # we rember that here as it might be reset to -1 by some button commands to avoid changing its state
+                if action == 1: # Serial Command
                     cmd_str_bin = b''
                     #example a2b_uu("Hello") sends Hello in binary format instead of ASCII
                     if 'a2b_uu' in cmd_str:
@@ -7695,7 +7732,13 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                         cmds = filter(None, cmd_str.split(';')) # allows for sequences of commands like in "<cmd>;<cmd>;...;<cmd>"
                         followupCmd = 0. # contains the required sleep time
                         for c in cmds:
-                            cs = c.strip().replace('_',str(self.modbus.lastReadResult)) # the last read value can be accessed via the "_" symbol
+                            cs = c.strip().replace('_',('0' if self.modbus.lastReadResult is None else str(self.modbus.lastReadResult))) # the last read value can be accessed via the "_" symbol
+
+                            # $ is substituted by the state of the current button (1:pressed, 0:normal)
+                            last = 0 # defaults to 0
+                            if lastbuttonpressed != -1 and len(self.buttonlist)>lastbuttonpressed:
+                                last = self.buttonStates[lastbuttonpressed]
+                            cs = cs.replace('$', str(last))
                             if followupCmd:
                                 if followupCmd == 0.08:
                                     self.modbus.sleepBetween(write=True)
@@ -7930,22 +7973,55 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                                     cmds = eval(cs[len('readFloat'):]) # pylint: disable=eval-used
                                     if isinstance(cmds,tuple) and len(cmds) == 2:
                                         # cmd has format "readFloat(s,r)"
-                                        self.modbus.lastReadResult = self.modbus.readFloat(*cmds,force=True) # type: ignore # "readFloat" of "modbusport" gets multiple values for keyword argument "force"
+                                        res:Optional[float] = self.modbus.readFloat(*cmds,force=True) # type: ignore # "readFloat" of "modbusport" gets multiple values for keyword argument "force"
+                                        self.modbus.lastReadResult = (res if res is None else int(round(res)))
                                         followupCmd = 0.03
                                 except Exception as e: # pylint: disable=broad-except
                                     _log.exception(e)
                             elif cs.startswith('button'):
                                 # cmd has format "button(<bool>)" # 0 or 1 or True or False
                                 try:
-                                    cmds = eval(cs[len('button'):]) # pylint: disable=eval-used
+                                    try:
+                                        args = eval(cs[len('button'):]) # pylint: disable=eval-used
+                                    except Exception: # pylint: disable=broad-except
+                                        args = [c[len('button('):-1].strip()] # just a tag like True would fail to eval
+                                    cs_len = 1
+                                    if isinstance(args, (list, tuple)):
+                                        cs_len = len(args)
+                                    else:
+                                        args = [args]
                                     last = self.lastbuttonpressed
-                                    if last != -1 and len(self.buttonlist)>last:
-                                        #block resetting style of last button
-                                        self.lastbuttonpressed = -1
-                                        if cmds:
-                                            self.setExtraEventButtonStyle(last, style='pressed')
+                                    if cs_len>1:
+                                        # just set the button style of the indicated button
+                                        b = toInt(args[0]) - 1 # gui button list is indexed from 1
+                                        bv = toBool(args[1])
+                                        if 0 <= b < len(self.buttonlist):
+                                            #block resetting style of last button
+                                            self.lastbuttonpressed = -1
+                                            if bv:
+                                                self.buttonStates[b] = 1
+                                                self.setExtraEventButtonStyleSignal.emit(b, 'pressed')
+                                            else:
+                                                self.buttonStates[b] = 0
+                                                self.setExtraEventButtonStyleSignal.emit(b, 'normal')
+                                    elif cs_len>0:
+                                        bv = toBool(args[0])
+                                        if last != -1 and len(self.buttonlist)>last:
+                                            #block resetting style of last button
+                                            self.lastbuttonpressed = -1
+                                            self.buttonStates[lastbuttonpressed] = int(bv)
+                                            if bv:
+                                                self.setExtraEventButtonStyleSignal.emit(last, 'pressed')
+                                            else:
+                                                self.setExtraEventButtonStyleSignal.emit(last, 'normal')
+                                    elif len(self.buttonlist)>lastbuttonpressed > -1:
+                                        self.lastbuttonpressed = -1 #block resetting style of last button
+                                        if self.buttonStates[lastbuttonpressed]:
+                                            self.buttonStates[lastbuttonpressed] = 0
+                                            self.setExtraEventButtonStyleSignal.emit(lastbuttonpressed, 'normal')
                                         else:
-                                            self.setExtraEventButtonStyle(last, style='normal')
+                                            self.buttonStates[lastbuttonpressed] = 1
+                                            self.setExtraEventButtonStyleSignal.emit(lastbuttonpressed, 'pressed')
                                 except Exception as e: # pylint: disable=broad-except
                                     _log.exception(e)
                             else:
@@ -7971,148 +8047,291 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                     # YOCTOPUCE
                     ##  on(c[,sn])   : turn channel c of the relay module on
                     ##  off(c[,sn])  : turn channel c of the relay module off
+                    ##  yset(c,b[,sn]) : switch channel c off (b=0) and on (b=1)
                     ##  flip(c[,sn]) : toggle the state of channel c
                     ##  pip(c,delay,duration[,sn]) : pulse the channel c on after a delay of delay milliseconds for the duration of duration milliseconds
                     ##  powerReset([,sn]) : reset the power meter of the Yocto Watt
                     #
                     # OTHERS
                     ##  slider(c,v)   : move slider c to value v
-                    ##  button(i,c,b[,sn]) : switches channel c off (b=0) and on (b=1) and sets button i to pressed or normal depending on the value b
+                    ##  button(i,c,b[,sn]) : switches channel c off (b=0) and on (b=1) and sets button i to pressed or normal depending on the value b (sn cannot contain port!)
+                    ##  button(i,b): sets button i to pressed if b evals to True and normal else
+                    ##  button(b): sets current button to pressed if b to True and normal else
+                    ##  button(): toggles state of current button
                     ##  sleep(s) : sleep for s seconds, s a float
-                    ##  santoker(<target>,<value> : the byte <target> indicates where <value> of type integer should be written to
+                    ##  santoker(<target>,<value>) : the byte <target> indicates where <value> of type integer should be written to
+                    ##  kaleido(<target>,<value>) : the <target> string indicates where <value> of type string should be written to
                     #
                     if cmd_str:
                         cmds = filter(None, cmd_str.split(';')) # allows for sequences of commands like in "<cmd>;<cmd>;...;<cmd>"
-                        for c in cmds:
-                            cs_a = re.findall(r'[0-9a-zA-Z-.:]+', c)
-                            cs_len = len(cs_a)
+                        lastbuttonpressed = self.lastbuttonpressed # we rember that here as it might be reset to -1 by some button commands to avoid changing its state
+                        for cs in cmds:
+                            c = cs.strip().replace('_',('0' if self.lastIOResult is None else f'{self.lastIOResult:g}')) # the last read value can be accessed via the "_" symbol
+                            # $ is substituted by the state of the current button (1:pressed, 0:normal)
+                            last = 0 # defaults to 0
+                            if lastbuttonpressed != -1 and len(self.buttonlist)>lastbuttonpressed:
+                                last = self.buttonStates[lastbuttonpressed]
+                            c = c.replace('$', str(last))
+                            try:
+                                if c.startswith('set'):
+                                    cs_a = re.findall(r'[0-9a-zA-Z-.:]+', c)
+                                    cs_len = len(cs_a)
+                                    if cs_len > 2:
+                                        channel=toInt(cs_a[1])
+                                        value=toBool(cs_a[2])
+                                    if cs_len == 3:
+                                        if not self.ser.phidgetBinaryOUTset(channel, value):
+                                            self.sendmessage(QApplication.translate('Message', f'Failed to set({cs_a[1]}, {cs_a[2]})'))
+                                        else:
+                                            # update last result
+                                            self.lastIOResult = float(value)
+                                    elif cs_len == 4:
+                                        serial = cs_a[3]
+                                        if not self.ser.phidgetBinaryOUTset(channel, value, serial):
+                                            self.sendmessage(QApplication.translate('Message', f'Failed to set({cs_a[1]}, {cs_a[2]}, {serial})'))
+                                        else:
+                                            # update last result
+                                            self.lastIOResult = float(value)
 
-                            if cs_a[0] == 'set':
-                                if cs_len>2:
-                                    channel=toInt(cs_a[1])
-                                    value=toBool(cs_a[2])
-                                if cs_len == 3:
-                                    if not self.ser.phidgetBinaryOUTset(channel, value):
-                                        self.sendmessage(QApplication.translate('Message', f'Failed to set({cs_a[1]}, {cs_a[2]})'))
-                                elif cs_len == 4:
-                                    serial = cs_a[3]
-                                    if not self.ser.phidgetBinaryOUTset(channel, value, serial):
-                                        self.sendmessage(QApplication.translate('Message', f'Failed to set({cs_a[1]}, {cs_a[2]}, {serial})'))
+                                elif c.startswith('toggle'):
+                                    cs_a = re.findall(r'[0-9a-zA-Z-.:]+', c)
+                                    cs_len = len(cs_a)
+                                    if cs_len > 1:
+                                        cx = toInt(cs_a[1])
+                                        sn = cs_a[2] if cs_len > 2 else None
+        #                                #keep state of this gpio, rather than rely on phidget and use non-zero value to set button color
+        #                                # NOTE: with this strategy the modules state might be different to this one if also a set command is used
+        #                                newValue = (self.buttonStates[lastbuttonpressed] + 1) & 0x1
+                                        # we rather take the new value from the Phidget itself
+                                        newValue = not self.ser.phidgetBinaryOUTget(cx,sn)
+                                        if self.ser.phidgetBinaryOUTset(cx, bool(newValue),sn):
+                                            self.buttonStates[lastbuttonpressed] = int(newValue)
+                                            self.lastIOResult = float(newValue)
+                                        else:
+                                            self.sendmessage(QApplication.translate('Message', 'Failed to toggle(%s)' % (cs_a[1]))) # pylint: disable=consider-using-f-string
+                                        #clear style that got set in button press event handler
+                                        if self.buttonStates[lastbuttonpressed] == 1:
+                                            self.setExtraEventButtonStyleSignal.emit(lastbuttonpressed, 'pressed')
+                                        else:
+                                            self.setExtraEventButtonStyleSignal.emit(lastbuttonpressed, 'normal')
+                                        #block resetting style of last button
+                                        self.lastbuttonpressed = -1
 
-                            elif cs_a[0] == 'toggle' and cs_len > 1:
-                                cx = toInt(cs_a[1])
-                                sn = cs_a[2] if cs_len > 2 else None
-#                                #keep state of this gpio, rather than rely on phidget and use non-zero value to set button color
-#                                # NOTE: with this strategy the modules state might be different to this one if also a set command is used
-#                                newValue = (self.buttonStates[self.lastbuttonpressed] + 1) & 0x1
-                                # we rather take the new value from the Phidget itself
-                                newValue = not self.ser.phidgetBinaryOUTget(cx,sn)
-                                if self.ser.phidgetBinaryOUTset(cx, bool(newValue),sn):
-                                    self.buttonStates[self.lastbuttonpressed] = newValue
-                                else:
-                                    self.sendmessage(QApplication.translate('Message', 'Failed to toggle(%s)' % (cs_a[1]))) # pylint: disable=consider-using-f-string
-                                    #clear style that got set in button press event handler
-                                    if self.buttonStates[self.lastbuttonpressed] != 0:
-                                        self.setExtraEventButtonStyle(self.lastbuttonpressed, style='pressed')
-                                    else:
-                                        self.setExtraEventButtonStyle(self.lastbuttonpressed, style='normal')
-                                #block resetting style of last button
-                                self.lastbuttonpressed = -1
+                                #-----
 
-                            elif cs_a[0] == 'pulse' and cs_len > 2:
-                                ci = toInt(cs_a[1])
-                                te = toInt(cs_a[2])
-                                sn = cs_a[3] if cs_len > 3 else None
-                                if 0.0 <= te <= 999999:
-                                    self.ser.phidgetBinaryOUTpulse(ci, te, sn)
-                                else:
-                                    self.sendmessage(QApplication.translate('Message', 'Pulse out of range (%d)') % te) # pylint: disable=consider-using-f-string
+                                elif c.startswith('pulse'):
+                                    cs_a = re.findall(r'[0-9a-zA-Z-.:]+', c)
+                                    cs_len = len(cs_a)
+                                    if cs_len > 2:
+                                        ci = toInt(cs_a[1])
+                                        te = toInt(cs_a[2])
+                                        sn = cs_a[3] if cs_len > 3 else None
+                                        if 0.0 <= te <= 999999:
+                                            self.ser.phidgetBinaryOUTpulse(ci, te, sn)
+                                        else:
+                                            self.sendmessage(QApplication.translate('Message', 'Pulse out of range (%d)') % te) # pylint: disable=consider-using-f-string
 
-                            elif cs_a[0] == 'out' and cs_len > 2:
-                                sn = cs_a[3] if cs_len > 3 else None
-                                if not self.ser.phidgetVOUTsetVOUT(toInt(cs_a[1]), toFloat(eval(cs_a[2])),sn): # pylint: disable=eval-used
-                                    self.sendmessage(QApplication.translate('Message', f'Failed to set VOUT({cs_a[1]}, {cs_a[2]})')) # pylint: disable=consider-using-f-string
+                                elif c.startswith('out'):
+                                    cs_a = re.findall(r'[0-9a-zA-Z-.:]+', c)
+                                    cs_len = len(cs_a)
+                                    if cs_len > 2:
+                                        sn = cs_a[3] if cs_len > 3 else None
+                                        if not self.ser.phidgetVOUTsetVOUT(toInt(cs_a[1]), toFloat(eval(cs_a[2])),sn): # pylint: disable=eval-used
+                                            self.sendmessage(QApplication.translate('Message', f'Failed to set VOUT({cs_a[1]}, {cs_a[2]})')) # pylint: disable=consider-using-f-string
 
-                            elif cs_a[0] == 'accel' and cs_len > 2:
-                                sn = cs_a[3] if cs_len > 3 else None
-                                self.ser.phidgetDCMotorSetAcceleration(toInt(cs_a[1]), toFloat(eval(cs_a[2])),sn) # pylint: disable=eval-used
+                                elif c.startswith('accel'):
+                                    cs_a = re.findall(r'[0-9a-zA-Z-.:]+', c)
+                                    cs_len = len(cs_a)
+                                    if cs_len > 2:
+                                        sn = cs_a[3] if cs_len > 3 else None
+                                        self.ser.phidgetDCMotorSetAcceleration(toInt(cs_a[1]), toFloat(eval(cs_a[2])),sn) # pylint: disable=eval-used
 
-                            elif cs_a[0] == 'vel' and cs_len > 2:
-                                sn = cs_a[3] if cs_len > 3 else None
-                                self.ser.phidgetDCMotorSetVelocity(toInt(cs_a[1]), toFloat(eval(cs_a[2])),sn) # pylint: disable=eval-used
+                                elif c.startswith('vel'):
+                                    cs_a = re.findall(r'[0-9a-zA-Z-.:]+', c)
+                                    cs_len = len(cs_a)
+                                    if cs_len > 2:
+                                        sn = cs_a[3] if cs_len > 3 else None
+                                        self.ser.phidgetDCMotorSetVelocity(toInt(cs_a[1]), toFloat(eval(cs_a[2])),sn) # pylint: disable=eval-used
 
-                            elif cs_a[0] == 'limit' and cs_len > 2:
-                                sn = cs_a[3] if cs_len > 3 else None
-                                self.ser.phidgetDCMotorSetCurrentLimit(toInt(cs_a[1]), toFloat(eval(cs_a[2])),sn) # pylint: disable=eval-used
+                                elif c.startswith('limit'):
+                                    cs_a = re.findall(r'[0-9a-zA-Z-.:]+', c)
+                                    cs_len = len(cs_a)
+                                    if cs_len > 2:
+                                        sn = cs_a[3] if cs_len > 3 else None
+                                        self.ser.phidgetDCMotorSetCurrentLimit(toInt(cs_a[1]), toFloat(eval(cs_a[2])),sn) # pylint: disable=eval-used
 
-                            elif cs_a[0] == 'slider' and cs_len == 3:
-                                v = toFloat(cs_a[2])
-                                self.moveslider(toInt(cs_a[1]), v)
-                            elif cs_a[0] == 'button' and cs_len > 3:
-                                b = toInt(cs_a[1]) - 1 # gui button list is indexed from 1
-                                ci = toInt(cs_a[2])
-                                v = toInt(cs_a[3])
-                                sn = cs_a[4] if cs_len > 4 else None
-                                if self.ser.phidgetBinaryOUTset(ci, bool(v & 0x1), sn):
-                                    self.buttonStates[b] = v & 0x1
-                                else:
-                                    self.sendmessage(QApplication.translate('Message', f'Failed to set button({cs_a[1]}, {cs_a[2]}, {cs_a[3]})'))
+                                elif c.startswith('slider'):
+                                    cs_a = re.findall(r'[0-9a-zA-Z-.:]+', c)
+                                    cs_len = len(cs_a)
+                                    if cs_len == 3:
+                                        v = toFloat(cs_a[2])
+                                        self.moveslider(toInt(cs_a[1]), v)
 
-                                if self.buttonStates[b] != 0:
-                                    self.setExtraEventButtonStyle(b, style='pressed')
-                                else:
-                                    self.setExtraEventButtonStyle(b, style='normal')
-                            elif cs_a[0] == 'sleep' and cs_len == 2: # in seconds
-                                try:
-                                    t = eval(cs_a[1]) # pylint: disable=eval-used
-                                    if isinstance(t,(float,int)):
-                                        # cmd has format "sleep(xx.yy)"
-                                        libtime.sleep(t)
-                                except Exception as e: # pylint: disable=broad-except
-                                    _log.exception(e)
-
-                            ##  santoker(<target>,<value> : the hex string indicates where <value> of type integer should be written to
-                            elif cs_a[0] == 'santoker' and cs_len == 3:
-                                if self.santoker is not None:
+                                elif c.startswith('button'):
                                     try:
-                                        v = int(round(float(eval(cs_a[2]))))  # pylint: disable=eval-used
-                                        # interpret target as hex string
-                                        bts = bytes.fromhex(cs_a[1])
-                                        if len(bts)>0:
-                                            self.santokerSendMessageSignal.emit(bts[0:1], v)
-                                    except Exception as e: # pylint: disable=broad-except
-                                        _log.exception(e)
+                                        cs_a = eval(c[len('button'):])  # pylint: disable=eval-used
+                                    except Exception: # pylint: disable=broad-except
+                                        cs_a = [c[len('button('):-1].strip()]
+                                    cs_len = 1
+                                    if isinstance(cs_a, (list, tuple)):
+                                        cs_len = len(cs_a)
+                                    else:
+                                        cs_a = [cs_a]
+                                    if cs_len > 2:
+                                        # PHIDGET Binary Output
+                                        b = toInt(cs_a[0]) - 1 # gui button list is indexed from 1
+                                        ci = toInt(cs_a[1])
+                                        v = toInt(cs_a[2])
+                                        sn = cs_a[3] if cs_len > 4 else None
+                                        if self.ser.phidgetBinaryOUTset(ci, bool(v & 0x1), sn):
+                                            self.buttonStates[b] = v & 0x1
+                                        else:
+                                            self.sendmessage(QApplication.translate('Message', f'Failed to set button({cs_a[0]}, {cs_a[1]}, {cs_a[2]})'))
+                                        self.lastbuttonpressed = -1 #block resetting style of last button
+                                        if self.buttonStates[b] != 0:
+                                            self.setExtraEventButtonStyleSignal.emit(b, 'pressed')
+                                        else:
+                                            self.setExtraEventButtonStyleSignal.emit(b, 'normal')
+                                    elif cs_len > 1:
+                                        # just set the button style of the indicated button
+                                        b = toInt(cs_a[0]) - 1 # gui button list is indexed from 1
+                                        bv = toBool(cs_a[1])
+                                        if 0 <= b < len(self.buttonlist):
+                                            #block resetting style of last button
+                                            self.lastbuttonpressed = -1
+                                            if bv:
+                                                self.buttonStates[b] = 1
+                                                self.setExtraEventButtonStyleSignal.emit(b, 'pressed')
+                                            else:
+                                                self.buttonStates[b] = 0
+                                                self.setExtraEventButtonStyleSignal.emit(b, 'normal')
+                                    elif cs_len > 0:
+                                        bv = toBool(cs_a[0])
+                                        if len(self.buttonlist)>lastbuttonpressed > -1:
+                                            #block resetting style of last button
+                                            self.lastbuttonpressed = -1
+                                            self.buttonStates[lastbuttonpressed] = int(bv)
+                                            if bv:
+                                                self.setExtraEventButtonStyleSignal.emit(lastbuttonpressed, 'pressed')
+                                            else:
+                                                self.setExtraEventButtonStyleSignal.emit(lastbuttonpressed, 'normal')
+                                    elif len(self.buttonlist)>lastbuttonpressed > -1:
+                                        self.lastbuttonpressed = -1 #block resetting style of last button
+                                        if self.buttonStates[lastbuttonpressed]:
+                                            self.buttonStates[lastbuttonpressed] = 0
+                                            self.setExtraEventButtonStyleSignal.emit(lastbuttonpressed, 'normal')
+                                        else:
+                                            self.buttonStates[lastbuttonpressed] = 1
+                                            self.setExtraEventButtonStyleSignal.emit(lastbuttonpressed, 'pressed')
 
-                            # Yoctopuce Relay Command Actions
-                            # on(c[,sn])
-                            elif cs_a[0] == 'on' and cs_len == 2:
-                                self.ser.yoctoRELon(int(cs_a[1]),None)
-                            elif cs_a[0] == 'on' and cs_len == 3:
-                                self.ser.yoctoRELon(int(cs_a[1]),cs_a[2])
-                            # off(c[,sn])
-                            elif cs_a[0] == 'off' and cs_len == 2:
-                                self.ser.yoctoRELoff(int(cs_a[1]),None)
-                            elif cs_a[0] == 'off' and cs_len == 3:
-                                self.ser.yoctoRELoff(int(cs_a[1]),cs_a[2])
-                            # flip(c[,sn])
-                            elif cs_a[0] == 'flip' and cs_len == 2:
-                                self.ser.yoctoRELflip(int(cs_a[1]),None)
-                            elif cs_a[0] == 'flip' and cs_len == 3:
-                                self.ser.yoctoRELflip(int(cs_a[1]),cs_a[2])
-                            # pip(c,delay,duration[,sn])
-                            elif cs_a[0] == 'pip' and cs_len == 4:
-                                self.ser.yoctoRELpulse(int(cs_a[1]),int(cs_a[2]),int(cs_a[3]),None)
-                            elif cs_a[0] == 'pip' and cs_len == 5:
-                                self.ser.yoctoRELpulse(int(cs_a[1]),int(cs_a[2]),int(cs_a[3]),cs_a[4])
-                            #  powerReset([,sn]) : reset the power meter of the Yocto Watt
-                            elif cs_a[0] == 'powerReset' and cs_len == 1:
-                                self.ser.yoctoPowerReset(None)
-                            elif cs_a[0] == 'powerReset' and cs_len == 2:
-                                self.ser.yoctoPowerReset(cs_a[1])
-                            else:
-                                #print("no match for command [%s], continue" % (cs_a[0]))
-                                _log.info('IO Command <%s> not recognized', cs_a[0])
-                                self.sendmessage(QApplication.translate('Message','No match for command [%s], continuing' % (cs_a[0]))) # pylint: disable=consider-using-f-string
+                                elif c.startswith('sleep'): # in seconds
+                                    cs_a = eval(c[len('sleep'):])  # pylint: disable=eval-used
+                                    if isinstance(cs_a,(float,int)):
+                                        # cmd has format "sleep(xx.yy)"
+                                        libtime.sleep(cs_a)
+
+                                ##  santoker(<target>,<value>) : the <target> hex string indicates where <value> of type integer should be written to
+                                elif c.startswith('santoker'):
+                                    if self.santoker is not None:
+                                        args = c[len('santoker'):]
+                                        if args.startswith('(') and args.endswith(')'):
+                                            comma_pos = args.index(',')
+                                            target = args[1:comma_pos]
+                                            fv = float(eval(args[comma_pos+1:-1])) # pylint: disable=eval-used
+                                            # interpret target as hex string
+                                            bts = bytes.fromhex(target)
+                                            if len(bts)>0:
+                                                self.santokerSendMessageSignal.emit(bts[0:1], int(round(fv)))
+
+                                ##  kaleido(<target>,<value>) : the <target> string indicates where <value> of type string should be written to
+                                elif c.startswith('kaleido'):
+                                    if self.kaleido is not None:
+                                        args = c[len('kaleido'):]
+                                        if args.startswith('(') and args.endswith(')'):
+                                            comma_pos = args.index(',')
+                                            target = args[1:comma_pos]
+                                            vs:str = args[comma_pos+1:-1]
+                                            try:
+                                                # <value> can be a formula like "1 - _"
+                                                vs = str(eval(vs)) # pylint: disable=eval-used
+                                            except Exception:  # pylint: disable=broad-except
+                                                # or <value> is just a string like "UP", "DW"
+                                                pass
+                                            if eventtype is None:
+                                                # send message without awaiting a result
+                                                self.kaleidoSendMessageSignal.emit(target, vs)
+                                            else:
+                                                # button has relative event type and value set to 0 (decided in recordextraevent())!
+                                                # send message, await new value and create an event with the new value
+                                                # or event type is set to -1 and result of event action should be awaited and bound to _
+                                                self.kaleidoSendMessageAwaitSignal.emit(target, vs, eventtype, lastbuttonpressed)
+
+                                # Yoctopuce Relay Command Actions
+                                # yset(c,b[,sn])
+                                elif c.startswith('yset'):
+                                    cs_a = re.findall(r'[0-9a-zA-Z-.:]+', c)
+                                    cs_len = len(cs_a)
+                                    if cs_len>2:
+                                        b = toBool(cs_a[2])
+                                    ser:Optional[str] = None
+                                    if cs_len == 4:
+                                        ser = cs_a[3]
+                                    if b:
+                                        self.ser.yoctoRELon(int(cs_a[1]),ser)
+                                    else:
+                                        self.ser.yoctoRELoff(int(cs_a[1]),ser)
+                                # on(c[,sn])
+                                elif c.startswith('on'):
+                                    cs_a = re.findall(r'[0-9a-zA-Z-.:]+', c)
+                                    cs_len = len(cs_a)
+                                    if cs_len == 2:
+                                        self.ser.yoctoRELon(int(cs_a[1]),None)
+                                    elif cs_len == 3:
+                                        self.ser.yoctoRELon(int(cs_a[1]),cs_a[2])
+
+                                # off(c[,sn])
+                                elif c.startswith('off'):
+                                    cs_a = re.findall(r'[0-9a-zA-Z-.:]+', c)
+                                    cs_len = len(cs_a)
+                                    if cs_len == 2:
+                                        self.ser.yoctoRELoff(int(cs_a[1]),None)
+                                    elif cs_len == 3:
+                                        self.ser.yoctoRELoff(int(cs_a[1]),cs_a[2])
+
+                                # flip(c[,sn])
+                                elif c.startswith('flip'):
+                                    cs_a = re.findall(r'[0-9a-zA-Z-.:]+', c)
+                                    cs_len = len(cs_a)
+                                    if cs_len == 2:
+                                        self.ser.yoctoRELflip(int(cs_a[1]),None)
+                                    elif cs_len == 3:
+                                        self.ser.yoctoRELflip(int(cs_a[1]),cs_a[2])
+
+                                # pip(c,delay,duration[,sn])
+                                elif c.startswith('pip'):
+                                    cs_a = re.findall(r'[0-9a-zA-Z-.:]+', c)
+                                    cs_len = len(cs_a)
+                                    if cs_len == 4:
+                                        self.ser.yoctoRELpulse(int(cs_a[1]),int(cs_a[2]),int(cs_a[3]),None)
+                                    elif cs_len == 5:
+                                        self.ser.yoctoRELpulse(int(cs_a[1]),int(cs_a[2]),int(cs_a[3]),cs_a[4])
+
+                                #  powerReset([,sn]) : reset the power meter of the Yocto Watt
+                                elif c.startswith('powerReset'):
+                                    cs_a = re.findall(r'[0-9a-zA-Z-.:]+', c)
+                                    cs_len = len(cs_a)
+                                    if cs_len == 1:
+                                        self.ser.yoctoPowerReset(None)
+                                    elif cs_len == 2:
+                                        self.ser.yoctoPowerReset(cs_a[1])
+
+                                else:
+                                    _log.info('IO Command <%s> not recognized', cs)
+                                    self.sendmessage(QApplication.translate('Message','No match for command [%s], continuing' % (cs))) # pylint: disable=consider-using-f-string
+
+                            except Exception as e: # pylint: disable=broad-except
+                                _log.exception(e)
+
 
                 elif action == 7: # slider call-program action
                     try:
@@ -8449,6 +8668,13 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                         cmds = filter(None, cmd_str.split(';')) # allows for sequences of commands like in "<cmd>;<cmd>;...;<cmd>"
                         for c in cmds:
                             cs = c.strip().replace('_',str(self.s7.lastReadResult)) # the last read value can be accessed via the "_" symbol
+
+                            # $ is substituted by the state of the current button (1:pressed, 0:normal)
+                            last = 0 # defaults to 0
+                            if lastbuttonpressed != -1 and len(self.buttonlist)>lastbuttonpressed:
+                                last = self.buttonStates[lastbuttonpressed]
+                            cs = cs.replace('$', str(last))
+
                             if cs.startswith('setDBint(') and len(cs) > 14:
                                 try:
                                     dbnr,s,v_str = cs[len('setDBint('):-1].split(',')
@@ -8501,15 +8727,47 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                             elif cs.startswith('button'):
                                 # cmd has format "button(<bool>)" # 0 or 1 or True or False
                                 try:
-                                    cmds = eval(cs[len('button'):]) # pylint: disable=eval-used
+                                    try:
+                                        args = eval(cs[len('button'):]) # pylint: disable=eval-used
+                                    except Exception: # pylint: disable=broad-except
+                                        args = [c[len('button('):-1].strip()] # just a tag like True would fail to eval
+                                    cs_len = 1
+                                    if isinstance(args, (list, tuple)):
+                                        cs_len = len(args)
+                                    else:
+                                        args = [args]
                                     last = self.lastbuttonpressed
-                                    if last != -1 and len(self.buttonlist)>last:
-                                        #block resetting style of last button
-                                        self.lastbuttonpressed = -1
-                                        if cmds:
-                                            self.setExtraEventButtonStyle(last, style='pressed')
+                                    if cs_len>1:
+                                        # just set the button style of the indicated button
+                                        b = toInt(args[0]) - 1 # gui button list is indexed from 1
+                                        bv = toBool(args[1])
+                                        if 0 <= b < len(self.buttonlist):
+                                            #block resetting style of last button
+                                            self.lastbuttonpressed = -1
+                                            if bv:
+                                                self.buttonStates[b] = 1
+                                                self.setExtraEventButtonStyleSignal.emit(b, 'pressed')
+                                            else:
+                                                self.buttonStates[b] = 0
+                                                self.setExtraEventButtonStyleSignal.emit(b, 'normal')
+                                    elif cs_len>0:
+                                        bv = toBool(args[0])
+                                        if last != -1 and len(self.buttonlist)>last:
+                                            #block resetting style of last button
+                                            self.lastbuttonpressed = -1
+                                            self.buttonStates[lastbuttonpressed] = int(bv)
+                                            if bv:
+                                                self.setExtraEventButtonStyleSignal.emit(last, 'pressed')
+                                            else:
+                                                self.setExtraEventButtonStyleSignal.emit(last, 'normal')
+                                    elif len(self.buttonlist)>lastbuttonpressed > -1:
+                                        self.lastbuttonpressed = -1 #block resetting style of last button
+                                        if self.buttonStates[lastbuttonpressed]:
+                                            self.buttonStates[lastbuttonpressed] = 0
+                                            self.setExtraEventButtonStyleSignal.emit(lastbuttonpressed, 'normal')
                                         else:
-                                            self.setExtraEventButtonStyle(last, style='normal')
+                                            self.buttonStates[lastbuttonpressed] = 1
+                                            self.setExtraEventButtonStyleSignal.emit(lastbuttonpressed, 'pressed')
                                 except Exception as e: # pylint: disable=broad-except
                                     _log.exception(e)
                             elif cs.startswith('sleep') and cs.endswith(')'): # in seconds
@@ -8535,8 +8793,15 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                 elif action == 20: # Artisan Command
                     if cmd_str:
                         cmds = filter(None, cmd_str.split(';')) # allows for sequences of commands like in "<cmd>;<cmd>;...;<cmd>"
+                        lastbuttonpressed = self.lastbuttonpressed # we rember that here as it might be reset to -1 by some button commands to avoid changing its state
                         for c in cmds:
-                            cs = c.strip()
+                            cs = c.strip().replace('_',('0' if self.lastArtisanResult is None else f'{self.lastArtisanResult:g}')) # the last read value can be accessed via the "_" symbol
+                            # $ is substituted by the state of the current button (1:pressed, 0:normal)
+                            last = 0 # defaults to 0
+                            if lastbuttonpressed != -1 and len(self.buttonlist)>lastbuttonpressed:
+                                last = self.buttonStates[lastbuttonpressed]
+                            cs = cs.replace('$', str(last))
+
                             # alarms(<bool>) enable/disable alarms
                             if cs.startswith('alarms(') and cs.endswith(')'):
                                 try:
@@ -8599,6 +8864,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                                         self.sendmessage(QApplication.translate('Message','PID set to OFF'))
                                 else:
                                     self.pidOffSignal.emit()
+                                    self.lastArtisanResult = 0
                             elif cs == 'PIDon':
                                 if self.qmc.device == 0: # Fuji
                                     standby = self.fujipid.getONOFFstandby()
@@ -8607,6 +8873,8 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                                         self.sendmessage(QApplication.translate('Message','PID set to ON'))
                                 else:
                                     self.pidOnSignal.emit()
+                                    if self.qmc.flagon:
+                                        self.lastArtisanResult = 1
                             elif cs == 'PIDtoggle':
                                 if self.qmc.device == 0: # Fuji
                                     standby = self.fujipid.getONOFFstandby()
@@ -8617,7 +8885,8 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                                         self.fujipid.setONOFFstandby(1)
                                         self.sendmessage(QApplication.translate('Message','PID set to OFF'))
                                 else:
-                                    self.pidcontrol.togglePID()
+                                    self.lastArtisanResult = (1 if (self.qmc.flagon and not self.pidcontrol.pidActive) else 0)
+                                    self.pidToggleSignal.emit()
                             # pidmode(<n>) : 0: manual, 1: RS, 2: background follow
                             elif cs.startswith('pidmode(') and cs.endswith(')'):
                                 try:
@@ -8760,36 +9029,74 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                             elif cs.startswith('button(') and cs.endswith(')'):
                                 try:
                                     try:
-                                        event = str(eval(cs[len('button('):-1])).strip() # pylint: disable=eval-used
+                                        cs_a = eval(cs[len('button'):])  # pylint: disable=eval-used
                                     except Exception: # pylint: disable=broad-except
-                                        event = cs[len('button('):-1].strip()
-                                    if event == 'ON' and not self.qmc.flagon:
-                                        self.qmc.toggleMonitorSignal.emit()
-                                    elif event == 'START' and not self.qmc.flagstart:
-                                        self.qmc.toggleRecorderSignal.emit()
-                                    elif event == 'CHARGE':
-                                        self.qmc.markChargeSignal.emit(0)
-                                    elif event == 'DRY':
-                                        self.qmc.markDRYSignal.emit()
-                                    elif event == 'FCs':
-                                        self.qmc.markFCsSignal.emit()
-                                    elif event == 'FCe':
-                                        self.qmc.markFCeSignal.emit()
-                                    elif event == 'SCs':
-                                        self.qmc.markSCsSignal.emit()
-                                    elif event == 'SCe':
-                                        self.qmc.markSCeSignal.emit()
-                                    elif event == 'DROP':
-                                        self.qmc.markDropSignal.emit()
-                                    elif event == 'COOL':
-                                        self.qmc.markCoolSignal.emit()
-                                    elif event == 'OFF' and self.qmc.flagon:
-                                        self.qmc.toggleMonitorSignal.emit()
+                                        cs_a = [cs[len('button('):-1].strip()]
+                                    cs_len = 1
+                                    if isinstance(cs_a, (list, tuple)):
+                                        cs_len = len(cs_a)
                                     else:
-                                        return
-                                    self.sendmessage(f'Artisan Command: {cs}')
+                                        cs_a = [cs_a]
+                                    if cs_len > 1:
+                                        # just set the button style of the indicated button
+                                        b = toInt(cs_a[0]) - 1 # gui button list is indexed from 1
+                                        bv = toBool(cs_a[1])
+                                        if 0 <= b < len(self.buttonlist):
+                                            #block resetting style of last button
+                                            self.lastbuttonpressed = -1
+                                            if bv:
+                                                self.buttonStates[b] = 1
+                                                self.setExtraEventButtonStyleSignal.emit(b, 'pressed')
+                                            else:
+                                                self.buttonStates[b] = 0
+                                                self.setExtraEventButtonStyleSignal.emit(b, 'normal')
+                                    elif cs_len > 0:
+                                        event = cs_a[0]
+                                        if event == 'ON' and not self.qmc.flagon:
+                                            #self.lastbuttonpressed = -1 # action triggers reset which resets all button states
+                                            self.qmc.toggleMonitorSignal.emit()
+                                        elif event == 'START' and not self.qmc.flagstart:
+                                            #self.lastbuttonpressed = -1 # action triggers reset which resets all button states
+                                            self.qmc.toggleRecorderSignal.emit()
+                                        elif event == 'CHARGE':
+                                            self.qmc.markChargeSignal.emit(0)
+                                        elif event == 'DRY':
+                                            self.qmc.markDRYSignal.emit()
+                                        elif event == 'FCs':
+                                            self.qmc.markFCsSignal.emit()
+                                        elif event == 'FCe':
+                                            self.qmc.markFCeSignal.emit()
+                                        elif event == 'SCs':
+                                            self.qmc.markSCsSignal.emit()
+                                        elif event == 'SCe':
+                                            self.qmc.markSCeSignal.emit()
+                                        elif event == 'DROP':
+                                            self.qmc.markDropSignal.emit()
+                                        elif event == 'COOL':
+                                            self.qmc.markCoolSignal.emit()
+                                        elif event == 'OFF' and self.qmc.flagon:
+                                            self.qmc.toggleMonitorSignal.emit()
+                                        else:
+                                            bv = toBool(event)
+                                            if len(self.buttonlist)>lastbuttonpressed > -1:
+                                                #block resetting style of last button
+                                                self.lastbuttonpressed = -1
+                                                self.buttonStates[lastbuttonpressed] = int(bv)
+                                                if bv:
+                                                    self.setExtraEventButtonStyleSignal.emit(lastbuttonpressed, 'pressed')
+                                                else:
+                                                    self.setExtraEventButtonStyleSignal.emit(lastbuttonpressed, 'normal')
+                                    elif len(self.buttonlist)>lastbuttonpressed > -1:
+                                        self.lastbuttonpressed = -1 #block resetting style of last button
+                                        if self.buttonStates[lastbuttonpressed]:
+                                            self.buttonStates[lastbuttonpressed] = 0
+                                            self.setExtraEventButtonStyleSignal.emit(lastbuttonpressed, 'normal')
+                                        else:
+                                            self.buttonStates[lastbuttonpressed] = 1
+                                            self.setExtraEventButtonStyleSignal.emit(lastbuttonpressed, 'pressed')
                                 except Exception as e: # pylint: disable=broad-except
                                     _log.exception(e)
+
                             # p-i-d(<p>,<i>,<d>) with <p>, <i>, <d> numbers to set the p-i-d parameters
                             elif cs.startswith('p-i-d(') and cs.endswith(')'):
                                 try:
@@ -9224,12 +9531,20 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                 elif action == 22 and cmd_str: # WebSocket Command
                     # send(<json>)
                     # sleep(xx.yy)  with xx.yy sleep time in seconds
+                    # button(<b>)
                     # read(request) request is a JSON request in brackets; full JSON response is bound to _
                     cmds = filter(None, cmd_str.split(';')) # allows for sequences of commands like in "<cmd>;<cmd>;...;<cmd>"
                     for c in cmds:
                         cs = c.strip()
                         if self.ws.lastReadResult is not None:
                             cs = cs.replace('_',str(self.ws.lastReadResult)) # the last read value can be accessed via the "_" symbol
+
+                        # $ is substituted by the state of the current button (1:pressed, 0:normal)
+                        last = 0 # defaults to 0
+                        if lastbuttonpressed != -1 and len(self.buttonlist)>lastbuttonpressed:
+                            last = self.buttonStates[lastbuttonpressed]
+                        cs = cs.replace('$', str(last))
+
                         # send(<json>) : send <json> request to connected WebSocket
                         if cs.startswith('send') and cs.endswith(')'):
                             try:
@@ -9256,15 +9571,47 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                         elif cs.startswith('button'):
                             # cmd has format "button(<bool>)" # 0 or 1 or True or False
                             try:
-                                cmds = eval(cs[len('button'):]) # pylint: disable=eval-used
+                                try:
+                                    args = eval(cs[len('button'):]) # pylint: disable=eval-used
+                                except Exception: # pylint: disable=broad-except
+                                    args = [c[len('button('):-1].strip()] # just a tag like True would fail to eval
+                                cs_len = 1
+                                if isinstance(args, (list, tuple)):
+                                    cs_len = len(args)
+                                else:
+                                    args = [args]
                                 last = self.lastbuttonpressed
-                                if last != -1 and len(self.buttonlist)>last:
-                                    #block resetting style of last button
-                                    self.lastbuttonpressed = -1
-                                    if cmds:
-                                        self.setExtraEventButtonStyle(last, style='pressed')
+                                if cs_len>1:
+                                    # just set the button style of the indicated button
+                                    b = toInt(args[0]) - 1 # gui button list is indexed from 1
+                                    bv = toBool(args[1])
+                                    if 0 <= b < len(self.buttonlist):
+                                        #block resetting style of last button
+                                        self.lastbuttonpressed = -1
+                                        if bv:
+                                            self.buttonStates[b] = 1
+                                            self.setExtraEventButtonStyleSignal.emit(b, 'pressed')
+                                        else:
+                                            self.buttonStates[b] = 0
+                                            self.setExtraEventButtonStyleSignal.emit(b, 'normal')
+                                elif cs_len>0:
+                                    bv = toBool(args[0])
+                                    if last != -1 and len(self.buttonlist)>last:
+                                        #block resetting style of last button
+                                        self.lastbuttonpressed = -1
+                                        self.buttonStates[lastbuttonpressed] = int(bv)
+                                        if bv:
+                                            self.setExtraEventButtonStyleSignal.emit(last, 'pressed')
+                                        else:
+                                            self.setExtraEventButtonStyleSignal.emit(last, 'normal')
+                                elif len(self.buttonlist)>lastbuttonpressed > -1:
+                                    self.lastbuttonpressed = -1 #block resetting style of last button
+                                    if self.buttonStates[lastbuttonpressed]:
+                                        self.buttonStates[lastbuttonpressed] = 0
+                                        self.setExtraEventButtonStyleSignal.emit(lastbuttonpressed, 'normal')
                                     else:
-                                        self.setExtraEventButtonStyle(last, style='normal')
+                                        self.buttonStates[lastbuttonpressed] = 1
+                                        self.setExtraEventButtonStyleSignal.emit(lastbuttonpressed, 'pressed')
                             except Exception as e: # pylint: disable=broad-except
                                 _log.exception(e)
                         else:
@@ -9428,7 +9775,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             elif self.extraeventbuttonround[tee] == 3: # both-sides rounded
                 rounding = fully_rounded_style
         #
-        if style=='normal' or not self.mark_last_button_pressed:
+        if style=='normal':
             color = self.extraeventbuttontextcolor[tee]
             backgroundcolor = self.extraeventbuttoncolor[tee]
         else: # style=="pressed":
@@ -9442,9 +9789,12 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         hover_style = f'QPushButton:hover:!pressed {{background:{createGradient(QColor(backgroundcolor).lighter(110).name())}}}'
         return f'{plain_style}{hover_style}{pressed_style}'
 
-    def setExtraEventButtonStyle(self, tee, style='normal'):
-        button_style = self.extraEventButtonStyle(tee, style)
-        self.buttonlist[tee].setStyleSheet(button_style)
+    # style is one of 'pressed' or 'normal'
+    def setExtraEventButtonStyle(self, tee:int, style:str):
+        if len(self.extraeventstypes)>tee and len(self.buttonlist)>tee:
+            button_style = self.extraEventButtonStyle(tee, style)
+            self.buttonlist[tee].setStyleSheet(button_style)
+            self.buttonlist[tee].setText(self.substButtonLabel(tee, self.extraeventslabels[tee], self.extraeventstypes[tee]))
 
     @pyqtSlot(bool)
     def recordextraevent_slot(self,_):
@@ -9459,27 +9809,26 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
     #by default actions are processed in a parallel thread, but components of multiple button actions not to avoid crashes
     def recordextraevent(self,ee,parallel=True,updateButtons=True):
         eventtype = self.extraeventstypes[ee]
-        if updateButtons: # not if triggered from mutiplebutton actions:
+        if updateButtons and self.mark_last_button_pressed: # not if triggered from mutiplebutton actions:
             try:
                 self.qmc.eventactionsemaphore.acquire(1)
                 # reset color of last pressed button
                 if self.lastbuttonpressed != -1 and len(self.buttonlist)>self.lastbuttonpressed:
-                    self.setExtraEventButtonStyle(self.lastbuttonpressed, style='normal')
+                    self.setExtraEventButtonStyleSignal.emit(self.lastbuttonpressed, 'normal')
 
                 #toggle button if it has nonzero state prior to toggling
                 if self.buttonStates[ee] != 0:
-                    self.setExtraEventButtonStyle(ee, style='normal')
+                    self.setExtraEventButtonStyleSignal.emit(ee, 'normal')
                 else:
-                    self.setExtraEventButtonStyle(ee, style='pressed')
-
-                # reset lastbuttonpressed
-                self.lastbuttonpressed = ee
+                    self.setExtraEventButtonStyleSignal.emit(ee, 'pressed')
 
             except Exception as e: # pylint: disable=broad-except
                 _log.exception(e)
             finally:
                 if self.qmc.eventactionsemaphore.available() < 1:
                     self.qmc.eventactionsemaphore.release(1)
+        # reset lastbuttonpressed
+        self.lastbuttonpressed = ee
         cmdvalue = self.qmc.eventsInternal2ExternalValue(self.extraeventsvalues[ee])
         if eventtype < 4 or eventtype > 4:  ## if eventtype == 4 we have an button event of type " " that does not add an event; if eventtype == 9 ("-") we have an untyped event
             if eventtype == 9: # an untyped event
@@ -9507,6 +9856,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                 actionvalue = self.calcEventValue(etype, new_value)
                 if self.extraeventsactions[ee] != 14: # only for VOUT Commands we keep the floats
                     actionvalue = int(round(actionvalue))
+                event_record:bool = True
                 if self.extraeventsactions[ee] in [8,9,16,17,18]: # for Hottop Heater/Fan/CoolingFan action we take the event value instead of the event string as cmd action
                     self.eventaction(self.extraeventsactions[ee],str(int(new_value)),parallel=parallel)
                 else:
@@ -9516,13 +9866,17 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                         cmd = cmd.format(*(tuple([actionvalue]*cmd.count('{}'))))
                     except Exception: # pylint: disable=broad-except
                         pass
-                    self.eventaction(self.extraeventsactions[ee],cmd,parallel=parallel)
+                    if eventtype > 4 and cmdvalue==0: # relative values for +/- actions and event value is 0
+                        self.eventaction(self.extraeventsactions[ee],cmd,parallel=parallel,eventtype=etype)
+                        event_record = False # we prevent recording an event here, as we assume that it will be added by the eventaction once the response is received
+                    else:
+                        self.eventaction(self.extraeventsactions[ee],cmd,parallel=parallel)
                 # remember the new value as the last value set for this event
                 self.block_quantification_sampling_ticks[etype] = self.sampling_ticks_to_block_quantifiction
                 self.extraeventsactionslastvalue[etype] = new_value
                 # move corresponding slider to new value:
                 self.moveslider(etype,new_value)
-                if self.qmc.flagstart:
+                if self.qmc.flagstart and event_record:
                     # we use event handling to enable the doupdategraphics/doupdatebackground also if running in background thread
                     self.qmc.eventRecordSignal.emit(ee)
         else:
@@ -9530,7 +9884,11 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             # split on an octothorpe '#' that is not inside parentheses '()'
             cmd = re.split(r'\#(?![^\(]*\))',self.extraeventsactionstrings[ee])[0].strip()
             cmd = cmd.format(*(tuple([cmdvalue]*cmd.count('{}'))))
-            self.eventaction(self.extraeventsactions[ee],cmd,parallel=parallel)
+            if cmdvalue == 0 and eventtype == 4:
+                # no event type and cmdvalue is 0 => cmd actions should await response and bind result to _
+                self.eventaction(self.extraeventsactions[ee],cmd,parallel=parallel,eventtype=-1)
+            else:
+                self.eventaction(self.extraeventsactions[ee],cmd,parallel=parallel)
 
     @pyqtSlot()
     @pyqtSlot(bool)
@@ -9615,6 +9973,9 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             self.messagelabel.setText(message)
             if repaint: # if repaint is executed in the main thread we receive "QWidget::repaint: Recursive repaint detected"
                 self.messagelabel.repaint()
+            # update messages window
+            if self.message_dlg:
+                self.updateMessageLogSignal.emit()
         except Exception as e: # pylint: disable=broad-except
             _log.exception(e)
         finally:
@@ -9731,22 +10092,10 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         self.sliderSV.setVisible(True)
         self.setSliderFocusPolicy(Qt.FocusPolicy.StrongFocus)
         # on "coarse" sliders we set the single step to 10, otherwise (default) to 1:
-        if self.eventslidercoarse[0]:
-            self.slider1.setSingleStep(10)
-        else:
-            self.slider1.setSingleStep(1)
-        if self.eventslidercoarse[1]:
-            self.slider2.setSingleStep(10)
-        else:
-            self.slider2.setSingleStep(1)
-        if self.eventslidercoarse[2]:
-            self.slider3.setSingleStep(10)
-        else:
-            self.slider3.setSingleStep(1)
-        if self.eventslidercoarse[3]:
-            self.slider4.setSingleStep(10)
-        else:
-            self.slider4.setSingleStep(1)
+        self.slider1.setSingleStep(self.eventSliderStepSize(0))
+        self.slider2.setSingleStep(self.eventSliderStepSize(1))
+        self.slider3.setSingleStep(self.eventSliderStepSize(2))
+        self.slider4.setSingleStep(self.eventSliderStepSize(0))
         #
         self.slidersAction.setChecked(True)
         if changeDefault:
@@ -10863,9 +11212,9 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                 ('devtime_long',devtime_long),
                 ('devtime',devtime),
                 ('dtr',dtr),
-                ('dryphasedeltatemp',setdecimal(cp['dry_phase_delta_temp']) if 'dry_phase_delta_temp' in cp else setdecimal(0.0)),  #dave NEW TODO add to help file
-                ('midphasedeltatemp',setdecimal(cp['mid_phase_delta_temp']) if 'mid_phase_delta_temp' in cp else setdecimal(0.0)),  #dave NEW TODO add to help file
-                ('finishphasedeltatemp',setdecimal(cp['finish_phase_delta_temp']) if 'finish_phase_delta_temp' in cp else setdecimal(0.0)),  #dave NEW TODO add to help file
+                ('dryphasedeltatemp',setdecimal(cp['dry_phase_delta_temp']) if 'dry_phase_delta_temp' in cp else setdecimal(0.0)),
+                ('midphasedeltatemp',setdecimal(cp['mid_phase_delta_temp']) if 'mid_phase_delta_temp' in cp else setdecimal(0.0)),
+                ('finishphasedeltatemp',setdecimal(cp['finish_phase_delta_temp']) if 'finish_phase_delta_temp' in cp else setdecimal(0.0)),
                 ('roastingnotes_line',roastingnotesline),
                 ('roastingnotes_10',roastingnotesline[:10]),
                 ('roastingnotes_15',roastingnotesline[:15]),
@@ -11431,7 +11780,6 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                 self.checkColors(self.getcolorPairsToCheck())
 
         except OSError as ex:
-            #traceback.print_exc(file=sys.stdout)
             _, _, exc_tb = sys.exc_info()
             self.qmc.adderror((QApplication.translate('Error Message', 'IO Error:') + ' {0}: {1}').format(str(ex),str(filename)),getattr(exc_tb, 'tb_lineno', '?'))
             # remove file from the recent file list
@@ -11446,7 +11794,6 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                 if isinstance(widget, ApplicationWindow):
                     widget.updateRecentFileActions()
         except ValueError as ex:
-            #traceback.print_exc(file=sys.stdout)
             _, _, exc_tb = sys.exc_info()
             self.qmc.adderror((QApplication.translate('Error Message', 'Value Error:') + ' fileload() {0}').format(str(ex)),getattr(exc_tb, 'tb_lineno', '?'))
         except Exception as ex: # pylint: disable=broad-except
@@ -12846,15 +13193,15 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                     fieldlist = [
                         ['Date',   self.qmc.roastdate.date().toString("dd'.'MM'.'yyyy")   ],
                         ['Unit',   self.qmc.mode                                          ],
-                        ['CHARGE', self.eventtime2string(CHARGE)                          ],
-                        ['TP',     self.eventtime2string(TP)                              ],
-                        ['DRYe',   self.eventtime2string(DRYe)                            ],
-                        ['FCs',    self.eventtime2string(FCs)                             ],
-                        ['FCe',    self.eventtime2string(FCe)                             ],
-                        ['SCs',    self.eventtime2string(SCs)                             ],
-                        ['SCe',    self.eventtime2string(SCe)                             ],
-                        ['DROP',   self.eventtime2string(DROP)                            ],
-                        ['COOL',   self.eventtime2string(COOL)                            ],
+                        ['CHARGE', self.eventtime2string(max(0,CHARGE-CHARGE))            ],
+                        ['TP',     self.eventtime2string(max(0,TP-CHARGE))                ],
+                        ['DRYe',   self.eventtime2string(max(0,DRYe-CHARGE))              ],
+                        ['FCs',    self.eventtime2string(max(0,FCs-CHARGE))               ],
+                        ['FCe',    self.eventtime2string(max(0,FCe-CHARGE))               ],
+                        ['SCs',    self.eventtime2string(max(0,SCs-CHARGE))               ],
+                        ['SCe',    self.eventtime2string(max(0,SCe-CHARGE))               ],
+                        ['DROP',   self.eventtime2string(max(0,DROP-CHARGE))              ],
+                        ['COOL',   self.eventtime2string(max(0,COOL-CHARGE))              ],
                         ['Time',   self.qmc.roastdate.time().toString()[:-3]              ],
                         ]
                     for f, fe in enumerate(fieldlist):
@@ -12916,7 +13263,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                                         event += self.qmc.etypesf(self.qmc.specialeventstype[n])[0] + self.qmc.eventsvalues(self.qmc.specialeventsvalue[n])
 
                         di,mo = divmod(tx,60)
-                        time1 = f'{di:02.0f}:{mo:%02.0f}'
+                        time1 = f'{di:02.0f}:{mo:02.0f}'
                         if last_time is None or last_time != time1:
                             extratemps = []
                             for j in range(len(self.qmc.extradevices)):
@@ -12990,7 +13337,6 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             _, _, exc_tb = sys.exc_info()
             self.qmc.adderror((QApplication.translate('Error Message','Exception:') + ' deserialize() {0}').format(str(ex)),getattr(exc_tb, 'tb_lineno', '?'))
             return obj
-#            traceback.print_exc(file=sys.stdout)
 
     def ensureCorrectExtraDeviceListLenght(self):
         self.qmc.extraname1 = self.qmc.extraname1[:len(self.qmc.extradevices)]
@@ -13275,7 +13621,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         self.extrastopbits = [toInt(x) for x in toList(settings.value('extrastopbits',self.extrastopbits))]
         self.extratimeout = [self.float2float(toFloat(x)) for x in toList(settings.value('extratimeout',self.extratimeout))]
         lenextraports = len(self.extracomport)
-        self.extraser = [serialport(self)]*lenextraports
+        self.extraser = [serialport(self) for _ in range(lenextraports)]
         #populate self.extraser
         for i in range(lenextraports):
             self.extraser[i].comport = str(self.extracomport[i])
@@ -15117,13 +15463,70 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
 
 
     @pyqtSlot(bytes,int)
-    def santokerSendMessage(self,target:bytes,value:int):
+    def santokerSendMessage(self, target:bytes, value:int):
         if self.santoker is not None:
             self.santoker.send_msg(target,value)
+
+
+    # kaleidoSendMessage() just sends out the message to the machine without waiting for a response
+    @pyqtSlot(str,str)
+    def kaleidoSendMessage(self, target:str, value:str):
+        if self.kaleido is not None:
+            self.kaleido.send_msg(target, value)
+
+    # kaleidoSendMessageAwait() sends out the message to the machine, awaits the reply and creates a corresponding event entry
+    @pyqtSlot(str,str,int,int)
+    def kaleidoSendMessageAwait(self, target:str, value:str, etype:int, lastbuttonpressed:int):
+        if self.kaleido is not None:
+            res:Optional[str] = self.kaleido.send_request(target, value)
+            if res is not None:
+                try:
+                    try:
+                        self.lastIOResult = float(res)
+                    except Exception: # pylint: disable=broad-except
+                        self.lastIOResult = None
+                    if etype == -1:
+                        if len(self.buttonlist)>lastbuttonpressed > -1:
+                            # we got a valid lastbutton which triggered this action and we set its state according to our result
+                            bv = toBool(res)
+                            #block resetting style of last button
+                            self.lastbuttonpressed = -1
+                            self.buttonStates[lastbuttonpressed] = int(bv)
+                            if bv:
+                                self.setExtraEventButtonStyleSignal.emit(lastbuttonpressed, 'pressed')
+                            else:
+                                self.setExtraEventButtonStyleSignal.emit(lastbuttonpressed, 'normal')
+                    elif etype>-1:
+                        new_value = int(round(float(res)))
+                        # limit value by slider limits
+                        new_value = min(self.eventslidermax[etype],max(self.eventslidermin[etype],new_value))
+                        # remember the new value as the last value set for this event
+                        self.block_quantification_sampling_ticks[etype] = self.sampling_ticks_to_block_quantifiction
+                        self.extraeventsactionslastvalue[etype] = new_value
+                        # move corresponding slider to new value:
+                        self.moveslider(etype,new_value)
+                        # create a new event
+                        nv:float = self.qmc.eventsExternal2InternalValue(float(new_value))
+                        if self.qmc.flagstart:
+                            self.qmc.eventRecordActionSignal.emit(etype,nv,'')
+                except Exception as e: # pylint: disable=broad-except
+                    _log.exception(e)
+
+    # removes window geometry and splitter settings from the given settings
+    @staticmethod
+    def clearWindowGeometry(settings:QSettings) -> None:
+        _log.info('clearWindowGeometry')
+        for s in ['Geometry', 'BlendGeometry','RoastGeometry','FlavorProperties','CalculatorGeometry','EventsGeometry', 'CompareGeometry',
+                'BackgroundGeometry','LCDGeometry','DeltaLCDGeometry','ExtraLCDGeometry','PhasesLCDGeometry','AlarmsGeometry',
+                'DeviceAssignmentGeometry','PortsGeometry','TransformatorPosition', 'CurvesPosition', 'StatisticsPosition',
+                'AxisPosition','PhasesPosition', 'BatchPosition', 'SamplingPosition', 'autosaveGeometry', 'PIDPosition',
+                'DesignerPosition','PIDLCDGeometry','ScaleLCDGeometry', 'MainSplitter']:
+            settings.remove(s)
 
     #loads the settings at the start of application. See the oppposite closeEventSettings()
     def settingsLoad(self, filename=None, theme=False, machine=False, redraw=True): # pyright: ignore # Code is too complex to analyze; reduce complexity by refactoring into subroutines or reducing
         res = False
+
         try:
             updateBatchCounter = True
             if filename is not None:
@@ -15158,7 +15561,8 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                                 updateBatchCounter = False
                             updateBatchCounter = True
                     settings.endGroup()
-                self.clearExtraDeviceSettingsBackup() # on explicit settings load we remove the ExtraDeviceBackup to prevent later restoreExtraDeviceSettingsBackup()
+                # on explicit settings load we remove the ExtraDeviceBackup to prevent later restoreExtraDeviceSettingsBackup()
+                self.clearExtraDeviceSettingsBackup()
             else:
                 settings = QSettings()
             if settings.contains('resetqsettings'):
@@ -15168,11 +15572,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                     if 'canvas' in self.qmc.palette:
                         self.updateCanvasColors(checkColors=False)
                     # remove window geometry and splitter settings
-                    for s in ['BlendGeometry','RoastGeometry','FlavorProperties','CalculatorGeometry','EventsGeometry', 'CompareGeometry',
-                        'BackgroundGeometry','LCDGeometry','DeltaLCDGeometry','ExtraLCDGeometry','PhasesLCDGeometry','AlarmsGeometry','DeviceAssignmentGeometry','PortsGeometry',
-                        'TransformatorPosition', 'CurvesPosition', 'StatisticsPosition', 'AxisPosition','PhasesPosition', 'BatchPosition',
-                        'SamplingPosition', 'autosaveGeometry', 'PIDPosition', 'DesignerPosition','PIDLCDGeometry','ScaleLCDGeometry', 'MainSplitter']:
-                        settings.remove(s)
+                    self.clearWindowGeometry(settings)
                     #
                     self.setFonts()
                     self.qmc.redraw()
@@ -15233,6 +15633,27 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                     setDebugLogLevel(bool(toBool(settings.value('DebugLogLevel',False))))
                 except Exception: # pylint: disable=broad-except
                     pass
+
+            # if screen setup changed (main screen size or pixel ratio or number of screens) we remove the
+            # window geometry and splitter settings on load to prevent dialog open issues on different multiple screen setups
+            # we use saved window positions only if we are sure that the screen setup did not change
+            if (settings.contains('screens') and settings.contains('mainScreenPixelRatio') and
+                    settings.contains('mainScreenWidth') and settings.contains('mainScreenHeight')):
+                screens:int = toInt(settings.value('screens',0))
+                mainScreenPixelRatio:float = toFloat(settings.value('mainScreenPixelRatio',0))
+                mainScreenWidth:int = toInt(settings.value('mainScreenWidth',0))
+                mainScreenHeight:int = toInt(settings.value('mainScreenHeight',0))
+                mainScreen:QScreen = self.app.primaryScreen()
+                if not ((screens == len(self.app.screens())) and
+                        (mainScreenPixelRatio == mainScreen.devicePixelRatio()) and
+                        (mainScreenWidth == mainScreen.size().width()) and
+                        (mainScreenHeight == mainScreen.size().height())):
+                    self.clearWindowGeometry(settings)
+            elif filename is not None and not theme and not machine:
+                # load a (old) settings file without proper screen setup information (not a theme or machine setup) we clear saved window positions
+                # as well to be on the save side
+                # NOTE: only the main window Geometry is exported to a settings file
+                self.clearWindowGeometry(settings)
 
             #restore device
             settings.beginGroup('Device')
@@ -15322,6 +15743,14 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                 self.santokerPort = toInt(settings.value('santokerPort',self.santokerPort))
             if settings.contains('santokerSerial'):
                 self.santokerSerial = bool(toBool(settings.value('santokerSerial',self.santokerSerial)))
+            if settings.contains('kaleidoHost'):
+                self.kaleidoHost = toString(settings.value('kaleidoHost',self.kaleidoHost))
+            if settings.contains('kaleidoPort'):
+                self.kaleidoPort = toInt(settings.value('kaleidoPort',self.kaleidoPort))
+            if settings.contains('kaleidoSerial'):
+                self.kaleidoSerial = toBool(settings.value('kaleidoSerial',self.kaleidoSerial))
+            if settings.contains('kaleidoPID'):
+                self.kaleidoPID = bool(toBool(settings.value('kaleidoPID',self.kaleidoPID)))
             # activate CONTROL BUTTON
             self.showControlButton()
             if settings.contains('controlETpid'):
@@ -16517,31 +16946,55 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             #restore sliders
             settings.beginGroup('Sliders')
             if settings.contains('slidervisibilities'):
-                self.eventslidervisibilities = list(map(toInt, toList(settings.value('slidervisibilities',self.eventslidervisibilities))))
-                self.eventslideractions = list(map(toInt, toList(settings.value('slideractions',self.eventslideractions))))
-                self.eventslidercommands = list(map(str,list(toStringList(settings.value('slidercommands',self.eventslidercommands)))))
-                self.eventslideroffsets = list(map(toFloat, toList(settings.value('slideroffsets',self.eventslideroffsets))))
-                self.eventsliderfactors = list(map(toFloat, toList(settings.value('sliderfactors',self.eventsliderfactors))))
+                eventslidervisibilities = list(map(toInt, toList(settings.value('slidervisibilities',self.eventslidervisibilities))))
+                if len(eventslidervisibilities) == self.eventsliders:
+                    self.eventslidervisibilities = eventslidervisibilities
+                eventslideractions = list(map(toInt, toList(settings.value('slideractions',self.eventslideractions))))
+                if len(eventslideractions) == self.eventsliders:
+                    self.eventslideractions = eventslideractions
+                eventslidercommands = list(map(str,list(toStringList(settings.value('slidercommands',self.eventslidercommands)))))
+                if len(eventslidercommands) == self.eventsliders:
+                    self.eventslidercommands = eventslidercommands
+                eventslideroffsets = list(map(toFloat, toList(settings.value('slideroffsets',self.eventslideroffsets))))
+                if len(eventslideroffsets) == self.eventsliders:
+                    self.eventslideroffsets = eventslideroffsets
+                eventsliderfactors = list(map(toFloat, toList(settings.value('sliderfactors',self.eventsliderfactors))))
+                if len(eventsliderfactors) == self.eventsliders:
+                    self.eventsliderfactors = eventsliderfactors
             if settings.contains('eventsliderKeyboardControl'):
                 self.eventsliderKeyboardControl = bool(toBool(settings.value('eventsliderKeyboardControl',self.eventsliderKeyboardControl)))
             if settings.contains('slidermin'):
-                self.eventslidermin = [toInt(x) for x in toList(settings.value('slidermin',self.eventslidermin))]
-                self.eventslidermax = [toInt(x) for x in toList(settings.value('slidermax',self.eventslidermax))]
+                eventslidermin = [toInt(x) for x in toList(settings.value('slidermin',self.eventslidermin))]
+                if len(eventslidermin) == self.eventsliders:
+                    self.eventslidermin = eventslidermin
+                eventslidermax = [toInt(x) for x in toList(settings.value('slidermax',self.eventslidermax))]
+                if len(eventslidermax) == self.eventsliders:
+                    self.eventslidermax = eventslidermax
                 self.updateSliderMinMax()
             if settings.contains('eventslidersflags'):
-                self.eventslidersflags = [toInt(x) for x in toList(settings.value('eventslidersflags',self.eventslidersflags))]
+                eventslidersflags = [toInt(x) for x in toList(settings.value('eventslidersflags',self.eventslidersflags))]
+                if len(eventslidersflags) == 3:
+                    self.eventslidersflags = eventslidersflags
             if settings.contains('eventsliderBernoulli'):
-                self.eventsliderBernoulli = [toInt(x) for x in toList(settings.value('eventsliderBernoulli',self.eventsliderBernoulli))]
+                eventsliderBernoulli = [toInt(x) for x in toList(settings.value('eventsliderBernoulli',self.eventsliderBernoulli))]
+                if len(eventsliderBernoulli) == self.eventsliders:
+                    self.eventsliderBernoulli = eventsliderBernoulli
             if settings.contains('eventslidercoarse'):
-                self.eventslidercoarse = [toInt(x) for x in toList(settings.value('eventslidercoarse',self.eventslidercoarse))]
+                eventslidercoarse = [toInt(x) for x in toList(settings.value('eventslidercoarse',self.eventslidercoarse))]
+                if len(eventslidercoarse) == self.eventsliders:
+                    self.eventslidercoarse = eventslidercoarse
             if settings.contains('eventslidertemp'):
-                self.eventslidertemp = [toInt(x) for x in toList(settings.value('eventslidertemp',self.eventslidertemp))]
+                eventslidertemp = [toInt(x) for x in toList(settings.value('eventslidertemp',self.eventslidertemp))]
+                if len(eventslidertemp) == self.eventsliders:
+                    self.eventslidertemp = eventslidertemp
             if settings.contains('eventsliderunits'):
-                self.eventsliderunits = list(map(str,list(toStringList(settings.value('eventsliderunits',self.eventsliderunits)))))
+                eventsliderunits = list(map(str,list(toStringList(settings.value('eventsliderunits',self.eventsliderunits)))))
+                if len(eventsliderunits) == self.eventsliders:
+                    self.eventsliderunits = eventsliderunits
             if settings.contains('ModeTempSliders'):
                 self.qmc.mode_tempsliders = str(settings.value('ModeTempSliders',self.qmc.mode_tempsliders))
-            settings.endGroup()
-            self.qmc.adjustTempSliders() # adjust min/max slider limits of temperature sliders to correspond to the current temp mode
+                settings.endGroup()
+                self.qmc.adjustTempSliders() # adjust min/max slider limits of temperature sliders to correspond to the current temp mode
             self.slidersAction.setEnabled(any(self.eventslidervisibilities) or self.pidcontrol.svSlider)
             if self.app.artisanviewerMode:
                 self.slidersAction.setEnabled(False)
@@ -16549,30 +17002,30 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             settings.beginGroup('Quantifiers')
             if settings.contains('quantifieractive'):
                 activequantifiers = [toInt(x) for x in toList(settings.value('quantifieractive',self.eventquantifieractive))]
-                if len(activequantifiers) == 4:
+                if len(activequantifiers) == self.eventsliders:
                     self.eventquantifieractive = activequantifiers
                 quantifiersource = [toInt(x) for x in toList(settings.value('quantifiersource',self.eventquantifiersource))]
-                if len(quantifiersource) == 4:
+                if len(quantifiersource) == self.eventsliders:
                     self.eventquantifiersource = quantifiersource
                 quantifiersmin =[toInt(x) for x in toList(settings.value('quantifiermin',self.eventquantifiermin))]
-                if len(quantifiersmin) == 4:
+                if len(quantifiersmin) == self.eventsliders:
                     self.eventquantifiermin = quantifiersmin
                 quantifiersmax =[toInt(x) for x in toList(settings.value('quantifiermax',self.eventquantifiermax))]
-                if len(quantifiersmax) == 4:
+                if len(quantifiersmax) == self.eventsliders:
                     self.eventquantifiermax = quantifiersmax
                 if settings.contains('quantifiercoarse'):
                     eventquantifiercoarse = [toInt(x) for x in toList(settings.value('quantifiercoarse',self.eventquantifiercoarse))]
-                    if len(eventquantifiercoarse) == 4:
+                    if len(eventquantifiercoarse) == self.eventsliders:
                         self.eventquantifiercoarse = eventquantifiercoarse
                     if settings.contains('clusterEventsFlag'):
                         self.clusterEventsFlag = bool(toBool(settings.value('clusterEventsFlag',self.clusterEventsFlag)))
                 if settings.contains('eventquantifieraction'):
                     eventquantifieraction = [toInt(x) for x in toList(settings.value('eventquantifieraction',self.eventquantifieraction))]
-                    if len(eventquantifieraction) == 4:
+                    if len(eventquantifieraction) == self.eventsliders:
                         self.eventquantifieraction = eventquantifieraction
                 if settings.contains('eventquantifierSV'):
                     eventquantifierSV = [toInt(x) for x in toList(settings.value('eventquantifierSV',self.eventquantifierSV))]
-                    if len(eventquantifierSV) == 4:
+                    if len(eventquantifierSV) == self.eventsliders:
                         self.eventquantifierSV = eventquantifierSV
             settings.endGroup()
             settings.beginGroup('Batch')
@@ -16679,19 +17132,33 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                     self.buttonlistmaxlen = toInt(settings.value('buttonlistmaxlen',self.buttonlistmaxlen))
                 if settings.contains('extraeventsbuttonsflags'):
                     self.extraeventsbuttonsflags = [toInt(x) for x in toList(settings.value('extraeventsbuttonsflags',self.extraeventsbuttonsflags))]
-                self.extraeventstypes = [toInt(x) for x in toList(settings.value('extraeventstypes',self.extraeventstypes))]
-                self.extraeventsvalues = [toFloat(x) for x in toList(settings.value('extraeventsvalues',self.extraeventsvalues))]
-                self.extraeventsactions = [toInt(x) for x in toList(settings.value('extraeventsactions',self.extraeventsactions))]
-                self.extraeventsvisibility = [toInt(x) for x in toList(settings.value('extraeventsvisibility',self.extraeventsvisibility))]
-                self.extraeventsactionstrings = list(toStringList(settings.value('extraeventsactionstrings',self.extraeventsactionstrings)))
-                self.extraeventslabels = list(toStringList(settings.value('extraeventslabels',self.extraeventslabels)))
-                self.extraeventsdescriptions= list(toStringList(settings.value('extraeventsdescriptions',self.extraeventsdescriptions)))
+
+                extraeventstypes = [toInt(x) for x in toList(settings.value('extraeventstypes',self.extraeventstypes))]
+                extraeventsvalues = [toFloat(x) for x in toList(settings.value('extraeventsvalues',self.extraeventsvalues))]
+                extraeventsactions = [toInt(x) for x in toList(settings.value('extraeventsactions',self.extraeventsactions))]
+                extraeventsvisibility = [toInt(x) for x in toList(settings.value('extraeventsvisibility',self.extraeventsvisibility))]
+                extraeventsactionstrings = list(toStringList(settings.value('extraeventsactionstrings',self.extraeventsactionstrings)))
+                extraeventslabels = list(toStringList(settings.value('extraeventslabels',self.extraeventslabels)))
+                extraeventsdescriptions= list(toStringList(settings.value('extraeventsdescriptions',self.extraeventsdescriptions)))
                 if settings.contains('extraeventbuttoncolor'):
-                    self.extraeventbuttoncolor = list(toStringList(settings.value('extraeventbuttoncolor',self.extraeventbuttoncolor)))
-                    self.extraeventbuttontextcolor = list(toStringList(settings.value('extraeventbuttontextcolor',self.extraeventbuttontextcolor)))
+                    extraeventbuttoncolor = list(toStringList(settings.value('extraeventbuttoncolor',self.extraeventbuttoncolor)))
+                    extraeventbuttontextcolor = list(toStringList(settings.value('extraeventbuttontextcolor',self.extraeventbuttontextcolor)))
                 else:
-                    self.extraeventbuttoncolor = ['yellow']*len(self.extraeventstypes)
-                    self.extraeventbuttontextcolor = ['black']*len(self.extraeventstypes)
+                    extraeventbuttoncolor = ['yellow']*len(extraeventstypes)
+                    extraeventbuttontextcolor = ['black']*len(extraeventstypes)
+                if len(extraeventstypes) == len(extraeventsvalues) == len(extraeventsactions) == len(extraeventsvisibility) ==\
+                        len(extraeventsactionstrings) == len(extraeventslabels) == len(extraeventsdescriptions) == \
+                        len(extraeventbuttoncolor) == len(extraeventbuttontextcolor):
+                    self.extraeventstypes = extraeventstypes
+                    self.extraeventsvalues = extraeventsvalues
+                    self.extraeventsactions = extraeventsactions
+                    self.extraeventsvisibility = extraeventsvisibility
+                    self.extraeventsactionstrings = extraeventsactionstrings
+                    self.extraeventslabels = extraeventslabels
+                    self.extraeventsdescriptions = extraeventsdescriptions
+                    self.extraeventbuttoncolor = extraeventbuttoncolor
+                    self.extraeventbuttontextcolor = extraeventbuttontextcolor
+
                 if settings.contains('buttonpalette'):
                     self.buttonpalettemaxlen = [min(30,max(6,toInt(x))) for x in toList(settings.value('buttonpalettemaxlen',self.buttonpalettemaxlen))]
                     bp = toList(settings.value('buttonpalette',self.buttonpalette))
@@ -16699,16 +17166,20 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                     if bp is None:
                         self.buttonpalette = [ self.makePalette() for _ in range(10) ] # initialize empty palettes
                     else:
-                        for p in bp[:10]:
-                            if p is None or len(p)>28:
+                        for p in bp[:self.max_palettes]:
+                            if p is None or len(p)>self.palette_entries:
+                                # we generate a new default palette
                                 self.buttonpalette.append(self.makePalette())
-                            elif len(p) == 28:
+                            elif len(p) == self.palette_entries:
                                 # we convert the list into a Palette tuple
-                                tp = cast('Palette', tuple(p))
-                                self.buttonpalette.append(tp)
+                                if self.paletteValid(p):
+                                    tp = cast('Palette', tuple(p))
+                                    self.buttonpalette.append(tp)
+                                else:
+                                    self.buttonpalette.append(self.makePalette())
                             else:
-                                # we fill the list from the defaults and convert it into a Palette
-                                tp = cast('Palette', tuple(p + list(self.makePalette())[len(p):]))
+                                # to be compatible to older Artisan versions with smaller palettes we fill the list from the defaults and convert it into a Palette
+                                tp = cast('Palette', tuple(p + list(self.makePalette(empty=False))[len(p):]))
                                 self.buttonpalette.append(tp)
                 if settings.contains('buttonpalette_shortcuts'):
                     self.buttonpalette_shortcuts = bool(toBool(settings.value('buttonpalette_shortcuts',self.buttonpalette_shortcuts)))
@@ -16865,6 +17336,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             res = False
             _, _, exc_tb = sys.exc_info()
             QMessageBox.information(self,QApplication.translate('Error Message', 'Error'),QApplication.translate('Error Message', 'Exception:') + ' settingsLoad()  @line ' + str(getattr(exc_tb, 'tb_lineno', '?')))
+
         return res
 
     def startWebLCDs(self,force=False):
@@ -17210,6 +17682,13 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                 settings.setValue('plus_email',self.plus_email)
                 settings.setValue('plus_language',self.plus_language)
 
+            # save screens fingerprint to decide if dialog positions should be remembered on startup
+            settings.setValue('screens',len(self.app.screens())) # number of connected screens (int)
+            mainScreen:QScreen = self.app.primaryScreen()
+            settings.setValue('mainScreenPixelRatio',mainScreen.devicePixelRatio()) # main screen pixel ratio (float)
+            settings.setValue('mainScreenWidth',mainScreen.size().width())          # main screen width (int)
+            settings.setValue('mainScreenHeight',mainScreen.size().height())        # main screen height (int)
+
             #on OS X we prevent the reopening of windows
             # as done by defaults write com.google.code.p.Artisan NSQuitAlwaysKeepsWindows -bool false
             # resulting in the entry <key>NSQuitAlwaysKeepsWindows</key><false/> in the app settings
@@ -17292,6 +17771,10 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             settings.setValue('santokerHost',self.santokerHost)
             settings.setValue('santokerPort',self.santokerPort)
             settings.setValue('santokerSerial',self.santokerSerial)
+            settings.setValue('kaleidoHost',self.kaleidoHost)
+            settings.setValue('kaleidoPort',self.kaleidoPort)
+            settings.setValue('kaleidoSerial',self.kaleidoSerial)
+            settings.setValue('kaleidoPID',self.kaleidoPID)
             settings.endGroup()
             settings.setValue('fmt_data_RoR',self.qmc.fmt_data_RoR)
             settings.setValue('fmt_data_ON',self.qmc.fmt_data_ON)
@@ -17971,7 +18454,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             settings.setValue('extraeventbuttoncolor',self.extraeventbuttoncolor)
             settings.setValue('extraeventbuttontextcolor',self.extraeventbuttontextcolor)
             settings.setValue('extraeventsbuttonsflags',self.extraeventsbuttonsflags)
-            settings.setValue('buttonpalette',[list(bp) for bp in self.buttonpalette]) # externally we store lists of lists, internally we hold a list of Tuples (Palettes)
+            settings.setValue('buttonpalette',[list(bp) for bp in self.buttonpalette]) # externally we store lists of lists, internally we hold a list of tuples of lists (Palettes)
             settings.setValue('buttonpalettemaxlen',self.buttonpalettemaxlen)
             settings.setValue('buttonpalette_shortcuts',self.buttonpalette_shortcuts)
             settings.setValue('eventbuttontablecolumnwidths',self.eventbuttontablecolumnwidths)
@@ -18163,6 +18646,10 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                 # disconnect Santoker
                 self.santoker.stop()
                 self.santoker = None
+            elif self.qmc.device == 138 and self.kaleido is not None:
+                # disconnect Santoker
+                self.kaleido.stop()
+                self.kaleido = None
         if self.qmc.flagon:
             self.qmc.ToggleMonitor()
         if self.WebLCDs:
@@ -19002,7 +19489,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         res['AUC_num'] = (data['AUC'] if 'AUC' in data else '0')
         res['AUC'] = (data['AUC'] if 'AUC' in data else '')
         res['energy_num'] = (f"{data['energy']:.1f}" if 'energy' in data else '0')
-        res['energy'] = ("f{data['energy']:.1f}{'kWh' if units else ''}" if 'energy' in data else '')
+        res['energy'] = (f"{data['energy']:.1f}{'kWh' if units else ''}" if 'energy' in data else '')
         res['co2_num'] = (f"{data['co2']:.1f}" if 'co2' in data else '0')
         res['co2'] = (f"{data['co2']:.1f}{'g' if units else ''}" if 'co2' in data else '')
         res['co2kg_num'] = (f"{data['co2kg']:.1f}" if 'co2kg' in data else '0')
@@ -19653,7 +20140,10 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                                         ]:
                                     if l:
                                         try:
-                                            self.qmc.ax.lines.remove(l)
+                                            if isinstance(self.qmc.ax.lines,list): # MPL < v3.5
+                                                self.qmc.ax.lines.remove(l)
+                                            else:
+                                                l.remove()
                                         except Exception: # pylint: disable=broad-except
                                             pass
                                 for a in [
@@ -19667,18 +20157,16 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                                         self.qmc.l_backgroundeventtype4dots]:
                                     if a:
                                         try:
-                                            self.qmc.ax.lines.remove(a)
+                                            if isinstance(self.qmc.ax.lines,list): # MPL < v3.5
+                                                self.qmc.ax.lines.remove(a)
+                                            else:
+                                                a.remove()
                                         except Exception: # pylint: disable=broad-except
                                             pass
 
                                 # we also have to remove those extra event annotations if in combo mode
                                 if self.qmc.eventsGraphflag == 4:
-                                    for child in self.qmc.ax.get_children():
-                                        if isinstance(child, mpl.text.Annotation):
-                                            try:
-                                                self.qmc.ax.texts.remove(child)
-                                            except Exception: # pylint: disable=broad-except
-                                                pass
+                                    self.qmc.ax_combo_text_annotations_clear()
                             except Exception as e: # pylint: disable=broad-except
                                 _log.exception(e)
                             # we only adjust the upper limit of the delta axis automatically
@@ -19990,7 +20478,6 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                                 writer.writerow(extendedRankingData)
                             except Exception as e: # pylint: disable=broad-except
                                 _, _, exc_tb = sys.exc_info()
-    #                            traceback.print_exc(file=sys.stdout)
                                 self.qmc.adderror((QApplication.translate('Error Message','Exception:') + ' rankingCSVReport() {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
                     self.sendmessage(QApplication.translate('Message','CSV Ranking Report exported to {0}').format(filename))
                 except OSError as x:
@@ -20302,13 +20789,11 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             if self.pdf_page_layout is None:
                 # lazy imports
                 try:
-                    #pylint: disable = E, W, R, C
                     from PyQt6.QtCore import QMarginsF  # @UnusedImport @Reimport  @UnresolvedImport
-                    from PyQt6.QtGui import QPageLayout, QPageSize  # @UnusedImport @Reimport  @UnresolvedImport
-                except Exception:  # pylint: disable=broad-except
-                    #pylint: disable = E, W, R, C
+                    from PyQt6.QtGui import QPageSize  # @UnusedImport @Reimport  @UnresolvedImport
+                except ImportError:
                     from PyQt5.QtCore import QMarginsF # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
-                    from PyQt5.QtGui import QPageLayout, QPageSize  # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
+                    from PyQt5.QtGui import QPageSize  # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
                 if QPrinter().pageLayout().pageSize().id() == QPageSize.PageSizeId.Letter:
                     # Letter
                     ps = QPageSize(QPageSize.PageSizeId.Letter)
@@ -21785,7 +22270,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             fname = toString(action.data())
             if os.path.isfile(fname):
                 _log.info('menu load recent settings: %s',fname)
-                self.loadSettings(fn=fname, remember=False)
+                self.loadSettings(fn=fname, remember=True)
             else:
                 settings = QSettings()
                 files = toStringList(settings.value('recentSettingList'))
@@ -23135,6 +23620,34 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
             if widget is not None:
                 widget.deleteLater()
 
+    # applies button label substitutions like \t => eventname, \0 => ON,...
+    def substButtonLabel(self, buttonNr:int, label:str, eventtype:int) -> str:
+        et:int = eventtype
+        res:str = label
+        if et > 4:
+            et = et - 5
+        if et < 4:
+            res = res.replace('\\t',self.qmc.etypes[et])
+        state:int = 0
+        if len(self.buttonStates) > buttonNr > -1:
+            state = self.buttonStates[buttonNr]
+        for var,subst in [
+                ('\\0', QApplication.translate('Label','OFF')),
+                ('\\1', QApplication.translate('Label','ON')),
+                ('\\2', (QApplication.translate('Label','ON') if state else QApplication.translate('Label','OFF'))),
+                ('\\3', (QApplication.translate('Label','OFF') if state else QApplication.translate('Label','ON'))),
+                ('\\s', QApplication.translate('Label','START')),
+                ('\\p', QApplication.translate('Label','STOP')),
+                ('\\S', (QApplication.translate('Label','STOP') if state else QApplication.translate('Label','START'))),
+                ('\\P', (QApplication.translate('Label','START') if state else QApplication.translate('Label','STOP'))),
+                ('\\o', QApplication.translate('Label','OPEN')),
+                ('\\c', QApplication.translate('Label','CLOSE')),
+                ('\\O', (QApplication.translate('Label','CLOSE') if state else QApplication.translate('Label','OPEN'))),
+                ('\\C', (QApplication.translate('Label','OPEN') if state else QApplication.translate('Label','CLOSE')))]:
+            res = res.replace(var,subst)
+        return res
+
+
     #orders extra event buttons based on max number of buttons
     def realignbuttons(self):
         #clear buttons
@@ -23202,14 +23715,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
 
             p.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
 
-            l = self.extraeventslabels[i]
-            # event type et
-            et = eet
-            if et > 4:
-                et = et - 5
-            if et < 4:
-                l = l.replace('\\t',self.qmc.etypes[et])
-            p.setText(l)
+            p.setText(self.substButtonLabel(i, self.extraeventslabels[i], eet))
             p.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             p.clicked.connect(self.recordextraevent_slot)
             self.buttonlist.append(p)
@@ -23302,15 +23808,23 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
     # action not returning anything
     @pyqtSlot(int)
     def setbuttonsfromAction(self, pindex:int) -> None:
-        if self.setbuttonsfrom(pindex):
-            return
-        return
+        self.setbuttonsfrom(pindex)
+
+    def paletteValid(self, palette:Union[List,Tuple]) -> bool:
+        return (len(palette)== self.palette_entries and
+                len(palette[0]) == len(palette[1]) == len(palette[2]) == len(palette[3]) == len(palette[4]) and
+                len(palette[0]) == len(palette[5]) == len(palette[6]) == len(palette[7]) == len(palette[8]) and
+                self.eventsliders == len(palette[9]) == len(palette[10]) == len(palette[11]) == len(palette[12]) and
+                self.eventsliders == len(palette[13]) == len(palette[14]) == len(palette[15]) == len(palette[16]) and
+                self.eventsliders == len(palette[17]) == len(palette[18]) == len(palette[19]) == len(palette[20]) and
+                self.eventsliders == len(palette[21]) == len(palette[23]) == len(palette[23]) == len(palette[24]) and
+                self.eventsliders == len(palette[26]) == len(palette[27]))
 
     #restores a palette number to current buttons
     # returns 1 on success and 0 on failure
     def setbuttonsfrom(self,pindex:int) -> int:
         copy:Palette = self.buttonpalette[pindex]
-        if len(copy):
+        if self.paletteValid(copy):
             self.extraeventstypes = copy[0][:]
             self.extraeventsvalues = copy[1][:]
             self.extraeventsactions = copy[2][:]
@@ -23385,7 +23899,11 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         if maxlen is not None:
             self.buttonpalettemaxlen = maxlen
 
-    def makePalette(self) -> 'Palette':
+    def makePalette(self,empty:bool = True) -> 'Palette':
+        # by default an empty (non paletteValid() palette is returned
+        # if empty is set to False, a valid palette from the current event settings is generated
+        if empty:
+            return cast('Palette', tuple([[]]*25 + [''] + [[]]*2))
         return (
             self.extraeventstypes[:],
             self.extraeventsvalues[:],
@@ -23422,7 +23940,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
         )
 
 
-    def loadPalettes(self,filename,pal:List['Palette']) -> Optional[List[int]]:
+    def loadPalettes(self,filename,input_pal:List['Palette']) -> Optional[List[int]]:
         try:
             f = QFile(filename)
             if not f.open(QIODevice.OpenModeFlag.ReadOnly):
@@ -23502,7 +24020,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore # Argument to class mus
                                     label,
                                     slider_quantifier_action_flags,
                                     slider_quantifier_SV_flags)
-                            pal[i] = nextpalette
+                            input_pal[i] = nextpalette
                 message =QApplication.translate('Message','Palettes loaded')
                 self.sendmessage(message)
                 return buttonpalettemaxlen

@@ -47,7 +47,6 @@ from uic import MeasureDialog
 _log: Final[logging.Logger] = logging.getLogger(__name__)
 
 try:
-    #pylint: disable = E, W, R, C
     from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot, QRegularExpression, QSettings, QTimer, QEvent, QLocale # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtGui import QColor, QIntValidator, QRegularExpressionValidator, QKeySequence, QPalette # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtWidgets import (QApplication, QWidget, QCheckBox, QComboBox, QDialogButtonBox, QGridLayout, # @UnusedImport @Reimport  @UnresolvedImport
@@ -55,8 +54,7 @@ try:
                                  QPushButton, QSpinBox, QTableWidget, QTableWidgetItem, QTabWidget, QSizePolicy, # @UnusedImport @Reimport  @UnresolvedImport
                                  QGroupBox, QToolButton) # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6 import sip # @UnusedImport @Reimport  @UnresolvedImport
-except Exception: # pylint: disable=broad-except
-    #pylint: disable = E, W, R, C
+except ImportError:
     from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QRegularExpression, QSettings, QTimer, QEvent, QLocale # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtGui import QColor, QIntValidator, QRegularExpressionValidator, QKeySequence, QPalette # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtWidgets import (QApplication, QWidget, QCheckBox, QComboBox, QDialogButtonBox, QGridLayout, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
@@ -65,7 +63,7 @@ except Exception: # pylint: disable=broad-except
                                  QGroupBox, QToolButton) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     try:
         from PyQt5 import sip # type: ignore # @Reimport @UnresolvedImport @UnusedImport
-    except Exception: # pylint: disable=broad-except
+    except ImportError:
         import sip  # type: ignore # @Reimport @UnresolvedImport @UnusedImport
 
 
@@ -462,34 +460,35 @@ class volumeCalculatorDlg(ArtisanDialog):
 #####################  RECENT ROAST POPUP  #############################################
 
 class RoastsComboBox(QComboBox): # pyright: ignore # Argument to class must be a base class (reportGeneralTypeIssues)
-    def __init__(self, parent:QWidget, aw:'ApplicationWindow', selection = None) -> None:
+    def __init__(self, parent:QWidget, aw:'ApplicationWindow', selection:Optional[str] = None) -> None:
         super().__init__(parent)
-        self.aw = aw
+        self.aw:'ApplicationWindow' = aw
         self.installEventFilter(self)
-        self.selection = selection # just the roast title
-        self.edited = selection
+        self.selection:Optional[str] = selection # just the roast title
+        self.edited:Optional[str] = selection
         self.updateMenu()
         self.editTextChanged.connect(self.textEdited)
         self.setEditable(True)
         self.completer().setCaseSensitivity(Qt.CaseSensitivity.CaseSensitive)
 #        self.setMouseTracking(False)
 
-    @pyqtSlot('QString')
-    def textEdited(self,txt):
+#    @pyqtSlot('QString')
+    @pyqtSlot(str)
+    def textEdited(self, txt:str) -> None:
         cleaned = ' '.join(txt.split())
         self.edited = cleaned
 
-    def getSelection(self):
+    def getSelection(self) -> Optional[str]:
         return self.edited or self.selection
 
-    def setSelection(self,i):
+    def setSelection(self, i:int) -> None:
         if i >= 0:
             try:
                 self.edited = None # reset the user text editing
             except Exception: # pylint: disable=broad-except
                 pass
 
-    def eventFilter(self, _obj, event):
+    def eventFilter(self, _obj, event) -> bool:
 # the next prevents correct setSelection on Windows
 #        if event.type() == QEvent.Type.FocusIn:
 #            self.setSelection(self.currentIndex())
@@ -500,12 +499,15 @@ class RoastsComboBox(QComboBox): # pyright: ignore # Argument to class must be a
         return False # cont processing
 
     # the first entry is always just the current text edit line
-    def updateMenu(self):
+    def updateMenu(self) -> None:
         self.blockSignals(True)
         try:
             roasts = self.aw.recentRoastsMenuList()
             self.clear()
-            self.addItems([self.edited] + roasts)
+            if self.edited is None:
+                self.addItems(roasts)
+            else:
+                self.addItems([self.edited] + roasts)
         except Exception: # pylint: disable=broad-except
             pass
         self.blockSignals(False)
@@ -2382,8 +2384,9 @@ class editGraphDlg(ArtisanResizeablDialog):
             self.aw.sendmessage(QApplication.translate('Message',f"Recent roast properties '{self.aw.recentRoastLabel(rr)}' set"))
         self.recentRoastEnabled()
 
-    @pyqtSlot('QString')
-    def recentRoastEnabled(self,_=''):
+#    @pyqtSlot('QString')
+    @pyqtSlot(str)
+    def recentRoastEnabled(self,_:str='') -> None:
         try:
             title = self.titleedit.currentText()
             weightIn = float(comma2dot(self.weightinedit.text()))

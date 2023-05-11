@@ -19,13 +19,11 @@ import platform
 import logging
 
 try:
-    #pylint: disable = E, W, R, C
     from PyQt6.QtCore import Qt, QEvent, QSettings, pyqtSlot # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtWidgets import (QApplication, QWidget, QDialog, QMessageBox, QDialogButtonBox, QTextEdit,  # @UnusedImport @Reimport  @UnresolvedImport
                 QHBoxLayout, QVBoxLayout, QLabel, QLineEdit)  # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtGui import QKeySequence, QAction  # @UnusedImport @Reimport  @UnresolvedImport
-except Exception: # pylint: disable=broad-except
-    #pylint: disable = E, W, R, C
+except ImportError:
     from PyQt5.QtCore import Qt, QEvent, QSettings, pyqtSlot # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtWidgets import (QApplication, QWidget, QAction, QDialog, QMessageBox, QDialogButtonBox, QTextEdit, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
                 QHBoxLayout, QVBoxLayout, QLabel, QLineEdit) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
@@ -285,6 +283,7 @@ class PortComboBox(MyQComboBox):  # pyright: ignore # Argument to class must be 
         if self.selection is not None:
             self.setCurrentText(self.selection)
         self.editTextChanged.connect(self.textEdited)
+        self.currentIndexChanged.connect(self.setSelection)
 
         # we prefer the device name if available over the selection port
         try:
@@ -301,6 +300,7 @@ class PortComboBox(MyQComboBox):  # pyright: ignore # Argument to class must be 
     def getSelection(self) -> Optional[str]:
         return self.edited or self.selection
 
+    @pyqtSlot(int)
     def setSelection(self, i:int) -> None:
         if i >= 0:
             try:

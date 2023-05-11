@@ -29,10 +29,8 @@ if TYPE_CHECKING:
     import websocket # type: ignore # pylint: disable=unused-import
 
 try:
-    #pylint: disable = E, W, R, C
     from PyQt6.QtWidgets import QApplication # @UnusedImport @Reimport  @UnresolvedImport
-except Exception: # pylint: disable=broad-except
-    #pylint: disable = E, W, R, C
+except ImportError:
     from PyQt5.QtWidgets import QApplication # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
 
 class wsport():
@@ -229,7 +227,7 @@ class wsport():
                 if self.ws is not None:
                     self.ws.run_forever(
                         skip_utf8_validation=True,
-                        ping_interval=self.ping_interval,
+                        ping_interval=self.ping_interval, # type:ignore # pyright: Argument of type "float" cannot be assigned to parameter "ping_interval" of type "int" in function "run_forever"
                         ping_timeout=self.ping_timeout)
             except Exception as e: # pylint: disable=broad-except
                 self.aw.qmc.adderror(QApplication.translate('Error Message','WebSocket connection failed: {}').format(e))
