@@ -156,13 +156,15 @@ class tgraphcanvas(FigureCanvas):
     fileDirtySignal = pyqtSignal()
     fileCleanSignal = pyqtSignal()
     markChargeSignal = pyqtSignal(int)
-    markDRYSignal = pyqtSignal()
-    markFCsSignal = pyqtSignal()
-    markFCeSignal = pyqtSignal()
-    markSCsSignal = pyqtSignal()
-    markSCeSignal = pyqtSignal()
-    markDropSignal = pyqtSignal()
-    markCoolSignal = pyqtSignal()
+    markChargeNoactionSignal = pyqtSignal(bool)
+    markTPSignal = pyqtSignal()
+    markDRYSignal = pyqtSignal(bool)
+    markFCsSignal = pyqtSignal(bool)
+    markFCeSignal = pyqtSignal(bool)
+    markSCsSignal = pyqtSignal(bool)
+    markSCeSignal = pyqtSignal(bool)
+    markDropSignal = pyqtSignal(bool)
+    markCoolSignal = pyqtSignal(bool)
     toggleMonitorSignal = pyqtSignal()
     toggleRecorderSignal = pyqtSignal()
     processAlarmSignal = pyqtSignal(int, bool, int, str)
@@ -229,7 +231,7 @@ class tgraphcanvas(FigureCanvas):
         'E1backgroundtimex', 'E2backgroundtimex', 'E3backgroundtimex', 'E4backgroundtimex', 'E1backgroundvalues', 'E2backgroundvalues', 'E3backgroundvalues',
         'E4backgroundvalues', 'l_backgroundeventtype1dots', 'l_backgroundeventtype2dots', 'l_backgroundeventtype3dots', 'l_backgroundeventtype4dots',
         'DeltaETBflag', 'DeltaBTBflag', 'clearBgbeforeprofileload', 'hideBgafterprofileload', 'heating_types', 'operator', 'organization', 'roastertype', 'roastersize', 'roasterheating', 'drumspeed',
-        'organization_setup', 'operator_setup', 'roastertype_setup', 'roastersize_setup', 'roasterheating_setup', 'drumspeed_setup', 'last_batchsize', 'machinesetup_energy_ratings',
+        'organization_setup', 'operator_setup', 'roastertype_setup', 'roastersize_setup', 'roastersize_setup_default', 'roasterheating_setup', 'drumspeed_setup', 'last_batchsize', 'machinesetup_energy_ratings',
         'machinesetup', 'roastingnotes', 'cuppingnotes', 'roastdate', 'roastepoch', 'lastroastepoch', 'batchcounter', 'batchsequence', 'batchprefix', 'neverUpdateBatchCounter',
         'roastbatchnr', 'roastbatchprefix', 'roastbatchpos', 'roasttzoffset', 'roastUUID', 'plus_default_store', 'plus_store', 'plus_store_label', 'plus_coffee',
         'plus_coffee_label', 'plus_blend_spec', 'plus_blend_spec_labels', 'plus_blend_label', 'plus_custom_blend', 'plus_sync_record_hash', 'plus_file_last_modified', 'beans', 'projectFlag', 'curveVisibilityCache', 'ETcurve', 'BTcurve',
@@ -254,8 +256,8 @@ class tgraphcanvas(FigureCanvas):
         'ETBdeltalinestyle', 'ETBdeltadrawstyle', 'ETBdeltalinewidth', 'ETBdeltamarker', 'ETBdeltamarkersize', 'alarmsetlabel', 'alarmflag', 'alarmguard', 'alarmnegguard', 'alarmtime', 'alarmoffset', 'alarmtime2menuidx', 'menuidx2alarmtime',
         'alarmcond', 'alarmstate', 'alarmsource', 'alarmtemperature', 'alarmaction', 'alarmbeep', 'alarmstrings', 'alarmtablecolumnwidths', 'silent_alarms',
         'alarmsets_count', 'alarmsets', 'loadalarmsfromprofile', 'loadalarmsfrombackground', 'alarmsfile', 'temporaryalarmflag', 'TPalarmtimeindex',
-        'rsfile', 'temporary_error', 'temporarymovepositiveslider', 'temporarymovenegativeslider',
-        'temporayslider_force_move', 'quantifiedEvent', 'loadaxisfromprofile', 'startofx_default', 'endofx_default', 'xgrid_default', 'ylimit_F_default',
+        'rsfile', 'temporary_error',
+        'quantifiedEvent', 'loadaxisfromprofile', 'startofx_default', 'endofx_default', 'xgrid_default', 'ylimit_F_default',
         'ylimit_min_F_default', 'ygrid_F_default', 'zlimit_F_default', 'zlimit_min_F_default', 'zgrid_F_default', 'ylimit_C_default', 'ylimit_min_C_default',
         'ygrid_C_default', 'zlimit_C_default', 'zlimit_min_C_default', 'zgrid_C_default', 'temp_grid', 'time_grid', 'zlimit_max', 'zlimit_min_max',
         'ylimit_max', 'ylimit_min_max', 'ylimit', 'ylimit_min', 'zlimit', 'zlimit_min', 'RoRlimitFlag', 'RoRlimit', 'RoRlimitm', 'maxRoRlimit',
@@ -603,8 +605,8 @@ class tgraphcanvas(FigureCanvas):
         self.phidget1200_changeTriggersStrings.insert(1,'0.01C')
         self.phidget1200_changeTriggersStrings.insert(1,'0.005C')
         self.phidget1200_dataRate:int = 340
-        self.phidget1200_dataRatesStrings: Final[List[str]] = ['340ms','500ms','750ms','1s']
-        self.phidget1200_dataRatesValues: Final[List[int]] = [340,500,700,1024]
+        self.phidget1200_dataRatesStrings: Final[List[str]] = ['250ms','500ms','750ms','1s']
+        self.phidget1200_dataRatesValues: Final[List[int]] = [250,500,700,1024]
 
         self.phidget1200_2_async:bool = False
         self.phidget1200_2_formula:int = 0
@@ -830,7 +832,11 @@ class tgraphcanvas(FigureCanvas):
                        'Kaleido BT/ET',             #138
                        '+Kaleido SV/AT',            #139
                        '+Kaleido Drum/AH',          #140
-                       '+Kaleido Heater/Fan'        #141
+                       '+Kaleido Heater/Fan',       #141
+                       'IKAWA',                     #142
+                       '+IKAWA SET/RPM',            #143
+                       '+IKAWA Heater/Fan',         #144
+                       '+IKAWA State'               #145
                        ]
 
         # ADD DEVICE:
@@ -883,7 +889,8 @@ class tgraphcanvas(FigureCanvas):
             132, # Yocto Current
             133, # Yocto Sensor
             134, # Santoker BT/ET
-            138  # Kaleido BT/ET
+            138, # Kaleido BT/ET
+            142  # IKAWA
         ]
 
         # ADD DEVICE:
@@ -937,6 +944,9 @@ class tgraphcanvas(FigureCanvas):
             137, # Phidget DAQ1500
             140, # Kaleido Drum/AH
             141, # Kaleido Heater/Fan
+            143, # IKAWA Set/RPM
+            144, # IKAWA Heater/Fan
+            145  # IKAWA State
         ]
 
         #extra devices
@@ -1297,6 +1307,7 @@ class tgraphcanvas(FigureCanvas):
         self.organization_setup:str = ''
         self.operator_setup:str = ''
         self.roastertype_setup:str = ''
+        self.roastersize_setup_default:float = 0 # in kg # the default to present on setup as loaded from the machine setup
         self.roastersize_setup:float = 0 # in kg
         self.roasterheating_setup:int = 0
         self.drumspeed_setup:str = ''
@@ -1405,7 +1416,7 @@ class tgraphcanvas(FigureCanvas):
         self.autoChargeIdx = 0
         self.autoDropIdx = 0
 
-        self.markTPflag:bool = True
+        self.markTPflag:bool = True # user setting if TP should be marked or not
         self.autoTPIdx = 0 # set by sample() on recognition and cleared once TP is marked
 
         # flags to control automatic DRY and FCs events based on phases limits
@@ -1430,7 +1441,7 @@ class tgraphcanvas(FigureCanvas):
 
         self.weight_units:List[str] = ['g','Kg','lb','oz']
         #[0]weight in, [1]weight out, [2]units (string)
-        self.weight:Tuple[float,float,str] = (0,0,self.weight_units[0])
+        self.weight:Tuple[float,float,str] = (0,0,self.weight_units[1])
 
         self.volume_units:List[str] = ['l','gal','qt','pt','cup','ml']
         #[0]volume in, [1]volume out, [2]units (string)
@@ -1646,10 +1657,6 @@ class tgraphcanvas(FigureCanvas):
         self.rsfile:str = '' # filename Ramp/Soak patterns were loaded from
 
         self.temporary_error:Optional[str] = None # set by adderror() to a new error message, send to the message line by updategraphics()
-        self.temporarymovepositiveslider:Optional[Tuple[int,int]] = None # set by pidcontrol.setEnergy (indirectly called from sample())
-                # holds tuple (slidernr,value) and is executed and reset by updategraphics
-        self.temporarymovenegativeslider:Optional[Tuple[int,int]] = None
-        self.temporayslider_force_move:bool = True # if True move the slider independent of the slider position to fire slider action!
 
         self.quantifiedEvent:List = [] # holds an event quantified during sample(), a tuple [<eventnr>,<value>,<recordEvent>]
 
@@ -2176,20 +2183,22 @@ class tgraphcanvas(FigureCanvas):
         self.fileDirtySignal.connect(self.fileDirty)
         self.fileCleanSignal.connect(self.fileClean)
         self.markChargeSignal.connect(self.markChargeDelay)
-        self.markDRYSignal.connect(self.markDRYTrigger)
-        self.markFCsSignal.connect(self.markFCsTrigger)
-        self.markFCeSignal.connect(self.markFCeTrigger)
-        self.markSCsSignal.connect(self.markSCsTrigger)
-        self.markSCeSignal.connect(self.markSCeTrigger)
-        self.markDropSignal.connect(self.markDropTrigger)
-        self.markCoolSignal.connect(self.markCoolTrigger)
+        self.markChargeNoactionSignal.connect(self.markCharge)
+        self.markTPSignal.connect(self.markTPTrigger)
+        self.markDRYSignal.connect(self.markDryEnd)
+        self.markFCsSignal.connect(self.mark1Cstart)
+        self.markFCeSignal.connect(self.mark1Cend)
+        self.markSCsSignal.connect(self.mark2Cstart)
+        self.markSCeSignal.connect(self.mark2Cend)
+        self.markDropSignal.connect(self.markDrop)
+        self.markCoolSignal.connect(self.markCoolEnd)
         self.toggleMonitorSignal.connect(self.toggleMonitorTigger)
         self.toggleRecorderSignal.connect(self.toggleRecorderTigger)
         self.processAlarmSignal.connect(self.processAlarm, type=Qt.ConnectionType.QueuedConnection) # type: ignore # queued to avoid deadlock between RampSoak processing and EventRecordAction, both accessing the same critical section protected by profileDataSemaphore
         self.alarmsetSignal.connect(self.selectAlarmSet)
         self.moveBackgroundSignal.connect(self.moveBackgroundAndRedraw)
         self.eventRecordSignal.connect(self.EventRecordSlot)
-        self.eventRecordActionSignal.connect(self.EventRecordActionSlot)
+        self.eventRecordActionSignal.connect(self.EventRecordActionSlot, type=Qt.ConnectionType.QueuedConnection) # type: ignore # queued to avoid deadlock between PID processing and EventRecordAction, both accessing the same critical section protected by profileDataSemaphore
         self.showCurveSignal.connect(self.showCurve)
         self.showExtraCurveSignal.connect(self.showExtraCurve)
         self.showEventsSignal.connect(self.showEvents)
@@ -2542,7 +2551,7 @@ class tgraphcanvas(FigureCanvas):
     @staticmethod
     def eventsExternal2InternalValue(v:float) -> float:
         if -1.0 < v < 1.0:
-            return 1.0
+            return 1.0 # ML: should this be 0!?
         if v >= 1.0:
             return v/10. + 1.
         return v/10. - 1.
@@ -2874,11 +2883,11 @@ class tgraphcanvas(FigureCanvas):
                 QDesktopServices.openUrl(QUrl(roastLink(self.roastUUID), QUrl.ParsingMode.TolerantMode))
                 return
 
-            if not self.wheelflag and event.inaxes is None and not self.flagstart and not self.flagon and event.button == 1 and event.dblclick and event.x > event.y:
+            if not self.wheelflag and event.inaxes is None and event.button == 1 and event.dblclick and event.x > event.y:
                 fig = self.ax.get_figure()
                 s = fig.get_size_inches()*fig.dpi
                 if event.x > s[0]*2/3 and event.y > s[1]*2/3:
-                    if self.backgroundprofile is None and __release_sponsor_domain__ and __release_sponsor_url__:
+                    if not self.flagstart and not self.flagon and self.backgroundprofile is None and __release_sponsor_domain__ and __release_sponsor_url__:
                         QDesktopServices.openUrl(QUrl(__release_sponsor_url__, QUrl.ParsingMode.TolerantMode))
                         return
                     if self.backgroundprofile is not None:
@@ -3091,8 +3100,7 @@ class tgraphcanvas(FigureCanvas):
 
     # note that partial values might be given here (time might update, but not the values)
     @pyqtSlot(str,str,str)
-    # pylint: disable=no-self-use # used as slot
-    def updateLargeLCDs(self, bt, et, time):
+    def updateLargeLCDs(self, bt, et, time): # pylint: disable=no-self-use # used as slot
         try:
             if self.aw.largeLCDs_dialog is not None:
                 if self.flagon and not self.flagstart:
@@ -3131,8 +3139,7 @@ class tgraphcanvas(FigureCanvas):
             _log.exception(e)
 
     @pyqtSlot(str)
-    # pylint: disable=no-self-use # used as slot
-    def updateLargeLCDsTime(self, time):
+    def updateLargeLCDsTime(self, time): # pylint: disable=no-self-use # used as slot
         try:
             if self.aw.largeLCDs_dialog is not None:
                 self.aw.largeLCDs_dialog.updateValues([],[],time=time)
@@ -3232,6 +3239,10 @@ class tgraphcanvas(FigureCanvas):
             if self.extradevices[n] in [54,90,91,135,136,140,141]: # Hottop Heater/Fan, Slider 12, Slider 34, Santoker Power / Fan, Kaleido Fan/Drum, Kaleido Heater/AH
                 return True
             if self.extradevices[n] == 136 and c == 0: # Santoker Drum
+                return True
+            if self.extradevices[n] in [140, 141]: # Kaleido drum/AH, heater/fan
+                return True
+            if self.extradevices[n] in [144, 145]: # IKAWA heater/fan, state
                 return True
             return False
         return False
@@ -3839,10 +3850,12 @@ class tgraphcanvas(FigureCanvas):
                             if b > 0:
                                 # we found a BT break at the current index minus b
                                 self.autoChargeIdx = length_of_qmc_timex - b
+
                         # check for TP event if already CHARGEed and not yet recognized (earliest in the next call to sample())
-                        elif not self.TPalarmtimeindex and self.timeindex[0] > -1 and not self.timeindex[1] and self.timeindex[0]+8 < len(sample_temp2) and self.checkTPalarmtime():
+                        elif self.TPalarmtimeindex is None and self.timeindex[0] > -1 and not self.timeindex[1] and self.timeindex[0]+8 < len(sample_temp2) and self.checkTPalarmtime():
                             try:
                                 tp = self.aw.findTP()
+
                                 if ((self.mode == 'C' and sample_temp2[tp] > 50 and sample_temp2[tp] < 150) or \
                                     (self.mode == 'F' and sample_temp2[tp] > 100 and sample_temp2[tp] < 300)): # only mark TP if not an error value!
                                     self.autoTPIdx = 1
@@ -4276,24 +4289,6 @@ class tgraphcanvas(FigureCanvas):
                 finally:
                     if self.profileDataSemaphore.available() < 1:
                         self.profileDataSemaphore.release(1)
-
-                #check move slider pending actions
-                if self.temporarymovepositiveslider is not None:
-                    slidernr,value = self.temporarymovepositiveslider # pylint: disable=unpacking-non-sequence
-                    if self.aw.sliderpos(slidernr) != value or self.temporayslider_force_move:
-                        self.aw.moveslider(slidernr,value) # move slider
-                        self.aw.fireslideraction(slidernr) # fire action
-                        self.aw.extraeventsactionslastvalue[slidernr] = int(round(value)) # remember last value for relative event buttons
-                        self.temporayslider_force_move = False
-                self.temporarymovepositiveslider = None
-                if self.temporarymovenegativeslider is not None:
-                    slidernr,value = self.temporarymovenegativeslider # pylint: disable=unpacking-non-sequence
-                    if self.aw.sliderpos(slidernr) != value or self.temporayslider_force_move:
-                        self.aw.moveslider(slidernr,value) # move slider
-                        self.aw.fireslideraction(slidernr) # fire action
-                        self.aw.extraeventsactionslastvalue[slidernr] = int(round(value)) # remember last value for relative event buttons
-                        self.temporayslider_force_move = False
-                self.temporarymovenegativeslider = None
 
                 #write error message
                 if self.temporary_error is not None:
@@ -6175,7 +6170,7 @@ class tgraphcanvas(FigureCanvas):
         except Exception as e: # pylint: disable=broad-except
             _log.exception(e)
 
-    def fmt_timedata(self,x):
+    def fmt_timedata(self, x:float) -> str:
         starttime:float
 
         if bool(self.aw.comparator):
@@ -6185,7 +6180,7 @@ class tgraphcanvas(FigureCanvas):
         else:
             starttime = 0
         sign = '' if x >= starttime else '-'
-        m,s = divmod(abs(x - starttime), 60)
+        m,s = divmod(abs(x - starttime), 60.)
 #        return '%s%d:%02d'%(sign,m,s)
         return f'{sign}{m:.0f}:{s:02.0f}'
 
@@ -6203,7 +6198,7 @@ class tgraphcanvas(FigureCanvas):
         return int(round(res))
 
     #used by xaxistosm(). Provides also negative time
-    def formtime(self,x,_):
+    def formtime(self, x:float, _pos) -> str:
         starttime:float
         if bool(self.aw.comparator):
             starttime = 0
@@ -6226,7 +6221,7 @@ class tgraphcanvas(FigureCanvas):
                 return  f'{m:.0f}:{s:02.0f}'
             return f'{m:.0f}'
 
-        m,s = divmod(abs(x - round(starttime)), 60)
+        m,s = divmod(abs(x - round(starttime)), 60.)
         s = int(round(s))
         m = int(m)
 
@@ -7869,7 +7864,7 @@ class tgraphcanvas(FigureCanvas):
                     if self.flagstart or self.xgrid == 0:
                         self.set_xlabel('')
                     else:
-                        self.set_xlabel(self.aw.arabicReshape(QApplication.translate('Label', 'min','abbrev. of minutes')))
+                        self.set_xlabel(f'{self.aw.qmc.roastertype_setup} {self.aw.qmc.roastersize_setup}kg')
 
                     try:
                         y_label.set_in_layout(False) # remove y-axis labels from tight_layout calculation
@@ -11239,11 +11234,11 @@ class tgraphcanvas(FigureCanvas):
                         santoker_serial,
                         connected_handler=lambda : self.aw.sendmessageSignal.emit(QApplication.translate('Message', '{} connected').format('Santoker'),True,None),
                         disconnected_handler=lambda : self.aw.sendmessageSignal.emit(QApplication.translate('Message', '{} disconnected').format('Santoker'),True,None),
-                        charge_handler=lambda : (self.markChargeSignal.emit() if (self.timeindex[0] == -1) else None),
-                        dry_handler=lambda : (self.markDRYSignal.emit() if (self.timeindex[2] == 0) else None),
-                        fcs_handler=lambda : (self.markFCsSignal.emit() if (self.timeindex[1] == 0) else None),
-                        scs_handler=lambda : (self.markSCsSignal.emit() if (self.timeindex[4] == 0) else None),
-                        drop_handler=lambda : (self.markDropSignal.emit() if (self.timeindex[6] == 0) else None))
+                        charge_handler=lambda : (self.markChargeSignal.emit(0) if (self.timeindex[0] == -1) else None),
+                        dry_handler=lambda : (self.markDRYSignal.emit(False) if (self.timeindex[2] == 0) else None),
+                        fcs_handler=lambda : (self.markFCsSignal.emit(False) if (self.timeindex[1] == 0) else None),
+                        scs_handler=lambda : (self.markSCsSignal.emit(False) if (self.timeindex[4] == 0) else None),
+                        drop_handler=lambda : (self.markDropSignal.emit(False) if (self.timeindex[6] == 0) else None))
                 elif self.device == 138:
                     # connect Kaleido
                     from artisanlib.kaleido import KaleidoPort
@@ -11262,6 +11257,15 @@ class tgraphcanvas(FigureCanvas):
                         serial=kaleido_serial,
                         connected_handler=lambda : self.aw.sendmessageSignal.emit(QApplication.translate('Message', '{} connected').format('Kaleido'),True,None),
                         disconnected_handler=lambda : self.aw.sendmessageSignal.emit(QApplication.translate('Message', '{} disconnected').format('Kaleido'),True,None))
+                elif self.device == 142:
+                    from artisanlib.ikawa import IKAWA_BLE
+                    self.aw.ikawa = IKAWA_BLE(
+                        connected_handler=lambda : self.aw.sendmessageSignal.emit(QApplication.translate('Message', '{} connected').format('IKAWA'),True,None),
+                        disconnected_handler=lambda : self.aw.sendmessageSignal.emit(QApplication.translate('Message', '{} disconnected').format('IKAWA'),True,None))
+                    if self.aw.ikawa is not None:
+                        self.aw.ikawa.start()
+                        self.aw.sendmessageSignal.emit(QApplication.translate('Message', 'scanning for device'),True,None)
+
             self.aw.initializedMonitoringExtraDeviceStructures()
 
             #reset alarms
@@ -11381,6 +11385,11 @@ class tgraphcanvas(FigureCanvas):
             if not bool(self.aw.simulator) and self.device == 138 and self.aw.kaleido is not None:
                 self.aw.kaleido.stop()
                 self.aw.kaleido = None
+
+            # disconnect IKAWA
+            if not bool(self.aw.simulator) and self.device == 142 and self.aw.ikawa is not None:
+                self.aw.ikawa.stop()
+                self.aw.ikawa = None
 
             # at OFF we stop the follow-background on FujiPIDs and set the SV to 0
             if self.device == 0 and self.aw.fujipid.followBackground and self.aw.fujipid.sv and self.aw.fujipid.sv > 0:
@@ -11962,7 +11971,7 @@ class tgraphcanvas(FigureCanvas):
     # trigger to be called by the markChargeSignal
     # if delay is not 0, the markCharge is issues after n milliseconds
     @pyqtSlot(int)
-    def markChargeDelay(self,delay):
+    def markChargeDelay(self, delay:int) -> None:
         if delay == 0:
             self.markCharge()
         else:
@@ -11972,8 +11981,9 @@ class tgraphcanvas(FigureCanvas):
         self.markCharge()
 
     #Records charge (put beans in) marker. called from push button 'Charge'
+    # if noaction is True, the button event action is not triggered
     @pyqtSlot(bool)
-    def markCharge(self,_=False):
+    def markCharge(self, noaction:bool = False) -> None:
         removed = False
         try:
             self.profileDataSemaphore.acquire(1)
@@ -12100,7 +12110,8 @@ class tgraphcanvas(FigureCanvas):
                     self.aw.buttonCHARGE.startAnimation()
                     self.updategraphicsSignal.emit() # we need this to have the projections redrawn immediately
             else:
-                self.aw.eventactionx(self.buttonactions[0],self.buttonactionstrings[0])
+                if not noaction:
+                    self.aw.eventactionx(self.buttonactions[0],self.buttonactionstrings[0])
                 self.aw.buttonCHARGE.setFlat(True)
                 self.aw.buttonCHARGE.stopAnimation()
                 try:
@@ -12116,12 +12127,19 @@ class tgraphcanvas(FigureCanvas):
                     self.updategraphicsSignal.emit() # we need this to have the projections redrawn immediately
             self.aw.onMarkMoveToNext(self.aw.buttonCHARGE)
 
+    # called via markTPexternalSignal, triggered by external device
+    # does not directly call markTP(), but via the next updategraphics()
+    @pyqtSlot()
+    def markTPTrigger(self):
+        if self.markTPflag:
+            self.TPalarmtimeindex = len(self.timex) - 1
+            self.autoTPIdx = 1 # trigger for updategraphics() to call markTP()
 
     # called from sample() and marks the autodetected TP visually on the graph
     def markTP(self):
         try:
             self.profileDataSemaphore.acquire(1)
-            if self.flagstart and self.markTPflag and self.TPalarmtimeindex and self.timeindex[0] != -1 and len(self.timex) > self.TPalarmtimeindex:
+            if self.flagstart and self.markTPflag and self.TPalarmtimeindex is not None and self.timeindex[0] != -1 and len(self.timex) > self.TPalarmtimeindex:
                 st = stringfromseconds(self.timex[self.TPalarmtimeindex]-self.timex[self.timeindex[0]],False)
                 st1 = self.aw.arabicReshape(QApplication.translate('Scope Annotation','TP {0}').format(st))
                 #anotate temperature
@@ -12144,14 +12162,12 @@ class tgraphcanvas(FigureCanvas):
             if self.profileDataSemaphore.available() < 1:
                 self.profileDataSemaphore.release(1)
         self.autoTPIdx = 0 # avoid a loop on auto marking
+        if self.aw.kaleido is not None and self.TPalarmtimeindex is not None:
+            self.aw.kaleido.markTP()
 
-    # trigger to be called by the markDRYSignal
-    @pyqtSlot()
-    def markDRYTrigger(self):
-        self.markDryEnd()
-
+    # if noaction is True, the button event action is not triggered
     @pyqtSlot(bool)
-    def markDryEnd(self,_=False):
+    def markDryEnd(self, noaction:bool = False) -> None:
         if len(self.timex) > 1:
             removed = False
             try:
@@ -12243,7 +12259,8 @@ class tgraphcanvas(FigureCanvas):
                     self.aw.buttonCHARGE.setFlat(True) # also deactivate CHARGE button
                     self.aw.buttonCHARGE.stopAnimation()
                     try:
-                        self.aw.eventactionx(self.buttonactions[1],self.buttonactionstrings[1])
+                        if not noaction:
+                            self.aw.eventactionx(self.buttonactions[1],self.buttonactionstrings[1])
                         if self.timeindex[0] > -1:
                             start = self.timex[self.timeindex[0]]
                         else:
@@ -12260,14 +12277,10 @@ class tgraphcanvas(FigureCanvas):
                         self.updategraphicsSignal.emit()
                 self.aw.onMarkMoveToNext(self.aw.buttonDRY)
 
-    # trigger to be called by the markFCsSignal
-    @pyqtSlot()
-    def markFCsTrigger(self):
-        self.mark1Cstart()
-
     #record 1C start markers of BT. called from push buttonFCs of application window
+    # if noaction is True, the button event action is not triggered
     @pyqtSlot(bool)
-    def mark1Cstart(self,_=False):
+    def mark1Cstart(self, noaction:bool = False) -> None:
         if len(self.timex) > 1:
             removed = False
             try:
@@ -12361,7 +12374,8 @@ class tgraphcanvas(FigureCanvas):
                     self.aw.buttonCHARGE.setFlat(True)
                     self.aw.buttonCHARGE.stopAnimation()
                     self.aw.buttonDRY.setFlat(True)
-                    self.aw.eventactionx(self.buttonactions[2],self.buttonactionstrings[2])
+                    if not noaction:
+                        self.aw.eventactionx(self.buttonactions[2],self.buttonactionstrings[2])
                     if self.timeindex[0] > -1:
                         start = self.timex[self.timeindex[0]]
                     else:
@@ -12375,14 +12389,11 @@ class tgraphcanvas(FigureCanvas):
                         self.updategraphicsSignal.emit() # we need this to have the projections redrawn immediately
                 self.aw.onMarkMoveToNext(self.aw.buttonFCs)
 
-    # trigger to be called by the markFCeSignal
-    @pyqtSlot()
-    def markFCeTrigger(self):
-        self.mark1Cend()
 
     #record 1C end markers of BT. called from buttonFCe of application window
+    # if noaction is True, the button event action is not triggered
     @pyqtSlot(bool)
-    def mark1Cend(self,_=False):
+    def mark1Cend(self, noaction:bool = False) -> None:
         if len(self.timex) > 1:
             removed = False
             try:
@@ -12469,7 +12480,8 @@ class tgraphcanvas(FigureCanvas):
                     self.aw.buttonCHARGE.stopAnimation()
                     self.aw.buttonDRY.setFlat(True)
                     self.aw.buttonFCs.setFlat(True)
-                    self.aw.eventactionx(self.buttonactions[3],self.buttonactionstrings[3])
+                    if not noaction:
+                        self.aw.eventactionx(self.buttonactions[3],self.buttonactionstrings[3])
                     if self.timeindex[0] > -1:
                         start = self.timex[self.timeindex[0]]
                     else:
@@ -12481,15 +12493,10 @@ class tgraphcanvas(FigureCanvas):
                     self.updategraphicsSignal.emit() # we need this to have the projections redrawn immediately
                 self.aw.onMarkMoveToNext(self.aw.buttonFCe)
 
-
-    # trigger to be called by the markSCsSignal
-    @pyqtSlot()
-    def markSCsTrigger(self):
-        self.mark2Cstart()
-
     #record 2C start markers of BT. Called from buttonSCs of application window
+    # if noaction is True, the button event action is not triggered
     @pyqtSlot(bool)
-    def mark2Cstart(self,_=False):
+    def mark2Cstart(self, noaction:bool = False) -> None:
         if len(self.timex) > 1:
             st1 = ''
             st2 = ''
@@ -12584,7 +12591,8 @@ class tgraphcanvas(FigureCanvas):
                     self.aw.buttonFCs.setFlat(True)
                     self.aw.buttonFCe.setFlat(True)
                     try:
-                        self.aw.eventactionx(self.buttonactions[4],self.buttonactionstrings[4])
+                        if not noaction:
+                            self.aw.eventactionx(self.buttonactions[4],self.buttonactionstrings[4])
                         if self.timeindex[0] > -1:
                             start = self.timex[self.timeindex[0]]
                         else:
@@ -12601,14 +12609,10 @@ class tgraphcanvas(FigureCanvas):
                     self.updategraphicsSignal.emit() # we need this to have the projections redrawn immediately
                 self.aw.onMarkMoveToNext(self.aw.buttonSCs)
 
-    # trigger to be called by the markSCeSignal
-    @pyqtSlot()
-    def markSCeTrigger(self):
-        self.mark2Cend()
-
     #record 2C end markers of BT. Called from buttonSCe of application window
+    # if noaction is True, the button event action is not triggered
     @pyqtSlot(bool)
-    def mark2Cend(self,_=False):
+    def mark2Cend(self, noaction:bool = False) -> None:
         if len(self.timex) > 1:
             removed = False
             try:
@@ -12700,7 +12704,8 @@ class tgraphcanvas(FigureCanvas):
                     self.aw.buttonFCs.setFlat(True)
                     self.aw.buttonFCe.setFlat(True)
                     self.aw.buttonSCs.setFlat(True)
-                    self.aw.eventactionx(self.buttonactions[5],self.buttonactionstrings[5])
+                    if not noaction:
+                        self.aw.eventactionx(self.buttonactions[5],self.buttonactionstrings[5])
                     if self.timeindex[0] > -1:
                         start = self.timex[self.timeindex[0]]
                     else:
@@ -12712,14 +12717,10 @@ class tgraphcanvas(FigureCanvas):
                     self.updategraphicsSignal.emit() # we need this to have the projections redrawn immediately
                 self.aw.onMarkMoveToNext(self.aw.buttonSCe)
 
-    # trigger to be called by the markDropSignal
-    @pyqtSlot()
-    def markDropTrigger(self):
-        self.markDrop()
-
     #record end of roast (drop of beans). Called from push button 'Drop'
+    # if noaction is True, the button event action is not triggered
     @pyqtSlot(bool)
-    def markDrop(self,_=False):
+    def markDrop(self, noaction:bool = False) -> None:
         if len(self.timex) > 1:
             removed = False
             try:
@@ -12858,7 +12859,8 @@ class tgraphcanvas(FigureCanvas):
                         self.aw.buttonSCe.setFlat(True)
 
                         try:
-                            self.aw.eventactionx(self.buttonactions[6],self.buttonactionstrings[6])
+                            if not noaction:
+                                self.aw.eventactionx(self.buttonactions[6],self.buttonactionstrings[6])
                             if self.timeindex[0] > -1:
                                 start = self.timex[self.timeindex[0]]
                             else:
@@ -12885,13 +12887,9 @@ class tgraphcanvas(FigureCanvas):
                 except Exception as e: # pylint: disable=broad-except
                     _log.exception(e)
 
-    # trigger to be called by the markCoolSignal
-    @pyqtSlot()
-    def markCoolTrigger(self):
-        self.markCoolEnd()
-
+    # if noaction is True, the button event action is not triggered
     @pyqtSlot(bool)
-    def markCoolEnd(self,_=False):
+    def markCoolEnd(self, noaction:bool = False) -> None:
         if len(self.timex) > 1:
             removed = False
             try:
@@ -12990,7 +12988,8 @@ class tgraphcanvas(FigureCanvas):
                     self.aw.buttonSCs.setFlat(True)
                     self.aw.buttonSCe.setFlat(True)
                     self.aw.buttonDROP.setFlat(True)
-                    self.aw.eventactionx(self.buttonactions[7],self.buttonactionstrings[7])
+                    if not noaction:
+                        self.aw.eventactionx(self.buttonactions[7],self.buttonactionstrings[7])
                     if self.timeindex[0] > -1:
                         start = self.timex[self.timeindex[0]]
                     else:
@@ -13610,8 +13609,8 @@ class tgraphcanvas(FigureCanvas):
                     # total energy/CO2
                     energy_label = QApplication.translate('GroupBox','Energy')
                     CO2_label = QApplication.translate('GroupBox','CO2')
-                    if not (platform.system() == 'Windows' and int(platform.release()) < 10):
-                        # no subscript for legacy Windows
+                    if not (platform.system() == 'Windows' and int(platform.release()) < 10) and self.graphfont in [0,3]:
+                        # no subscript for legacy Windows, or graph fonts different to default and WenQuanYi
                         CO2_label = CO2_label.replace('CO2','CO₂')
                     energy_unit = self.energyunits[self.energyresultunit_setup]
                     energymetrics,_ = self.calcEnergyuse()
@@ -13632,9 +13631,9 @@ class tgraphcanvas(FigureCanvas):
                     # CO2 per kg
                     if CO2_per_green > 0:
                         if CO2_per_green < 1000:
-                            scaled_co2_kg = scaleFloat2String(CO2_per_green) + 'g/kh'
+                            scaled_co2_kg = scaleFloat2String(CO2_per_green) + 'g/kg'
                         else:
-                            scaled_co2_kg = scaleFloat2String(CO2_per_green/1000.) + 'kg/kh'
+                            scaled_co2_kg = scaleFloat2String(CO2_per_green/1000.) + 'kg/kg'
                         CO2perKgCoffeeLabel = f'  ({scaled_co2_kg})'
                     # no weight is available
                     else:
@@ -13650,8 +13649,8 @@ class tgraphcanvas(FigureCanvas):
                     # just roast energy/CO2
                     energy_label = QApplication.translate('GroupBox','Energy')
                     CO2_label = QApplication.translate('GroupBox','CO2')
-                    if not (platform.system() == 'Windows' and int(platform.release()) < 10):
-                        # no subscript for legacy Windows
+                    if not (platform.system() == 'Windows' and int(platform.release()) < 10) and self.graphfont in [0,3]:
+                        # no subscript for legacy Windows, or graph fonts different to default and WenQuanYi
                         CO2_label = CO2_label.replace('CO2','CO₂')
                     energy_unit = self.energyunits[self.energyresultunit_setup]
                     roast_label = QApplication.translate('Label','Roast')
@@ -13673,9 +13672,9 @@ class tgraphcanvas(FigureCanvas):
                     # CO2 per kg
                     if CO2_per_green_roast > 0:
                         if CO2_per_green_roast < 1000:
-                            scaled_co2_kg = scaleFloat2String(CO2_per_green_roast) + 'g/kh'
+                            scaled_co2_kg = scaleFloat2String(CO2_per_green_roast) + 'g/kg'
                         else:
-                            scaled_co2_kg = scaleFloat2String(CO2_per_green_roast/1000.) + 'kg/kh'
+                            scaled_co2_kg = scaleFloat2String(CO2_per_green_roast/1000.) + 'kg/kg'
                         CO2perKgCoffeeLabel = f'  ({scaled_co2_kg})'
                     # no weight is available
                     else:
@@ -13691,7 +13690,7 @@ class tgraphcanvas(FigureCanvas):
             elif self.flagstart or self.xgrid == 0:
                 self.set_xlabel('')
             else:
-                self.set_xlabel(self.aw.arabicReshape(QApplication.translate('Label', 'min','abbrev. of minutes')))
+                self.set_xlabel(f'{self.aw.qmc.roastertype_setup} {self.aw.qmc.roastersize_setup}kg')
         except Exception as ex: # pylint: disable=broad-except
             _log.exception(ex)
             _, _, exc_tb = sys.exc_info()
@@ -15637,7 +15636,7 @@ class tgraphcanvas(FigureCanvas):
     def addpoint_action(self,_=False):
         self.addpoint()
 
-    def addpoint(self,manual=True):
+    def addpoint(self, manual:bool = True) -> Optional[int]:
         try:
             #current x, and y is obtained when doing right click in mouse: on_press()
             if manual:
@@ -15652,7 +15651,7 @@ class tgraphcanvas(FigureCanvas):
                     self.currentx = values[0] + offset
                     self.currenty = values[1]
                 else:
-                    return
+                    return None
 
 
             if self.currentx > self.timex[-1]:       #if point is beyond max timex (all the way to the right)
@@ -15671,7 +15670,7 @@ class tgraphcanvas(FigureCanvas):
                 #no need to update time index
 
                 self.redrawdesigner(force=True)
-                return # 0
+                return 0
 
             if self.currentx < self.timex[0]:         #if point is below min timex (all the way to the left)
                 #find closest line
@@ -15694,14 +15693,14 @@ class tgraphcanvas(FigureCanvas):
                         self.timeindex[u] += 1
 
                 self.redrawdesigner(force=True)
-                return # len(self.timex)-1   #return index received from Designer Dialog Config to assign index to timeindex)
+                return len(self.timex)-1   #return index received from Designer Dialog Config to assign index to timeindex)
 
             #mid range
             #find index
             i = next((x for x, val in enumerate(self.timex) if val > self.currentx), None) # returns None if no index exists with "self.timex[i] > self.currentx"
 
             if i is None:
-                return
+                return None
 
             #find closest line
             d1 = abs(self.temp1[i] - self.currenty)
@@ -15721,12 +15720,13 @@ class tgraphcanvas(FigureCanvas):
                         self.timeindex[x] += 1
 
             self.redrawdesigner(force=True)
-            return # i
+            return i
 
         except Exception as e: # pylint: disable=broad-except
             _log.exception(e)
             _, _, exc_tb = sys.exc_info()
             self.adderror((QApplication.translate('Error Message', 'Exception:') + ' addpoint() {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
+            return None
 
     #removes point
     @pyqtSlot()
@@ -16247,7 +16247,7 @@ class tgraphcanvas(FigureCanvas):
                                             linewidth=self.wheellinewidth,picker=3))
                     count = 0
                     #set color, alpha, and text
-                    for _,barwheel[z] in zip(radii, barwheel[z]): # noqa: B020
+                    for _,barwheel[z] in zip(radii, barwheel[z]): # noqa: B020 # type:ignore # pyright: error: "object*" is not iterable
                         barwheel[z].set_facecolor(self.wheelcolor[z][count])
                         barwheel[z].set_alpha(max(min(self.segmentsalpha[z][count],1),0))
                         barwheel[z].set_url(str(z) + '-' + str(count))

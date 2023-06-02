@@ -234,7 +234,7 @@ class nonedevDlg(QDialog): # pylint: disable=too-few-public-methods # pyright: i
 class serialport():
     """ this class handles the communications with all the devices"""
 
-    __slots__ = ['aw', 'platf', 'comport','baudrate','bytesize','parity','stopbits','timeout','SP','COMsemaphore', \
+    __slots__ = ['aw', 'platf', 'default_comport', 'comport','baudrate','bytesize','parity','stopbits','timeout','SP','COMsemaphore', \
         'PhidgetTemperatureSensor','Phidget1048values','Phidget1048lastvalues','Phidget1048semaphores',\
         'PhidgetIRSensor','PhidgetIRSensorIC','Phidget1045values','Phidget1045lastvalue','Phidget1045tempIRavg',\
         'Phidget1045semaphore','PhidgetBridgeSensor','Phidget1046values','Phidget1046lastvalues','Phidget1046semaphores',\
@@ -254,7 +254,8 @@ class serialport():
         self.platf = platform.system()
 
         #default initial settings. They are changed by settingsload() at initiation of program according to the device chosen
-        self.comport:str = 'COM4'      #NOTE: this string should not be translated. It is an argument for lib Pyserial
+        self.default_comport:Final[str] = 'COM4'
+        self.comport:str = self.default_comport      #NOTE: this string should not be translated. It is an argument for lib Pyserial
         self.baudrate:int = 9600
         self.bytesize:int = 8
         self.parity:str = 'O'
@@ -357,7 +358,7 @@ class serialport():
         # device 1 (with index 1 below) is Omega HH806
         # device 2 (with index 2 below) is omega HH506
         # etc
-        # ADD DEVICE: to add a device you have to modify several places. Search for the tag "ADD DEVICE:" in the code (main.py, comm.py, devices.py)
+        # ADD DEVICE: to add a device you have to modify several places. Search for the tag "ADD DEVICE:" in the code (canvas.py, comm.py, devices.py)
         # - add to self.devicefunctionlist
         self.devicefunctionlist:List[Callable[..., Tuple[float,float,float]]] = [
                                    self.fujitemperature,    #0
@@ -501,7 +502,11 @@ class serialport():
                                    self.Kaleido_BTET,         #138
                                    self.Kaleido_SVAT,         #139
                                    self.Kaleido_DrumAH,       #140
-                                   self.Kaleido_HeaterFan     #141
+                                   self.Kaleido_HeaterFan,    #141
+                                   self.Ikawa,                #142
+                                   self.Ikawa_SetRpm,         #143
+                                   self.Ikawa_HeaterFan,      #144
+                                   self.Ikawa_State           #145
                                    ]
         #string with the name of the program for device #27
         self.externalprogram:str = 'test.py'
@@ -1491,6 +1496,9 @@ class serialport():
         if self.aw.santoker is not None:
             t1 = self.aw.santoker.getET()
             t2 = self.aw.santoker.getBT()
+            if self.aw.qmc.mode == 'F':
+                t1 = fromCtoF(t1)
+                t2 = fromCtoF(t2)
         else:
             t1 = t2 = -1
         return tx,t1,t2 # time, ET (chan2), BT (chan1)
@@ -1515,10 +1523,33 @@ class serialport():
 
     def Kaleido_BTET(self) -> Tuple[float,float,float]:
         tx = self.aw.qmc.timeclock.elapsedMilli()
+        t1:float = -1
+        t2:float = -1
+        sid:int = 0
         if self.aw.kaleido is not None:
-            t1,t2 = self.aw.kaleido.getBTET()
-        else:
-            t1 = t2 = -1
+            t1, t2, sid = self.aw.kaleido.getBTET()
+            try:
+                event_flag:int = sid & 15 # last 4 bits of the sid
+                if event_flag == 1 and self.aw.qmc.timeindex[0] == -1:
+                    self.aw.qmc.markChargeNoactionSignal.emit(True) # CHARGE
+                elif event_flag == 2 and self.aw.qmc.TPalarmtimeindex is None:
+                    self.aw.qmc.markTPSignal.emit() # TP
+                elif event_flag == 3 and self.aw.qmc.timeindex[1] == 0:
+                    self.aw.qmc.markDRYSignal.emit(True) # DRY
+                elif event_flag == 4 and self.aw.qmc.timeindex[2] == 0:
+                    self.aw.qmc.markFCsSignal.emit(True) # FCs
+                elif event_flag == 5 and self.aw.qmc.timeindex[3] == 0:
+                    self.aw.qmc.markFCeSignal.emit(True) # FCe
+                elif event_flag == 6 and self.aw.qmc.timeindex[4] == 0:
+                    self.aw.qmc.markSCsSignal.emit(True) # SCs
+                elif event_flag == 7 and self.aw.qmc.timeindex[5] == 0:
+                    self.aw.qmc.markSCeSignal.emit(True) # SCe
+                elif event_flag == 8 and self.aw.qmc.timeindex[6] == 0:
+                    self.aw.qmc.markDropSignal.emit(True) # DROP
+                elif event_flag == 9 and self.aw.qmc.timeindex[7] == 0:
+                    self.aw.qmc.markCoolSignal.emit(True) # COOL
+            except Exception as e: # pylint: disable=broad-except
+                _log.error(e)
         return tx,t2,t1 # time, ET (chan2), BT (chan1)
 
     def Kaleido_SVAT(self) -> Tuple[float,float,float]:
@@ -1563,6 +1594,47 @@ class serialport():
         else:
             t1 = t2 = -1
         return tx,t2,t1 # time Fan (chan2), Heater (chan1)
+
+    def Ikawa(self) -> Tuple[float,float,float]:
+        tx = self.aw.qmc.timeclock.elapsedMilli()
+        t1:float = -1
+        t2:float = -1
+        if self.aw.ikawa is not None:
+            self.aw.ikawa.getData()
+            t1 = self.aw.ikawa.ET
+            t2 = self.aw.ikawa.BT
+            if self.aw.qmc.mode == 'F':
+                t1 = fromCtoF(t1)
+                t2 = fromCtoF(t2)
+        return tx,t1,t2 # time, ET (chan2), BT (chan1)
+
+    def Ikawa_SetRpm(self) -> Tuple[float,float,float]:
+        tx = self.aw.qmc.timeclock.elapsedMilli()
+        t1:float = -1
+        t2:float = -1
+        if self.aw.ikawa is not None:
+            t1 = self.aw.ikawa.RPM
+            t2 = self.aw.ikawa.SP
+            if self.aw.qmc.mode == 'F':
+                t2 = fromCtoF(t2)
+        return tx,t1,t2 # time, RPM (chan2), SET (chan1)
+
+    def Ikawa_HeaterFan(self) -> Tuple[float,float,float]:
+        tx = self.aw.qmc.timeclock.elapsedMilli()
+        t1:float = -1
+        t2:float = -1
+        if self.aw.ikawa is not None:
+            t1 = self.aw.ikawa.fan
+            t2 = self.aw.ikawa.heater
+        return tx,t1,t2 # time, Fan (chan2), Heater (chan1)
+
+    def Ikawa_State(self) -> Tuple[float,float,float]:
+        tx = self.aw.qmc.timeclock.elapsedMilli()
+        t1:float = -1
+        t2:float = -1
+        if self.aw.ikawa is not None:
+            t2 = self.aw.ikawa.state
+        return tx,t1,t2 # time, _ (chan2), State (chan1)
 
     def TEVA18B(self) -> Tuple[float,float,float]:
         tx = self.aw.qmc.timeclock.elapsedMilli()
@@ -2287,6 +2359,8 @@ class serialport():
     def processChannelData(self,x:Optional[float],d:int,m:str) -> float:
         if x is not None:
             res:float = x
+            if res == -1:
+                return -1
             # apply divider
             if d==1: # apply divider
                 res = x / 10.
@@ -2387,8 +2461,7 @@ class serialport():
                     if ri is not None:
                         res[i] = ri
                 rf = self.processChannelData(res[i],self.aw.modbus.inputDivs[i],self.aw.modbus.inputModes[i])
-                if rf is not None:
-                    res[i] = rf
+                res[i] = rf
 
         self.aw.qmc.extraMODBUStemps = res[:]
         self.aw.qmc.extraMODBUStx = self.aw.qmc.timeclock.elapsedMilli()
@@ -2978,7 +3051,7 @@ class serialport():
                 self.PhidgetIRSensor.setOnTemperatureChangeHandler(lambda *_:None)
             # set rate
             try:
-                self.PhidgetIRSensor.setDataInterval(self.aw.qmc.phidget1200_dataRate)
+                self.PhidgetIRSensor.setDataInterval(max(self.PhidgetIRSensor.getMinDataInterval(),self.aw.qmc.phidget1200_dataRate))
             except Exception as e: # pylint: disable=broad-except
                 _log.exception(e)
 
