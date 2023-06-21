@@ -369,14 +369,14 @@ class volumeCalculatorDlg(ArtisanDialog):
 
     @pyqtSlot(bool)
     def inWeight(self,_):
-        QTimer.singleShot(1,lambda : self.widgetWeight(self.coffeeinweightEdit))
-        QTimer.singleShot(10,self.resetInVolume)
+        QTimer.singleShot(1, self.setWidgetInWeight)
+        QTimer.singleShot(10, self.resetInVolume)
         QApplication.processEvents()
 
     @pyqtSlot(bool)
     def outWeight(self,_):
-        QTimer.singleShot(1,lambda : self.widgetWeight(self.coffeeoutweightEdit))
-        QTimer.singleShot(10,self.resetOutVolume)
+        QTimer.singleShot(1, self.setWidgetOutWeight)
+        QTimer.singleShot(10, self.resetOutVolume)
         QApplication.processEvents()
 
     def retrieveWeight(self):
@@ -390,6 +390,14 @@ class volumeCalculatorDlg(ArtisanDialog):
     def resetVolume(self):
         self.resetInVolume()
         self.resetOutVolume()
+
+    @pyqtSlot()
+    def setWidgetInWeight(self):
+        self.widgetWeight(self.coffeeinweightEdit)
+
+    @pyqtSlot()
+    def setWidgetOutWeight(self):
+        self.widgetWeight(self.coffeeoutweightEdit)
 
     @pyqtSlot()
     def resetInVolume(self):
@@ -520,10 +528,10 @@ class editGraphDlg(ArtisanResizeablDialog):
     connectScaleSignal = pyqtSignal()
     readScaleSignal = pyqtSignal()
 
-    def __init__(self, parent, aw, activeTab = 0) -> None:
+    def __init__(self, parent:QWidget, aw:'ApplicationWindow', activeTab:int = 0) -> None:
         super().__init__(parent, aw)
 
-        self.aw = aw
+        self.activeTab = activeTab
 
         self.setModal(True)
 #        self.setWindowModality(Qt.WindowModality.WindowModal)
@@ -1556,8 +1564,6 @@ class editGraphDlg(ArtisanResizeablDialog):
         self.volume_percent()
         self.setLayout(totallayout)
 
-        self.TabWidget.setCurrentIndex(activeTab)
-
         self.titleedit.setFocus()
 
         self.updateTemplateLine()
@@ -1584,13 +1590,22 @@ class editGraphDlg(ArtisanResizeablDialog):
                 else: # we are in ON mode, but not connected, we connect which triggers a stock update if successful
                     plus.controller.connect(interactive=False)
                 if plus.controller.is_connected():
-                    QTimer.singleShot(1500,self.populatePlusCoffeeBlendCombos)
+                    QTimer.singleShot(1500, self.populatePlusCoffeeBlendCombos)
         except Exception as e:  # pylint: disable=broad-except
             _log.exception(e)
         if platform.system() == 'Windows':
             self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
         else:
             self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok).setFocus()
+
+        # we set the active tab with a QTimer after the tabbar has been rendered once, as otherwise
+        # some tabs are not rendered at all on Winwos using Qt v6.5.1 (https://bugreports.qt.io/projects/QTBUG/issues/QTBUG-114204?filter=allissues)
+        QTimer.singleShot(50, self.setActiveTab)
+
+    @pyqtSlot()
+    def setActiveTab(self) -> None:
+        self.TabWidget.setCurrentIndex(self.activeTab)
+
 
 ## CUSTOM BLEND DIALOG
 
@@ -1685,6 +1700,7 @@ class editGraphDlg(ArtisanResizeablDialog):
         self.batchLayout.addWidget(self.batchcounterSpinBox)
         self.batchLayout.addWidget(self.batchposSpinBox)
 
+    @pyqtSlot()
     def readScale(self):
         if self.disconnecting:
             self.aw.scale.closeport()
@@ -1711,6 +1727,7 @@ class editGraphDlg(ArtisanResizeablDialog):
     def connectScaleLoop(self):
         QTimer.singleShot(2000,self.connectScale)
 
+    @pyqtSlot()
     def connectScale(self):
         if self.disconnecting:
             self.aw.scale.closeport()
@@ -1864,6 +1881,8 @@ class editGraphDlg(ArtisanResizeablDialog):
                 _log.exception(e)
 
     # storeIndex is the index of the selected entry in the popup
+    @pyqtSlot()
+    @pyqtSlot(int)
     def populatePlusCoffeeBlendCombos(self,storeIndex=None):
         if self.aw.plus_account is not None:
             try: # this can crash if dialog got closed while this is processed in a different thread!
@@ -3975,37 +3994,34 @@ class editGraphDlg(ArtisanResizeablDialog):
             if i in self.aw.qmc.specialevents:
                 self.datatable.item(i,0).setBackground(QColor('yellow'))
 
-            if i:
-                    #identify by color and add notation
-                if i == self.aw.qmc.timeindex[0]:
-                    self.datatable.item(i,0).setBackground(QColor('#f07800'))
-                    text = QApplication.translate('Table', 'CHARGE')
-                elif i == self.aw.qmc.timeindex[1]:
-                    self.datatable.item(i,0).setBackground(QColor('orange'))
-                    text = QApplication.translate('Table', 'DRY END')
-                elif i == self.aw.qmc.timeindex[2]:
-                    self.datatable.item(i,0).setBackground(QColor('orange'))
-                    text = QApplication.translate('Table', 'FC START')
-                elif i == self.aw.qmc.timeindex[3]:
-                    self.datatable.item(i,0).setBackground(QColor('orange'))
-                    text = QApplication.translate('Table', 'FC END')
-                elif i == self.aw.qmc.timeindex[4]:
-                    self.datatable.item(i,0).setBackground(QColor('orange'))
-                    text = QApplication.translate('Table', 'SC START')
-                elif i == self.aw.qmc.timeindex[5]:
-                    self.datatable.item(i,0).setBackground(QColor('orange'))
-                    text = QApplication.translate('Table', 'SC END')
-                elif i == self.aw.qmc.timeindex[6]:
-                    self.datatable.item(i,0).setBackground(QColor('#f07800'))
-                    text = QApplication.translate('Table', 'DROP')
-                elif i == self.aw.qmc.timeindex[7]:
-                    self.datatable.item(i,0).setBackground(QColor('orange'))
-                    text = QApplication.translate('Table', 'COOL')
-                else:
-                    text = ''
-                Rtime.setText(text + ' ' + Rtime.text())
+            #identify by color and add notation
+            if i == self.aw.qmc.timeindex[0] and i != -1:
+                self.datatable.item(i,0).setBackground(QColor('#f07800'))
+                text = QApplication.translate('Table', 'CHARGE')
+            elif i == self.aw.qmc.timeindex[1] and i != 0:
+                self.datatable.item(i,0).setBackground(QColor('orange'))
+                text = QApplication.translate('Table', 'DRY END')
+            elif i == self.aw.qmc.timeindex[2] and i != 0:
+                self.datatable.item(i,0).setBackground(QColor('orange'))
+                text = QApplication.translate('Table', 'FC START')
+            elif i == self.aw.qmc.timeindex[3] and i != 0:
+                self.datatable.item(i,0).setBackground(QColor('orange'))
+                text = QApplication.translate('Table', 'FC END')
+            elif i == self.aw.qmc.timeindex[4] and i != 0:
+                self.datatable.item(i,0).setBackground(QColor('orange'))
+                text = QApplication.translate('Table', 'SC START')
+            elif i == self.aw.qmc.timeindex[5] and i != 0:
+                self.datatable.item(i,0).setBackground(QColor('orange'))
+                text = QApplication.translate('Table', 'SC END')
+            elif i == self.aw.qmc.timeindex[6] and i != 0:
+                self.datatable.item(i,0).setBackground(QColor('#f07800'))
+                text = QApplication.translate('Table', 'DROP')
+            elif i == self.aw.qmc.timeindex[7] and i != 0:
+                self.datatable.item(i,0).setBackground(QColor('orange'))
+                text = QApplication.translate('Table', 'COOL')
             else:
-                Rtime.setText(' ' + Rtime.text())
+                text = ''
+            Rtime.setText(text + ' ' + Rtime.text())
 
             self.datatable.setItem(i,1,ET)
             self.datatable.setItem(i,2,BT)

@@ -33,14 +33,14 @@ from uic import SliderCalculatorDialog
 
 
 try:
-    from PyQt6.QtCore import (Qt, pyqtSlot, QSettings) # @UnusedImport @Reimport  @UnresolvedImport
+    from PyQt6.QtCore import (Qt, pyqtSlot, QSettings, QTimer) # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtGui import (QColor, QFont, QIntValidator) # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, # @UnusedImport @Reimport  @UnresolvedImport
                                  QPushButton, QSpinBox, QWidget, QTabWidget, QDialogButtonBox, # @UnusedImport @Reimport  @UnresolvedImport
                                  QGridLayout, QGroupBox, QTableWidget, QHeaderView, QToolButton) # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6 import sip # @UnusedImport @Reimport  @UnresolvedImport
 except ImportError:
-    from PyQt5.QtCore import (Qt, pyqtSlot, QSettings) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
+    from PyQt5.QtCore import (Qt, pyqtSlot, QSettings, QTimer) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtGui import (QColor, QFont, QIntValidator) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
                                  QPushButton, QSpinBox, QWidget, QTabWidget, QDialogButtonBox, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
@@ -54,11 +54,10 @@ except ImportError:
 _log: Final[logging.Logger] = logging.getLogger(__name__)
 
 class EventsDlg(ArtisanResizeablDialog):
-    def __init__(self, parent:QWidget, aw:'ApplicationWindow', activeTab = 0) -> None:
+    def __init__(self, parent:QWidget, aw:'ApplicationWindow', activeTab:int = 0) -> None:
         super().__init__(parent, aw)
-
-        self.aw = aw
-        self.app = aw.app
+        self.app = self.aw.app
+        self.activeTab = activeTab
 
         self.buttonlistmaxlen:int = self.aw.buttonlistmaxlen
 
@@ -259,9 +258,6 @@ class EventsDlg(ArtisanResizeablDialog):
         tab7Layout.addStretch()
         tab7Layout.addSpacing(10)
         tab7Layout.addLayout(buttonLayout)
-
-        C7Widget = QWidget()
-        C7Widget.setLayout(tab7Layout)
 
         ## TAB 1
         self.eventsbuttonflag = QCheckBox(QApplication.translate('ComboBox','Event Button'))
@@ -1543,7 +1539,6 @@ class EventsDlg(ArtisanResizeablDialog):
 ###########################################
         #tab layout
         self.TabWidget = QTabWidget()
-        self.TabWidget.currentChanged.connect(self.tabSwitched)
         C1Widget = QWidget()
         C1Widget.setLayout(tab1layout)
         self.TabWidget.addTab(C1Widget,QApplication.translate('Tab','Config'))
@@ -1570,10 +1565,9 @@ class EventsDlg(ArtisanResizeablDialog):
         C4Widget = QWidget()
         C4Widget.setLayout(valueVLayout)
         self.TabWidget.addTab(C4Widget,QApplication.translate('Tab','Style'))
-
+        C7Widget = QWidget()
+        C7Widget.setLayout(tab7Layout)
         self.TabWidget.addTab(C7Widget,QApplication.translate('Tab','Annotations'))
-
-        self.TabWidget.setCurrentIndex(activeTab)
 
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.TabWidget)
@@ -1585,6 +1579,16 @@ class EventsDlg(ArtisanResizeablDialog):
             self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
         else:
             self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok).setFocus()
+
+        self.TabWidget.currentChanged.connect(self.tabSwitched)
+
+        # we set the active tab with a QTimer after the tabbar has been rendered once, as otherwise
+        # some tabs are not rendered at all on Winwos using Qt v6.5.1 (https://bugreports.qt.io/projects/QTBUG/issues/QTBUG-114204?filter=allissues)
+        QTimer.singleShot(50, self.setActiveTab)
+
+    @pyqtSlot()
+    def setActiveTab(self) -> None:
+        self.TabWidget.setCurrentIndex(self.activeTab)
 
     # returns the position in self.sliderStepSizes corresponding to the given eventslidercoarse setting n
     @staticmethod
