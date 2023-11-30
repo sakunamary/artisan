@@ -35,36 +35,37 @@ try:
     )
     from PyQt6.QtCore import Qt, pyqtSlot, QSize, QSettings # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtGui import QIcon # @UnusedImport @Reimport  @UnresolvedImport
-    from PyQt6 import sip # @UnusedImport @Reimport  @UnresolvedImport
+#    from PyQt6 import sip # @UnusedImport @Reimport  @UnresolvedImport
 except Exception: # pylint: disable=broad-except
     #pylint: disable = E, W, R, C
     from PyQt5.QtWidgets import (  # type: ignore
-        QApplication, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
-        QComboBox, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
-        QLineEdit, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
-        QDialogButtonBox, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
-        QToolButton, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
-        QTableWidget, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
-        QStyle, # type: ignore#  @UnusedImport @Reimport  @UnresolvedImport
-        QHeaderView, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
+        QApplication, # @UnusedImport @Reimport  @UnresolvedImport
+        QComboBox, # @UnusedImport @Reimport  @UnresolvedImport
+        QLineEdit, # @UnusedImport @Reimport  @UnresolvedImport
+        QDialogButtonBox, # @UnusedImport @Reimport  @UnresolvedImport
+        QToolButton, # @UnusedImport @Reimport  @UnresolvedImport
+        QTableWidget, # @UnusedImport @Reimport  @UnresolvedImport
+        QStyle, # @UnusedImport @Reimport  @UnresolvedImport
+        QHeaderView, # @UnusedImport @Reimport  @UnresolvedImport
     )
     from PyQt5.QtCore import Qt, pyqtSlot, QSize, QSettings # type: ignore  # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtGui import QIcon # type: ignore  # @UnusedImport @Reimport  @UnresolvedImport
-    try:
-        from PyQt5 import sip # type: ignore  # @Reimport @UnresolvedImport @UnusedImport
-    except Exception: # pylint: disable=broad-except
-        import sip  # type: ignore # @Reimport @UnresolvedImport @UnusedImport
+#    try:
+#        from PyQt5 import sip # type: ignore  # @Reimport @UnresolvedImport @UnusedImport
+#    except Exception: # pylint: disable=broad-except
+#        import sip  # type: ignore # @Reimport @UnresolvedImport @UnusedImport
 
 import logging
 from artisanlib.util import comma2dot
 from artisanlib.dialogs import ArtisanDialog
 from artisanlib.widgets import MyQComboBox
-from uic import BlendDialog
-from typing import Optional, List, Dict, Tuple, Any, TYPE_CHECKING
-from typing_extensions import Final  # Python <=3.7
+from uic import BlendDialog # OFF type: ignore[attr-defined] # pylint: disable=no-name-in-module
+from typing import Final, Optional, List, Collection, Dict, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from artisanlib.main import ApplicationWindow # noqa: F401 # pylint: disable=unused-import
+    from PyQt6.QtWidgets import QWidget # noqa: F401 # pylint: disable=unused-import
+    from PyQt6.QtGui import QCloseEvent # pylint: disable=unused-import
 
 _log: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ _log: Final[logging.Logger] = logging.getLogger(__name__)
 #####################  Component  ######################################################
 
 # coffee is given by its hr_id
-class Component():
+class Component:
     def __init__(self, coffee: str, ratio: float) -> None:
         self._coffee = coffee
         self._ratio = ratio
@@ -99,7 +100,7 @@ class Component():
 ########################################################################################
 #######################  CustomBlend  ##################################################
 
-class CustomBlend():
+class CustomBlend:
     def __init__(self, name: str, components: List[Component]) -> None:
         self._name:str = name
         self._components:List[Component] = components
@@ -109,7 +110,7 @@ class CustomBlend():
         return self._name
 
     @name.setter
-    def name(self, value:str):
+    def name(self, value:str) -> None:
         self._name = value
 
     @property
@@ -125,7 +126,7 @@ class CustomBlend():
     #  - the component ratios of all ingredients sum up to 1,
     #  - there are no duplicates in the list of component coffees, and,
     #  - all component coffees are contained in the list of available_coffees (list of hr_ids as strings), if given
-    def isValid(self, available_coffees: Optional[List] = None) -> bool:
+    def isValid(self, available_coffees: Optional[Collection[str]] = None) -> bool:
         component_coffees = [c.coffee for c in self._components]
         return (
             len(component_coffees)>1 and
@@ -137,7 +138,7 @@ class CustomBlend():
 #####################  Custom CustomBlend Dialog  ######################################
 
 class CustomBlendDialog(ArtisanDialog):
-    def __init__(self, parent, aw:'ApplicationWindow', inWeight:float, weightUnit:str, coffees:Dict[str, str], blend:CustomBlend) -> None:
+    def __init__(self, parent:'QWidget', aw:'ApplicationWindow', inWeight:float, weightUnit:str, coffees:Dict[str, str], blend:CustomBlend) -> None:
         super().__init__(parent, aw)
         self.initialTotalWeight:float = inWeight
         self.inWeight:float = inWeight
@@ -151,13 +152,14 @@ class CustomBlendDialog(ArtisanDialog):
 
         # configure UI
         self.ui = BlendDialog.Ui_customBlendDialog()
-        self.ui.setupUi(self)
+        self.ui.setupUi(self) # OFF type:ignore[no-untyped-call]
         self.setWindowTitle(QApplication.translate('Form Caption','Custom Blend'))
         self.ui.buttonBox.setStandardButtons(QDialogButtonBox.StandardButton.Cancel|QDialogButtonBox.StandardButton.Apply)
         # hack to assign the Apply button the AcceptRole without losing default system translations
         applyButton = self.ui.buttonBox.button(QDialogButtonBox.StandardButton.Apply)
-        self.ui.buttonBox.removeButton(applyButton)
-        self.applyButton = self.ui.buttonBox.addButton(applyButton.text(), QDialogButtonBox.ButtonRole.AcceptRole)
+        if applyButton is not None:
+            self.ui.buttonBox.removeButton(applyButton)
+            self.applyButton = self.ui.buttonBox.addButton(applyButton.text(), QDialogButtonBox.ButtonRole.AcceptRole)
 
         # populate widgets
         self.ui.lineEdit_name.setText(self.blend.name)
@@ -290,7 +292,8 @@ class CustomBlendDialog(ArtisanDialog):
         #save window geometry
         settings.setValue('BlendGeometry',self.saveGeometry())
 
-    def closeEvent(self,_:Optional[Any]) -> None:
+    @pyqtSlot('QCloseEvent')
+    def closeEvent(self, _:Optional['QCloseEvent'] = None) -> None:
         self.saveSettings()
 
     @pyqtSlot()
@@ -304,8 +307,9 @@ class CustomBlendDialog(ArtisanDialog):
         super().reject()
 
     @pyqtSlot()
-    def close(self) -> None:
+    def close(self) -> bool:
         self.closeEvent(None)
+        return True
 
     def updateAddButton(self) -> None:
         self.ui.pushButton_add.setEnabled(len(self.coffees)>len(self.blend.components))
@@ -338,7 +342,8 @@ class CustomBlendDialog(ArtisanDialog):
 
             ratio_correct = self.checkRatio()
 
-            self.applyButton.setEnabled(ratio_correct)
+            if self.applyButton is not None:
+                self.applyButton.setEnabled(ratio_correct)
 
             for i, c in enumerate(self.blend.components):
                 #ratio
@@ -375,7 +380,9 @@ class CustomBlendDialog(ArtisanDialog):
                 #delete
                 if rows>2:
                     deleteButton = QToolButton()
-                    deleteButton.setIcon(QIcon(QApplication.style().standardIcon(QStyle.StandardPixmap.SP_DialogDiscardButton))) #SP_TitleBarCloseButton
+                    app_style = QApplication.style()
+                    if app_style is not None:
+                        deleteButton.setIcon(QIcon(app_style.standardIcon(QStyle.StandardPixmap.SP_DialogDiscardButton))) #SP_TitleBarCloseButton
                     deleteButton.setIconSize(QSize(16,16))
                     deleteButton.setFixedSize(QSize(22, 22))
                     deleteButton.clicked.connect(self.deleteComponent)
@@ -383,17 +390,18 @@ class CustomBlendDialog(ArtisanDialog):
 
             header = self.ui.tableWidget.horizontalHeader()
             self.ui.tableWidget.resizeColumnsToContents()
-            header.setStretchLastSection(False)
-            header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-            header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-            header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-            header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+            if header is not None:
+                header.setStretchLastSection(False)
+                header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+                header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+                header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+                header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
             self.ui.tableWidget.setColumnWidth(3,22)
         except Exception as e: # pylint: disable=broad-except
             _log.exception(e)
 
 
-def openCustomBlendDialog(window, aw:'ApplicationWindow', inWeight:float, weightUnit:str, coffees:Dict[str, str], blend:CustomBlend) -> Tuple[Optional[CustomBlend], float]:
+def openCustomBlendDialog(window:'QWidget', aw:'ApplicationWindow', inWeight:float, weightUnit:str, coffees:Dict[str, str], blend:CustomBlend) -> Tuple[Optional[CustomBlend], float]:
     dialog = CustomBlendDialog(window, aw, inWeight, weightUnit, coffees, blend)
     res = dialog.exec()
     blend_res:Optional[CustomBlend]
@@ -404,13 +412,14 @@ def openCustomBlendDialog(window, aw:'ApplicationWindow', inWeight:float, weight
         blend_res = None
         total_weight = inWeight
 
-    #deleteLater() will not work here as the dialog is still bound via the parent
-    #dialog.deleteLater() # now we explicitly allow the dialog an its widgets to be GCed
-    # the following will immediately release the memory despite this parent link
-    QApplication.processEvents() # we ensure events concerning this dialog are processed before deletion
-    try: # sip not supported on older PyQt versions (RPi!)
-        sip.delete(dialog)
-        #print(sip.isdeleted(dialog))
-    except Exception: # pylint: disable=broad-except
-        pass
+#    #deleteLater() will not work here as the dialog is still bound via the parent
+#    #dialog.deleteLater() # now we explicitly allow the dialog an its widgets to be GCed
+#    # the following will immediately release the memory despite this parent link
+#    QApplication.processEvents() # we ensure events concerning this dialog are processed before deletion
+#    try: # sip not supported on older PyQt versions (RPi!)
+#        sip.delete(dialog)
+#        #print(sip.isdeleted(dialog))
+#    except Exception: # pylint: disable=broad-except
+#        pass
+
     return blend_res, total_weight

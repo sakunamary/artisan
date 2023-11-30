@@ -8,12 +8,11 @@ import csv
 import re
 import time as libtime
 import logging
-from typing import List, Optional, TYPE_CHECKING
-from typing_extensions import Final  # Python <=3.7
+from typing import Final, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from artisanlib.types import ProfileData # pylint: disable=unused-import
-from artisanlib.util import fill_gaps, encodeLocal
+from artisanlib.util import replace_duplicates, encodeLocal
 
 try:
     from PyQt6.QtCore import QDateTime, QDate, QTime, Qt # @UnusedImport @Reimport  @UnresolvedImport
@@ -24,20 +23,6 @@ except ImportError:
 
 
 _log: Final[logging.Logger] = logging.getLogger(__name__)
-
-def replace_duplicates(data):
-    lv = -1
-    data_core = []
-    for v in data:
-        if v == lv:
-            data_core.append(-1)
-        else:
-            data_core.append(v)
-            lv = v
-    # reconstruct first and last reading
-    if len(data)>0:
-        data_core[-1] = data[-1]
-    return fill_gaps(data_core, interpolate_max=100)
 
 # returns a dict containing all profile information contained in the given IKAWA CSV file
 def extractProfilePetronciniCSV(file,aw):
@@ -90,7 +75,7 @@ def extractProfilePetronciniCSV(file,aw):
         temp2:List[float] = [] # bean temperature
         extra1:List[float] = [] # inlet temperature
         extra2:List[float] = [] # burner percentage
-        timeindex:List[int] = [-1,0,0,0,0,0,0,0] #CHARGE index init set to -1 as 0 could be an actal index used
+        timeindex:List[int] = [-1,0,0,0,0,0,0,0] #CHARGE index init set to -1 as 0 could be an actual index used
         i = 0
         for row in data:
             if row == []:

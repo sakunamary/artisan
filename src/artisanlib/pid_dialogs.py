@@ -18,11 +18,12 @@
 import sys
 import time as libtime
 import logging
-from typing import TYPE_CHECKING
-from typing_extensions import Final  # Python <=3.7
+from typing import Final, Optional, Dict, List, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from artisanlib.main import ApplicationWindow # noqa: F401 # pylint: disable=unused-import
+    from PyQt6.QtWidgets import QWidget # pylint: disable=unused-import
+    from PyQt6.QtGui import QCloseEvent # pylint: disable=unused-import
 
 from artisanlib.util import stringfromseconds, stringtoseconds, comma2dot
 from artisanlib.dialogs import ArtisanDialog
@@ -119,7 +120,7 @@ class PID_DlgControl(ArtisanDialog):
                 pidSourceItems.append(str(i) + 'xT1: ' + self.aw.qmc.extraname1[i])
                 pidSourceItems.append(str(i) + 'xT2: ' + self.aw.qmc.extraname2[i])
             self.pidSource.addItems(pidSourceItems)
-            if self.aw.pidcontrol.pidSource in [0,1]:
+            if self.aw.pidcontrol.pidSource in {0,1}:
                 self.pidSource.setCurrentIndex(1)
             elif self.aw.pidcontrol.pidSource == 2:
                 self.pidSource.setCurrentIndex(0)
@@ -172,7 +173,7 @@ class PID_DlgControl(ArtisanDialog):
         self.pOnGroup.addButton(self.pOnM)
         self.pOnE.setChecked(self.aw.pidcontrol.pOnE)
         self.pOnM.setChecked(not self.aw.pidcontrol.pOnE)
-        if self.aw.pidcontrol.externalPIDControl() in [1,2]:
+        if self.aw.pidcontrol.externalPIDControl() in {1,2}:
             self.pOnE.setEnabled(False)
             self.pOnM.setEnabled(False)
 
@@ -775,9 +776,9 @@ class PID_DlgControl(ArtisanDialog):
             self.aw.pidcontrol.svBeeps = self.getRSnSVbeeps(n)
             self.aw.pidcontrol.svDescriptions = self.getRSnSVdescriptions(n)
             self.setrampsoaks()
-            self.aw.pidcontrol.rsfile = ''
-            self.rsfile.setText(self.aw.pidcontrol.rsfile)
-        except Exception as e: # pylint: disable=broad-except
+            self.aw.qmc.rsfile = ''
+            self.rsfile.setText(self.aw.qmc.rsfile)
+        except Exception as e: # pylint: disable=broad-exception-caught
             _log.exception(e)
 
     def getRSnSVLabel(self,n):
@@ -835,7 +836,7 @@ class PID_DlgControl(ArtisanDialog):
             self.aw.pidcontrol.svDescriptions = rampsoaks['svDescriptions']
             self.aw.qmc.rsfile = filename
             self.rsfile.setText(self.aw.qmc.rsfile)
-        except Exception as ex: # pylint: disable=broad-except
+        except Exception as ex: # pylint: disable=broad-exception-caught
             _log.exception(ex)
             _, _, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message','Exception:') + ' importrampsoaksJSON() {0}').format(str(ex)),getattr(exc_tb, 'tb_lineno', '?'))
@@ -851,7 +852,7 @@ class PID_DlgControl(ArtisanDialog):
     def exportrampsoaksJSON(self,filename):
         try:
             self.saverampsoaks()
-            rampsoaks = {}
+            rampsoaks:Dict[str,Union[str,List[float],List[int],List[bool],List[str]]] = {}
             rampsoaks['svLabel'] = self.aw.pidcontrol.svLabel
             rampsoaks['svValues'] = self.aw.pidcontrol.svValues
             rampsoaks['svRamps'] = self.aw.pidcontrol.svRamps
@@ -878,12 +879,16 @@ class PID_DlgControl(ArtisanDialog):
             self.aw.pidcontrol.svLabel = self.labelEdit.text()
             for i in range(self.aw.pidcontrol.svLen):
                 self.aw.pidcontrol.svValues[i] = self.SVWidgets[i].value()
-                self.aw.pidcontrol.svRamps[i] = self.aw.QTime2time(self.RampWidgets[i].time())
-                self.aw.pidcontrol.svSoaks[i] = self.aw.QTime2time(self.SoakWidgets[i].time())
+                self.aw.pidcontrol.svRamps[i] = int(round(self.aw.QTime2time(self.RampWidgets[i].time())))
+                self.aw.pidcontrol.svSoaks[i] = int(round(self.aw.QTime2time(self.SoakWidgets[i].time())))
                 self.aw.pidcontrol.svActions[i] = int(self.ActionWidgets[i].currentIndex()) - 1
-                beep = self.BeepWidgets[i].layout().itemAt(1).widget()
-                assert isinstance(beep, QCheckBox)
-                self.aw.pidcontrol.svBeeps[i] = bool(beep.isChecked())
+                layout = self.BeepWidgets[i].layout()
+                if layout is not None:
+                    layoutItem = layout.itemAt(1)
+                    if layoutItem is not None:
+                        beep = layoutItem.widget()
+                        assert isinstance(beep, QCheckBox)
+                        self.aw.pidcontrol.svBeeps[i] = bool(beep.isChecked())
                 self.aw.pidcontrol.svDescriptions[i] = self.DescriptionWidgets[i].text()
         finally:
             if self.aw.qmc.rampSoakSemaphore.available() < 1:
@@ -898,12 +903,16 @@ class PID_DlgControl(ArtisanDialog):
                 self.RampWidgets[i].setTime(self.aw.time2QTime(self.aw.pidcontrol.svRamps[i]))
                 self.SoakWidgets[i].setTime(self.aw.time2QTime(self.aw.pidcontrol.svSoaks[i]))
                 self.ActionWidgets[i].setCurrentIndex(self.aw.pidcontrol.svActions[i] + 1)
-                beep = self.BeepWidgets[i].layout().itemAt(1).widget()
-                assert isinstance(beep, QCheckBox)
-                if self.aw.pidcontrol.svBeeps[i]:
-                    beep.setCheckState(Qt.CheckState.Checked)
-                else:
-                    beep.setCheckState(Qt.CheckState.Unchecked)
+                layout = self.BeepWidgets[i].layout()
+                if layout is not None:
+                    layoutItem = layout.itemAt(1)
+                    if layoutItem is not None:
+                        beep = layoutItem.widget()
+                        assert isinstance(beep, QCheckBox)
+                        if self.aw.pidcontrol.svBeeps[i]:
+                            beep.setCheckState(Qt.CheckState.Checked)
+                        else:
+                            beep.setCheckState(Qt.CheckState.Unchecked)
                 self.DescriptionWidgets[i].setText(self.aw.pidcontrol.svDescriptions[i])
         finally:
             if self.aw.qmc.rampSoakSemaphore.available() < 1:
@@ -1012,7 +1021,8 @@ class PID_DlgControl(ArtisanDialog):
         #
         self.closeEvent(None)
 
-    def closeEvent(self,_):
+    @pyqtSlot('QCloseEvent')
+    def closeEvent(self,_:Optional['QCloseEvent'] = None) -> None:
         #save window position (only; not size!)
         settings = QSettings()
         settings.setValue('PIDPosition',self.frameGeometry().topLeft())
@@ -1025,7 +1035,7 @@ class PID_DlgControl(ArtisanDialog):
 
 # common code for all Fuji PXxx subclasses
 class PXpidDlgControl(ArtisanDialog):
-    def __init__(self, parent, aw) -> None:
+    def __init__(self, parent:'QWidget', aw:'ApplicationWindow') -> None:
         super().__init__(parent, aw)
         self.status = QStatusBar()
         self.status.setSizeGripEnabled(False)
@@ -1059,8 +1069,9 @@ class PXpidDlgControl(ArtisanDialog):
                 reg_dict = self.aw.fujipid.PXR
             else:
                 reg_dict = self.aw.fujipid.PXF
-        command = ''
+        command = b''
         reg = None
+        r:bytes
         try:
             if self.aw.ser.useModbusPort:
                 reg = self.aw.modbus.address2register(reg_dict['decimalposition'][1],6)
@@ -1076,7 +1087,7 @@ class PXpidDlgControl(ArtisanDialog):
                 self.status.showMessage(message, 5000)
             else:
                 self.status.showMessage(QApplication.translate('StatusBar','Problem setting decimal position'),5000)
-        except Exception as e: # pylint: disable=broad-except
+        except Exception as e: # pylint: disable=broad-exception-caught
             _, _, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message', 'Exception:') + ' setpoint(): {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
 
@@ -1113,7 +1124,7 @@ class PXpidDlgControl(ArtisanDialog):
             else:
                 reg_dict = self.aw.fujipid.PXF
                 conversiontoindex = self.aw.fujipid.PXFconversiontoindex
-        command = ''
+        command = b''
         reg = None
         try:
             if self.aw.ser.useModbusPort:
@@ -1133,7 +1144,7 @@ class PXpidDlgControl(ArtisanDialog):
                 self.status.showMessage(message, 5000)
             else:
                 self.status.showMessage(QApplication.translate('StatusBar','Problem setting thermocouple type'),5000)
-        except Exception as e: # pylint: disable=broad-except
+        except Exception as e: # pylint: disable=broad-exception-caught
             _, _, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message', 'Exception:') + ' setthermocoupletype(): {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
 
@@ -1174,7 +1185,7 @@ class PXpidDlgControl(ArtisanDialog):
                 reg_dict = self.aw.fujipid.PXF
                 conversiontoindex = self.aw.fujipid.PXFconversiontoindex
                 thermotypes = self.aw.fujipid.PXFthermotypes
-        command = ''
+        command = b''
         message = 'empty'
         reg = None
         Thtype = None
@@ -1200,7 +1211,7 @@ class PXpidDlgControl(ArtisanDialog):
                     message = f'BT type {Thtype}: {thermotypes[conversiontoindex.index(Thtype)]}'
                     self.BTthermocombobox.setCurrentIndex(conversiontoindex.index(Thtype))
                 self.status.showMessage(message,5000)
-        except Exception as e: # pylint: disable=broad-except
+        except Exception as e: # pylint: disable=broad-exception-caught
             _, _, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message', 'Exception:') + ' readthermocoupletype(): {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
 
@@ -1211,7 +1222,7 @@ class PXpidDlgControl(ArtisanDialog):
 #########################################################################
 
 class PXRpidDlgControl(PXpidDlgControl):
-    def __init__(self, parent = None, aw = None) -> None:
+    def __init__(self, parent:'QWidget', aw:'ApplicationWindow') -> None:
         super().__init__(parent,aw)
         self.setModal(True)
         #self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose) # default is True and this is set already in ArtisanDialog by default
@@ -1228,7 +1239,7 @@ class PXRpidDlgControl(PXpidDlgControl):
         labelpattern = QLabel(QApplication.translate('Label', 'Ramp/Soak Pattern'))
         self.patternComboBox =  QComboBox()
         self.patternComboBox.addItems(['1-4','5-8','1-8'])
-        self.patternComboBox.setCurrentIndex(self.aw.fujipid.PXR['rampsoakpattern'][0])
+        self.patternComboBox.setCurrentIndex(int(self.aw.fujipid.PXR['rampsoakpattern'][0]))
         self.status.showMessage(QApplication.translate('StatusBar','Ready'),5000)
         self.label_rs1 =  QLabel()
         self.label_rs2 =  QLabel()
@@ -1335,7 +1346,7 @@ class PXRpidDlgControl(PXpidDlgControl):
         else: # fuji PXF
             self.BTthermocombobox.addItems(self.aw.fujipid.PXFthermotypes)
         if self.aw.fujipid.PXR['pvinputtype'][0] in self.aw.fujipid.PXRconversiontoindex:
-            self.ETthermocombobox.setCurrentIndex(self.aw.fujipid.PXRconversiontoindex.index(self.aw.fujipid.PXR['pvinputtype'][0]))
+            self.ETthermocombobox.setCurrentIndex(self.aw.fujipid.PXRconversiontoindex.index(int(self.aw.fujipid.PXR['pvinputtype'][0])))
         setETthermocouplebutton = QPushButton(QApplication.translate('Button','Set'))
         setETthermocouplebutton.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         setBTthermocouplebutton = QPushButton(QApplication.translate('Button','Set'))
@@ -1543,39 +1554,39 @@ class PXRpidDlgControl(PXpidDlgControl):
         self.label_rs6.setText(str6)
         self.label_rs7.setText(str7)
         self.label_rs8.setText(str8)
-        pattern = [[1,1,1,1,0,0,0,0],
-                  [0,0,0,0,1,1,1,1],
-                  [1,1,1,1,1,1,1,1]]
+        pattern = ((1,1,1,1,0,0,0,0),
+                   (0,0,0,0,1,1,1,1),
+                   (1,1,1,1,1,1,1,1))
         self.aw.fujipid.PXR['rampsoakpattern'][0] = self.patternComboBox.currentIndex()
-        if pattern[self.aw.fujipid.PXR['rampsoakpattern'][0]][0]:
+        if pattern[int(self.aw.fujipid.PXR['rampsoakpattern'][0])][0]:
             self.label_rs1.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs1.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXR['rampsoakpattern'][0]][1]:
+        if pattern[int(self.aw.fujipid.PXR['rampsoakpattern'][0])][1]:
             self.label_rs2.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs2.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXR['rampsoakpattern'][0]][2]:
+        if pattern[int(self.aw.fujipid.PXR['rampsoakpattern'][0])][2]:
             self.label_rs3.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs3.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXR['rampsoakpattern'][0]][3]:
+        if pattern[int(self.aw.fujipid.PXR['rampsoakpattern'][0])][3]:
             self.label_rs4.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs4.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXR['rampsoakpattern'][0]][4]:
+        if pattern[int(self.aw.fujipid.PXR['rampsoakpattern'][0])][4]:
             self.label_rs5.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs5.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXR['rampsoakpattern'][0]][5]:
+        if pattern[int(self.aw.fujipid.PXR['rampsoakpattern'][0])][5]:
             self.label_rs6.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs6.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXR['rampsoakpattern'][0]][6]:
+        if pattern[int(self.aw.fujipid.PXR['rampsoakpattern'][0])][6]:
             self.label_rs7.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs7.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXR['rampsoakpattern'][0]][7]:
+        if pattern[int(self.aw.fujipid.PXR['rampsoakpattern'][0])][7]:
             self.label_rs8.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs8.setStyleSheet('background-color:white;')
@@ -1593,7 +1604,7 @@ class PXRpidDlgControl(PXpidDlgControl):
         if self.aw.ser.useModbusPort:
             reg = self.aw.modbus.address2register(self.aw.fujipid.PXR['autotuning'][1],6)
             self.aw.modbus.writeSingleRegister(self.aw.ser.controlETpid[1],reg,flag)
-            r = '00000000'
+            r = b'00000000'
         else:
             command = self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],6,self.aw.fujipid.PXR['autotuning'][1],flag)
             #TX and RX
@@ -1634,7 +1645,7 @@ class PXRpidDlgControl(PXpidDlgControl):
                 mssg = QApplication.translate('Error Message','Exception:') + ' setONOFFstandby()'
                 self.status.showMessage(mssg,5000)
                 self.aw.qmc.adderror(mssg)
-        except Exception as e: # pylint: disable=broad-except
+        except Exception as e: # pylint: disable=broad-exception-caught
             _, _, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message','Exception:') + ' setONOFFstandby() {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
 
@@ -1686,6 +1697,8 @@ class PXRpidDlgControl(PXpidDlgControl):
         else:
             msg = self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],3,self.aw.fujipid.PXR['rampsoakmode'][1],1)
             currentmode = self.aw.fujipid.readoneword(msg)
+        if currentmode is None:
+            return -1
         self.aw.fujipid.PXR['rampsoakmode'][0] = currentmode
         if currentmode == 0:
             mode = ['0',
@@ -1828,7 +1841,7 @@ class PXRpidDlgControl(PXpidDlgControl):
             #2 = 1-8
             selectedmode = self.patternComboBox.currentIndex()
             currentmode = self.aw.fujipid.getrampsoakmode()
-            if currentmode != -1:
+            if currentmode is not None and currentmode != -1:
                 self.aw.fujipid.PXR['rampsoakpattern'][0] = currentmode
                 if currentmode != selectedmode:
                     #set mode in pid to match the mode selected in the combobox
@@ -1847,8 +1860,8 @@ class PXRpidDlgControl(PXpidDlgControl):
                     self.status.showMessage(QApplication.translate('StatusBar','RS ON'), 5000)
                     #ramp soak pattern. 0=executes 1 to 4; 1=executes 5 to 8; 2=executes 1 to 8
                     pattern =[[1,4],[5,8],[1,8]]
-                    start = pattern[self.aw.fujipid.PXR['rampsoakpattern'][0]][0]
-                    end = pattern[self.aw.fujipid.PXR['rampsoakpattern'][0]][1]+1
+                    start = pattern[int(self.aw.fujipid.PXR['rampsoakpattern'][0])][0]
+                    end = pattern[int(self.aw.fujipid.PXR['rampsoakpattern'][0])][1]+1
                     strcommand = 'SETRS'
                     result = ''
                     for i in range(start,end):
@@ -1888,35 +1901,41 @@ class PXRpidDlgControl(PXpidDlgControl):
 
     @pyqtSlot(bool)
     def getpid(self,_):
+        p:Optional[float]
         if self.aw.ser.useModbusPort:
             reg = self.aw.modbus.address2register(self.aw.fujipid.PXR['p'][1],3)
-            p = self.aw.modbus.readSingleRegister(self.aw.ser.controlETpid[1],reg,3)/10.
+            p = self.aw.modbus.readSingleRegister(self.aw.ser.controlETpid[1],reg,3)
         else:
             pcommand= self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],3,self.aw.fujipid.PXR['p'][1],1)
-            p = self.aw.fujipid.readoneword(pcommand)/10.
-        if p == -1 :
+            p = self.aw.fujipid.readoneword(pcommand)
+        if p is None or p == -1 :
             return
+        p = p/10.
         self.pedit.setText(str(int(p)))
         self.aw.fujipid.PXR['p'][0] = p
         #i is int range 0-3200
+        i:Optional[float]
         if self.aw.ser.useModbusPort:
             reg = self.aw.modbus.address2register(self.aw.fujipid.PXR['i'][1],3)
-            i = self.aw.modbus.readSingleRegister(self.aw.ser.controlETpid[1],reg,3)/10.
+            i = self.aw.modbus.readSingleRegister(self.aw.ser.controlETpid[1],reg,3)
         else:
             icommand = self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],3,self.aw.fujipid.PXR['i'][1],1)
-            i = self.aw.fujipid.readoneword(icommand)/10.
-        if i == -1:
+            i = self.aw.fujipid.readoneword(icommand)
+        if i is None or i == -1:
             return
+        i = i/10.
         self.iedit.setText(str(int(i)))
         self.aw.fujipid.PXR['i'][0] = i
+        d:Optional[float]
         if self.aw.ser.useModbusPort:
             reg = self.aw.modbus.address2register(self.aw.fujipid.PXR['d'][1],3)
-            d = self.aw.modbus.readSingleRegister(self.aw.ser.controlETpid[1],reg,3)/10.
+            d = self.aw.modbus.readSingleRegister(self.aw.ser.controlETpid[1],reg,3)
         else:
             dcommand = self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],3,self.aw.fujipid.PXR['d'][1],1)
-            d = self.aw.fujipid.readoneword(dcommand)/10.
-        if d == -1:
+            d = self.aw.fujipid.readoneword(dcommand)
+        if d is None or d == -1:
             return
+        d = d/10.
         self.dedit.setText(str(int(d)))
         self.aw.fujipid.PXR['d'][0] = d
 
@@ -1950,7 +1969,9 @@ class PXRpidDlgControl(PXpidDlgControl):
         self.segmenttable.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.segmenttable.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.segmenttable.setShowGrid(True)
-        self.segmenttable.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        vheader: Optional[QHeaderView] = self.segmenttable.verticalHeader()
+        if vheader is not None:
+            vheader.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         regextime = QRegularExpression(r'^-?[0-9]?[0-9]?[0-9]:[0-5][0-9]$')
         #populate table
         for i in range(8):
@@ -2001,7 +2022,7 @@ class PXRpidDlgControl(PXpidDlgControl):
                 libtime.sleep(0.1) #important time between writings
                 reg = self.aw.modbus.address2register(self.aw.fujipid.PXR[soakkey][1],6)
                 self.aw.modbus.writeSingleRegister(self.aw.ser.controlETpid[1],reg,soak)
-                r1 = r2 = r3 = '        '
+                r1 = r2 = r3 = b'        '
             else:
                 svcommand = self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],6,self.aw.fujipid.PXR[svkey][1],int(sv*10))
                 r1 = self.aw.ser.sendFUJIcommand(svcommand,8)
@@ -2027,7 +2048,7 @@ class PXRpidDlgControl(PXpidDlgControl):
 ############################################################################
 
 class PXG4pidDlgControl(PXpidDlgControl):
-    def __init__(self, parent = None, aw = None) -> None:
+    def __init__(self, parent:'QWidget', aw:'ApplicationWindow') -> None:
         super().__init__(parent, aw)
         self.setModal(True)
         #self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose) # default is True and this is set already in ArtisanDialog by default
@@ -2084,9 +2105,9 @@ class PXG4pidDlgControl(PXpidDlgControl):
         self.patternComboBox =  QComboBox()
         self.patternComboBox.addItems(['1-4','5-8','1-8','9-12','13-16','9-16','1-16'])
         if self.aw.ser.controlETpid[0] == 0:
-            self.patternComboBox.setCurrentIndex(self.aw.fujipid.PXG4['rampsoakpattern'][0])
+            self.patternComboBox.setCurrentIndex(int(self.aw.fujipid.PXG4['rampsoakpattern'][0]))
         else:
-            self.patternComboBox.setCurrentIndex(self.aw.fujipid.PXF['rampsoakpattern'][0])
+            self.patternComboBox.setCurrentIndex(int(self.aw.fujipid.PXF['rampsoakpattern'][0]))
         self.patternComboBox.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.patternComboBox.currentIndexChanged.connect(self.paintlabels)
         self.paintlabels()
@@ -2431,11 +2452,11 @@ class PXG4pidDlgControl(PXpidDlgControl):
         if self.aw.ser.controlETpid[0] == 0: # PXG
             self.ETthermocombobox.addItems(self.aw.fujipid.PXGthermotypes)
             if self.aw.fujipid.PXG4['pvinputtype'][0] in self.aw.fujipid.PXGconversiontoindex:
-                self.ETthermocombobox.setCurrentIndex(self.aw.fujipid.PXGconversiontoindex.index(self.aw.fujipid.PXG4['pvinputtype'][0]))
+                self.ETthermocombobox.setCurrentIndex(self.aw.fujipid.PXGconversiontoindex.index(int(self.aw.fujipid.PXG4['pvinputtype'][0])))
         else: # PXF
             self.ETthermocombobox.addItems(self.aw.fujipid.PXFthermotypes)
             if self.aw.fujipid.PXF['pvinputtype'][0] in self.aw.fujipid.PXFconversiontoindex:
-                self.ETthermocombobox.setCurrentIndex(self.aw.fujipid.PXFconversiontoindex.index(self.aw.fujipid.PXF['pvinputtype'][0]))
+                self.ETthermocombobox.setCurrentIndex(self.aw.fujipid.PXFconversiontoindex.index(int(self.aw.fujipid.PXF['pvinputtype'][0])))
         if self.aw.ser.readBTpid[0] == 0:        #fuji PXG
             self.BTthermocombobox.addItems(self.aw.fujipid.PXGthermotypes)
         elif self.aw.ser.readBTpid[0] == 1:      #fuji PXR
@@ -2736,7 +2757,7 @@ class PXG4pidDlgControl(PXpidDlgControl):
                 self.aw.fujipid.PXG4[rampkey][0] = stringtoseconds(segments[rampkey])
                 self.aw.fujipid.PXG4[soakkey][0] = stringtoseconds(segments[soakkey])
             self.createsegmenttable()
-        except Exception as ex: # pylint: disable=broad-except
+        except Exception as ex: # pylint: disable=broad-exception-caught
             _, _, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message','Exception:',None) + ' loadPIDJSON() {0}').format(str(ex)),getattr(exc_tb, 'tb_lineno', '?'))
 
@@ -2785,21 +2806,21 @@ class PXG4pidDlgControl(PXpidDlgControl):
                 pidvalues[dkey] = self.aw.fujipid.PXG4[dkey][0]
             pids['pidvalues'] = pidvalues
             # store ramp-soak segments
-            segments = {}
+            segments:Dict[str,Union[float,int]] = {}
             for i in range(16):
                 svkey = 'segment' + str(i+1) + 'sv'
                 rampkey = 'segment' + str(i+1) + 'ramp'
                 soakkey = 'segment' + str(i+1) + 'soak'
                 segments[svkey] = self.aw.fujipid.PXG4[svkey][0]
-                segments[rampkey] = stringfromseconds(self.aw.fujipid.PXG4[rampkey][0])
-                segments[soakkey] = stringfromseconds(self.aw.fujipid.PXG4[soakkey][0])
+                segments[rampkey] = self.aw.fujipid.PXG4[rampkey][0]
+                segments[soakkey] = self.aw.fujipid.PXG4[soakkey][0]
             pids['segments'] = segments
             from json import dump as json_dump
             with open(filename, 'w', encoding='utf-8') as outfile:
                 json_dump(pids, outfile, ensure_ascii=True)
                 outfile.write('\n')
             return True
-        except Exception as ex: # pylint: disable=broad-except
+        except Exception as ex: # pylint: disable=broad-exception-caught
             _, _, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message', 'Exception:',None) + ' savePIDJSON(): {0}').format(str(ex)),getattr(exc_tb, 'tb_lineno', '?'))
             return False
@@ -2814,7 +2835,7 @@ class PXG4pidDlgControl(PXpidDlgControl):
             if self.aw.ser.useModbusPort:
                 reg = self.aw.modbus.address2register(reg_dict['timeunits'][1],6)
                 self.aw.modbus.writeSingleRegister(self.aw.ser.controlETpid[1],reg,1)
-                r = command = ''
+                r = command = b''
             else:
                 command = self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],6,reg_dict['timeunits'][1],1)
                 r = self.aw.ser.sendFUJIcommand(command,8)
@@ -2824,7 +2845,7 @@ class PXG4pidDlgControl(PXpidDlgControl):
                 self.status.showMessage(message, 5000)
             else:
                 self.status.showMessage(QApplication.translate('StatusBar','Problem setting time units',None),5000)
-        except Exception as e: # pylint: disable=broad-except
+        except Exception as e: # pylint: disable=broad-exception-caught
             _, _, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message', 'Exception:',None) + ' settimeunits(): {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
 
@@ -2863,76 +2884,76 @@ class PXG4pidDlgControl(PXpidDlgControl):
         self.label_rs14.setText(str14)
         self.label_rs15.setText(str15)
         self.label_rs16.setText(str16)
-        pattern = [[1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
-                  [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
-                  [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0],
-                  [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
-                  [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1],
-                  [0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1],
-                  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]]
+        pattern = ((1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0),
+                   (0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0),
+                   (1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0),
+                   (0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0),
+                   (0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1),
+                   (0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1),
+                   (1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1))
         self.aw.fujipid.PXG4['rampsoakpattern'][0] = self.patternComboBox.currentIndex()
-        if pattern[self.aw.fujipid.PXG4['rampsoakpattern'][0]][0]:
+        if pattern[int(self.aw.fujipid.PXG4['rampsoakpattern'][0])][0]:
             self.label_rs1.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs1.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXG4['rampsoakpattern'][0]][1]:
+        if pattern[int(self.aw.fujipid.PXG4['rampsoakpattern'][0])][1]:
             self.label_rs2.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs2.setStyleSheet('background-color:white;')
 
-        if pattern[self.aw.fujipid.PXG4['rampsoakpattern'][0]][2]:
+        if pattern[int(self.aw.fujipid.PXG4['rampsoakpattern'][0])][2]:
             self.label_rs3.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs3.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXG4['rampsoakpattern'][0]][3]:
+        if pattern[int(self.aw.fujipid.PXG4['rampsoakpattern'][0])][3]:
             self.label_rs4.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs4.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXG4['rampsoakpattern'][0]][4]:
+        if pattern[int(self.aw.fujipid.PXG4['rampsoakpattern'][0])][4]:
             self.label_rs5.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs5.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXG4['rampsoakpattern'][0]][5]:
+        if pattern[int(self.aw.fujipid.PXG4['rampsoakpattern'][0])][5]:
             self.label_rs6.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs6.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXG4['rampsoakpattern'][0]][6]:
+        if pattern[int(self.aw.fujipid.PXG4['rampsoakpattern'][0])][6]:
             self.label_rs7.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs7.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXG4['rampsoakpattern'][0]][7]:
+        if pattern[int(self.aw.fujipid.PXG4['rampsoakpattern'][0])][7]:
             self.label_rs8.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs8.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXG4['rampsoakpattern'][0]][8]:
+        if pattern[int(self.aw.fujipid.PXG4['rampsoakpattern'][0])][8]:
             self.label_rs9.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs9.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXG4['rampsoakpattern'][0]][9]:
+        if pattern[int(self.aw.fujipid.PXG4['rampsoakpattern'][0])][9]:
             self.label_rs10.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs10.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXG4['rampsoakpattern'][0]][10]:
+        if pattern[int(self.aw.fujipid.PXG4['rampsoakpattern'][0])][10]:
             self.label_rs11.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs11.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXG4['rampsoakpattern'][0]][11]:
+        if pattern[int(self.aw.fujipid.PXG4['rampsoakpattern'][0])][11]:
             self.label_rs12.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs12.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXG4['rampsoakpattern'][0]][12]:
+        if pattern[int(self.aw.fujipid.PXG4['rampsoakpattern'][0])][12]:
             self.label_rs13.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs13.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXG4['rampsoakpattern'][0]][13]:
+        if pattern[int(self.aw.fujipid.PXG4['rampsoakpattern'][0])][13]:
             self.label_rs14.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs14.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXG4['rampsoakpattern'][0]][14]:
+        if pattern[int(self.aw.fujipid.PXG4['rampsoakpattern'][0])][14]:
             self.label_rs15.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs15.setStyleSheet('background-color:white;')
-        if pattern[self.aw.fujipid.PXG4['rampsoakpattern'][0]][15]:
+        if pattern[int(self.aw.fujipid.PXG4['rampsoakpattern'][0])][15]:
             self.label_rs16.setStyleSheet("background-color:'#FFCC99';")
         else:
             self.label_rs16.setStyleSheet('background-color:white;')
@@ -2979,7 +3000,7 @@ class PXG4pidDlgControl(PXpidDlgControl):
                     if self.aw.ser.useModbusPort:
                         reg = self.aw.modbus.address2register(reg_dict['selectsv'][1],6)
                         self.aw.modbus.writeSingleRegister(self.aw.ser.controlETpid[1],reg,svn)
-                        r = command = ''
+                        r = command = b''
                     else:
                         command = self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],6,reg_dict['selectsv'][1],svn)
                         r = self.aw.ser.sendFUJIcommand(command,8)
@@ -2996,19 +3017,19 @@ class PXG4pidDlgControl(PXpidDlgControl):
                 elif reply == QMessageBox.StandardButton.Cancel:
                     self.status.showMessage(QApplication.translate('StatusBar','Cancelled svN change',None),5000)
                     #set radio button
-                    if 1 == N:
+                    if N == 1:
                         self.radiosv1.setChecked(True)
-                    elif 2 == N:
+                    elif N == 2:
                         self.radiosv2.setChecked(True)
-                    elif 3 == N:
+                    elif N == 3:
                         self.radiosv3.setChecked(True)
-                    elif 4 == N:
+                    elif N == 4:
                         self.radiosv4.setChecked(True)
-                    elif 5 == N:
+                    elif N == 5:
                         self.radiosv5.setChecked(True)
-                    elif 6 == N:
+                    elif N == 6:
                         self.radiosv6.setChecked(True)
-                    elif 7 == N:
+                    elif N == 7:
                         self.radiosv7.setChecked(True)
                     return
             else:
@@ -3061,7 +3082,7 @@ class PXG4pidDlgControl(PXpidDlgControl):
                     if self.aw.ser.useModbusPort:
                         reg = self.aw.modbus.address2register(reg_dict['selectedpid'][1],6)
                         self.aw.modbus.writeSingleRegister(self.aw.ser.controlETpid[1],reg,pidn)
-                        r = command = ''
+                        r = command = b''
                     else:
                         command = self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],6,reg_dict['selectedpid'][1],pidn)
                         r = self.aw.ser.sendFUJIcommand(command,8)
@@ -3078,25 +3099,25 @@ class PXG4pidDlgControl(PXpidDlgControl):
                 elif reply == QMessageBox.StandardButton.Cancel:
                     self.status.showMessage(QApplication.translate('StatusBar','Cancelled pid change',None),5000)
                     #put back radio button
-                    if 1 == N:
+                    if N == 1:
                         self.radiosv1.setChecked(True)
                         self.radiopid1.setChecked(True)
-                    elif 2 == N:
+                    elif N == 2:
                         self.radiosv2.setChecked(True)
                         self.radiopid2.setChecked(True)
-                    elif 3 == N:
+                    elif N == 3:
                         self.radiosv3.setChecked(True)
                         self.radiopid3.setChecked(True)
-                    elif 4 == N:
+                    elif N == 4:
                         self.radiosv4.setChecked(True)
                         self.radiopid4.setChecked(True)
-                    elif 5 == N:
+                    elif N == 5:
                         self.radiosv5.setChecked(True)
                         self.radiopid5.setChecked(True)
-                    elif 6 == N:
+                    elif N == 6:
                         self.radiosv6.setChecked(True)
                         self.radiopid6.setChecked(True)
-                    elif 7 == N:
+                    elif N == 7:
                         self.radiosv7.setChecked(True)
                         self.radiopid7.setChecked(True)
                     return
@@ -3170,7 +3191,7 @@ class PXG4pidDlgControl(PXpidDlgControl):
             return
         #send command to the right sv
         svkey = 'sv'+ str(i)
-        r = '00000000'
+        r = b'00000000'
         if newSVvalue is not None:
             if self.aw.ser.useModbusPort:
                 reg = self.aw.modbus.address2register(reg_dict[svkey][1],6)
@@ -3306,7 +3327,7 @@ class PXG4pidDlgControl(PXpidDlgControl):
             self.aw.modbus.writeSingleRegister(self.aw.ser.controlETpid[1],reg,newIvalue)
             reg = self.aw.modbus.address2register(reg_dict[dkey][1],6)
             self.aw.modbus.writeSingleRegister(self.aw.ser.controlETpid[1],reg,newDvalue)
-            p = i = d = '        '
+            p = i = d = b'        '
         else:
             commandp = self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],6,reg_dict[pkey][1],newPvalue)
             commandi = self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],6,reg_dict[ikey][1],newIvalue)
@@ -3396,24 +3417,36 @@ class PXG4pidDlgControl(PXpidDlgControl):
             dkey = 'd' + str(k)
             msg = QApplication.translate('StatusBar','sending commands for p{0} i{1} d{2}',None).format(str(k),str(k),str(k))
             self.status.showMessage(msg,1000)
+            p:Optional[float]
             if self.aw.ser.useModbusPort:
                 reg = self.aw.modbus.address2register(reg_dict[pkey][1],3)
-                p = self.aw.modbus.readSingleRegister(self.aw.ser.controlETpid[1],reg,3)/10.
+                p = self.aw.modbus.readSingleRegister(self.aw.ser.controlETpid[1],reg,3)
             else:
                 commandp = self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],3,reg_dict[pkey][1],1)
-                p = self.aw.fujipid.readoneword(commandp)/10.
+                p = self.aw.fujipid.readoneword(commandp)
+            if p is None:
+                return
+            p = p/10.
+            i:Optional[float]
             if self.aw.ser.useModbusPort:
                 reg = self.aw.modbus.address2register(reg_dict[ikey][1],3)
-                i = self.aw.modbus.readSingleRegister(self.aw.ser.controlETpid[1],reg,3)/10.
+                i = self.aw.modbus.readSingleRegister(self.aw.ser.controlETpid[1],reg,3)
             else:
                 commandi = self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],3,reg_dict[ikey][1],1)
-                i = self.aw.fujipid.readoneword(commandi)/10.
+                i = self.aw.fujipid.readoneword(commandi)
+            if i is None:
+                return
+            i = i/10
+            dd:Optional[float]
             if self.aw.ser.useModbusPort:
                 reg = self.aw.modbus.address2register(reg_dict[dkey][1],3)
-                dd = self.aw.modbus.readSingleRegister(self.aw.ser.controlETpid[1],reg,3)/10.
+                dd = self.aw.modbus.readSingleRegister(self.aw.ser.controlETpid[1],reg,3)
             else:
                 commandd = self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],3,reg_dict[dkey][1],1)
-                dd = self.aw.fujipid.readoneword(commandd)/10.
+                dd = self.aw.fujipid.readoneword(commandd)
+            if dd is None:
+                return
+            dd = dd/10
             p = float(p)
             i = float(i)
             dd = float(dd)
@@ -3476,21 +3509,21 @@ class PXG4pidDlgControl(PXpidDlgControl):
             command = self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],3,reg_dict['selectedpid'][1],1)
             N = self.aw.fujipid.readoneword(command)
         libtime.sleep(0.035)
-        if -1 != N:
-            self.aw.fujipid.PXG4['selectedpid'][0] = N
-            if 1 == N:
+        if N is not None and -1 != N:
+            self.aw.fujipid.PXG4['selectedpid'][0] = int(N)
+            if N == 1:
                 self.radiopid1.setChecked(True)
-            elif 2 == N:
+            elif N == 2:
                 self.radiopid2.setChecked(True)
-            elif 3 == N:
+            elif N == 3:
                 self.radiopid3.setChecked(True)
-            elif 4 == N:
+            elif N == 4:
                 self.radiopid4.setChecked(True)
-            elif 5 == N:
+            elif N == 5:
                 self.radiopid5.setChecked(True)
-            elif 6 == N:
+            elif N == 6:
                 self.radiopid6.setChecked(True)
-            elif 7 == N:
+            elif N == 7:
                 self.radiopid7.setChecked(True)
             mssg = QApplication.translate('StatusBar','PID is using pid = {0}',None).format(str(N))
             self.status.showMessage(mssg,5000)
@@ -3507,12 +3540,16 @@ class PXG4pidDlgControl(PXpidDlgControl):
             reg_dict = self.aw.fujipid.PXF
         for i in reversed(list(range(1,8))):
             svkey = 'sv' + str(i)
+            sv:Optional[float]
             if self.aw.ser.useModbusPort:
                 reg = self.aw.modbus.address2register(reg_dict[svkey][1],3)
-                sv = self.aw.modbus.readSingleRegister(self.aw.ser.controlETpid[1],reg,3)/10.
+                sv = self.aw.modbus.readSingleRegister(self.aw.ser.controlETpid[1],reg,3)
             else:
                 command = self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],3,reg_dict[svkey][1],1)
-                sv = self.aw.fujipid.readoneword(command)/10.
+                sv = self.aw.fujipid.readoneword(command)
+            if sv is None:
+                return
+            sv = sv / 10
             self.aw.fujipid.PXG4[svkey][0] = sv
             if i == 1:
                 self.sv1edit.setText(str(sv))
@@ -3549,6 +3586,8 @@ class PXG4pidDlgControl(PXpidDlgControl):
         else:
             command = self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],3,reg_dict['selectsv'][1],1)
             N = self.aw.fujipid.readoneword(command)
+        if N is None:
+            return
         if N > 0:
             reg_dict['selectsv'][0] = N
         if N == 1:
@@ -3725,15 +3764,15 @@ class PXG4pidDlgControl(PXpidDlgControl):
             if res:
                 #record command as an Event if flag = 1
                 self.status.showMessage(QApplication.translate('StatusBar','RS ON',None), 5000)
-                pattern =[[1,4],[5,8],[1,8],[9,12],[13,16],[9,16],[1,16]]
+                pattern = ((1,4),(5,8),(1,8),(9,12),(13,16),(9,16),(1,16))
                 if self.aw.ser.controlETpid[0] == 0: #Fuji PXG
                     reg_dict = self.aw.fujipid.PXG4
                 elif self.aw.ser.controlETpid[0] == 4: #Fuji PXF
                     reg_dict = self.aw.fujipid.PXF
                 else:
                     return
-                start = pattern[reg_dict['rampsoakpattern'][0]][0]
-                end = pattern[reg_dict['rampsoakpattern'][0]][1]+1
+                start = pattern[int(reg_dict['rampsoakpattern'][0])][0]
+                end = pattern[int(reg_dict['rampsoakpattern'][0])][1]+1
                 strcommand = 'SETRS'
                 result = ''
                 for i in range(start,end):
@@ -3840,6 +3879,8 @@ class PXG4pidDlgControl(PXpidDlgControl):
         else:
             command = self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],3,reg_dict['selectedpid'][1],1)
             N = self.aw.fujipid.readoneword(command)
+        if N is None:
+            return
         reg_dict['selectedpid'][0] = N
         string = QApplication.translate('StatusBar','Current pid = {0}. Proceed with autotune command?',None).format(str(N))
         reply = QMessageBox.question(self.aw,QApplication.translate('Message','Ramp Soak start-end mode',None),string,
@@ -3851,7 +3892,7 @@ class PXG4pidDlgControl(PXpidDlgControl):
             if self.aw.ser.useModbusPort:
                 reg = self.aw.modbus.address2register(reg_dict['autotuning'][1],6)
                 self.aw.modbus.writeSingleRegister(self.aw.ser.controlETpid[1],reg,flag)
-                r = '00000000'
+                r = b'00000000'
             else:
                 command = self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],6,reg_dict['autotuning'][1],flag)
                 #TX and RX
@@ -3927,7 +3968,9 @@ class PXG4pidDlgControl(PXpidDlgControl):
         self.segmenttable.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.segmenttable.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.segmenttable.setShowGrid(True)
-        self.segmenttable.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        vheader: Optional[QHeaderView] = self.segmenttable.verticalHeader()
+        if vheader is not None:
+            vheader.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         regextime = QRegularExpression(r'^-?[0-9]?[0-9]?[0-9]:[0-5][0-9]$')
         #populate table
         for i in range(16):
@@ -3981,7 +4024,7 @@ class PXG4pidDlgControl(PXpidDlgControl):
                 libtime.sleep(0.1) #important time between writings
                 reg = self.aw.modbus.address2register(reg_dict[soakkey][1],6)
                 self.aw.modbus.writeSingleRegister(self.aw.ser.controlETpid[1],reg,soak)
-                r1 = r2 = r3 = '        '
+                r1 = r2 = r3 = b'        '
             else:
                 svcommand = self.aw.fujipid.message2send(self.aw.ser.controlETpid[1],6,reg_dict[svkey][1],int(sv*10))
                 r1 = self.aw.ser.sendFUJIcommand(svcommand,8)
@@ -4007,7 +4050,7 @@ class PXG4pidDlgControl(PXpidDlgControl):
 ############################################################################
 
 class DTApidDlgControl(ArtisanDialog):
-    def __init__(self, parent, aw) -> None:
+    def __init__(self, parent:'QWidget', aw:'ApplicationWindow') -> None:
         super().__init__(parent, aw)
         self.setModal(True)
         #self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose) # default is to set to True, which is already set in ArtisanDialog

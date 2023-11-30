@@ -32,17 +32,20 @@ except ImportError:
 from artisanlib.widgets import MyQComboBox
 
 from typing import Optional, List, Tuple, TYPE_CHECKING
-from typing_extensions import Final  # Python <=3.7
+from typing import Final  # Python <=3.7
 if TYPE_CHECKING:
     from artisanlib.main import ApplicationWindow # pylint: disable=unused-import
+    from PyQt6.QtWidgets import QPushButton # pylint: disable=unused-import
+    from PyQt6.QtGui import QCloseEvent, QDragEnterEvent, QDropEvent, QKeyEvent, QShowEvent  # pylint: disable=unused-import
+    from PyQt6.QtCore import QTimerEvent, QEvent, QObject # pylint: disable=unused-import
 
 _log: Final[logging.Logger] = logging.getLogger(__name__)
 
-class ArtisanDialog(QDialog): # pyright: ignore # Argument to class must be a base class (reportGeneralTypeIssues)
+class ArtisanDialog(QDialog): # pyright: ignore [reportGeneralTypeIssues] # Argument to class must be a base class
 
     __slots__ = ['aw', 'dialogbuttons']
 
-    def __init__(self, parent, aw) -> None:
+    def __init__(self, parent:Optional[QWidget], aw:'ApplicationWindow') -> None:
         super().__init__(parent)
         self.aw = aw # the Artisan application window
 
@@ -65,26 +68,30 @@ class ArtisanDialog(QDialog): # pyright: ignore # Argument to class must be a ba
 
         # configure standard dialog buttons
         self.dialogbuttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,Qt.Orientation.Horizontal)
-        self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok).setDefault(True)
-        self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok).setAutoDefault(True)
-        self.dialogbuttons.button(QDialogButtonBox.StandardButton.Cancel).setDefault(False)
-        self.dialogbuttons.button(QDialogButtonBox.StandardButton.Cancel).setAutoDefault(False)
-        self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok).setFocusPolicy(Qt.FocusPolicy.StrongFocus) # to add to tab focus switch
+        okButton: Optional[QPushButton] = self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
+        if okButton is not None:
+            okButton.setDefault(True)
+            okButton.setAutoDefault(True)
+            okButton.setFocusPolicy(Qt.FocusPolicy.StrongFocus) # to add to tab focus switch
+        cancelButton: Optional[QPushButton] = self.dialogbuttons.button(QDialogButtonBox.StandardButton.Cancel)
+        if cancelButton is not None:
+            cancelButton.setDefault(False)
+            cancelButton.setAutoDefault(False)
+            # add additional CMD-. shortcut to close the dialog
+            cancelButton.setShortcut(QKeySequence('Ctrl+.'))
+            # add additional CMD-W shortcut to close this dialog (ESC on Mac OS X)
+    #        cancelAction = QAction(self, triggered=lambda _:self.dialogbuttons.rejected.emit())
+            cancelAction = QAction(self)
+            cancelAction.triggered.connect(self.cancelDialog)
+            try:
+                cancelAction.setShortcut(QKeySequence.StandardKey.Cancel)
+            except Exception: # pylint: disable=broad-except
+                pass
+            cancelButton.addActions([cancelAction])
         for btn,txt,trans in [
-            (self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok),'OK', QApplication.translate('Button','OK')),
-            (self.dialogbuttons.button(QDialogButtonBox.StandardButton.Cancel),'Cancel',QApplication.translate('Button','Cancel'))]:
+                (okButton,'OK', QApplication.translate('Button','OK')),
+                (cancelButton,'Cancel',QApplication.translate('Button','Cancel'))]:
             self.setButtonTranslations(btn,txt,trans)
-        # add additional CMD-. shortcut to close the dialog
-        self.dialogbuttons.button(QDialogButtonBox.StandardButton.Cancel).setShortcut(QKeySequence('Ctrl+.'))
-        # add additional CMD-W shortcut to close this dialog (ESC on Mac OS X)
-#        cancelAction = QAction(self, triggered=lambda _:self.dialogbuttons.rejected.emit())
-        cancelAction = QAction(self)
-        cancelAction.triggered.connect(self.cancelDialog)
-        try:
-            cancelAction.setShortcut(QKeySequence.StandardKey.Cancel)
-        except Exception: # pylint: disable=broad-except
-            pass
-        self.dialogbuttons.button(QDialogButtonBox.StandardButton.Cancel).addActions([cancelAction])
 
     @pyqtSlot()
     def cancelDialog(self) -> None:
@@ -92,30 +99,33 @@ class ArtisanDialog(QDialog): # pyright: ignore # Argument to class must be a ba
         self.reject()
 
     @staticmethod
-    def setButtonTranslations(btn, txt, trans):
-        current_trans = btn.text()
-        if txt == current_trans:
-            # if standard qtbase translations fail, revert to artisan translations
-            current_trans = trans
-        if txt != current_trans:
-            btn.setText(current_trans)
+    def setButtonTranslations(btn: Optional['QPushButton'], txt:str, trans:str) -> None:
+        if btn is not None:
+            current_trans = btn.text()
+            if txt == current_trans:
+                # if standard qtbase translations fail, revert to artisan translations
+                current_trans = trans
+            if txt != current_trans:
+                btn.setText(current_trans)
 
-    def closeEvent(self,_):
+    @pyqtSlot('QCloseEvent')
+    def closeEvent(self,_:Optional['QCloseEvent'] = None) -> None:
         self.dialogbuttons.rejected.emit()
 
-    def keyPressEvent(self,event):
-        key = int(event.key())
-        #uncomment next line to find the integer value of a key
-        #print(key)
-        #modifiers = QApplication.keyboardModifiers()
-        modifiers = event.modifiers()
-        if key == 16777216 or (key == 87 and modifiers == Qt.KeyboardModifier.ControlModifier): #ESCAPE or CMD-W
-            self.close()
-        else:
-            super().keyPressEvent(event)
+    def keyPressEvent(self, event: Optional['QKeyEvent']) -> None:
+        if event is not None:
+            key = int(event.key())
+            #uncomment next line to find the integer value of a key
+            #print(key)
+            #modifiers = QApplication.keyboardModifiers()
+            modifiers = event.modifiers()
+            if key == 16777216 or (key == 87 and modifiers == Qt.KeyboardModifier.ControlModifier): #ESCAPE or CMD-W
+                self.close()
+            else:
+                super().keyPressEvent(event)
 
 class ArtisanResizeablDialog(ArtisanDialog):
-    def __init__(self, parent, aw) -> None:
+    def __init__(self, parent:QWidget, aw:'ApplicationWindow') -> None:
         super().__init__(parent, aw)
         if str(platform.system()) == 'Windows':
             windowFlags = self.windowFlags()
@@ -123,11 +133,11 @@ class ArtisanResizeablDialog(ArtisanDialog):
             self.setWindowFlags(windowFlags)
 
 # if modal=False the message box is not rendered as native dialog on macOS!
-class ArtisanMessageBox(QMessageBox): # pyright: ignore # Argument to class must be a base class (reportGeneralTypeIssues)
+class ArtisanMessageBox(QMessageBox): # pyright: ignore [reportGeneralTypeIssues] # Argument to class must be a base class
 
     __slots__ = ['timeout', 'currentTime']
 
-    def __init__(self, parent:Optional[QWidget] = None, title=None, text=None, timeout=0, modal=True) -> None:
+    def __init__(self, parent:Optional[QWidget] = None, title:Optional[str] = None, text:Optional[str] = None, timeout:int = 0, modal:bool = True) -> None:
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setText(text)
@@ -139,18 +149,18 @@ class ArtisanMessageBox(QMessageBox): # pyright: ignore # Argument to class must
         self.timeout = timeout # configured timeout, defaults to 0 (no timeout)
         self.currentTime = 0 # counts seconds after timer start
 
-    def showEvent(self,_):
+    def showEvent(self, _:Optional['QShowEvent']) -> None:
         self.currentTime = 0
         if (self.timeout and self.timeout != 0):
             self.startTimer(1000)
 
-    def timerEvent(self,_):
+    def timerEvent(self, _:Optional['QTimerEvent']) -> None:
         self.currentTime = self.currentTime + 1
         if self.currentTime >= self.timeout:
             self.done(0)
 
 class HelpDlg(ArtisanDialog):
-    def __init__(self, parent:QWidget, aw:'ApplicationWindow', title = '', content = '') -> None:
+    def __init__(self, parent:QWidget, aw:'ApplicationWindow', title:str = '', content:str = '') -> None:
         super().__init__(parent, aw)
         self.setWindowTitle(title)
         self.setModal(False)
@@ -178,9 +188,12 @@ class HelpDlg(ArtisanDialog):
         hLayout.addWidget(phelp)
         hLayout.addLayout(buttonLayout)
         self.setLayout(hLayout)
-        self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok).setFocus()
+        okButton: Optional[QPushButton] = self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
+        if okButton is not None:
+            okButton.setFocus()
 
-    def closeEvent(self, _):
+    @pyqtSlot('QCloseEvent')
+    def closeEvent(self, _:Optional['QCloseEvent'] = None) -> None:
         settings = QSettings()
         #save window geometry
         settings.setValue('HelpGeometry',self.saveGeometry())
@@ -190,7 +203,7 @@ class ArtisanInputDialog(ArtisanDialog):
 
     __slots__ = ['url', 'inputLine']
 
-    def __init__(self, parent:QWidget, aw:'ApplicationWindow', title='',label='') -> None:
+    def __init__(self, parent:QWidget, aw:'ApplicationWindow', title:str = '', label:str = '') -> None:
         super().__init__(parent, aw)
 
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
@@ -200,10 +213,9 @@ class ArtisanInputDialog(ArtisanDialog):
         self.setWindowTitle(title)
         self.setModal(True)
         self.setAcceptDrops(True)
-        label = QLabel(label)
         self.inputLine = QLineEdit(self.url)
         layout = QVBoxLayout()
-        layout.addWidget(label)
+        layout.addWidget(QLabel(label))
         layout.addWidget(self.inputLine)
         layout.addWidget(self.dialogbuttons)
         self.setLayout(layout)
@@ -211,24 +223,32 @@ class ArtisanInputDialog(ArtisanDialog):
         # connect the ArtisanDialog standard OK/Cancel buttons
         self.dialogbuttons.rejected.connect(self.reject)
         self.dialogbuttons.accepted.connect(self.accept)
-        self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok).setFocus()
+        okButton: Optional[QPushButton] = self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
+        if okButton is not None:
+            okButton.setFocus()
 
     @pyqtSlot()
-    def accept(self):
+    def accept(self) -> None:
         self.url = self.inputLine.text()
         super().accept()
 
     @staticmethod
-    def dragEnterEvent(event):
-        if event.mimeData().hasUrls():
-            event.accept()
-        else:
-            event.ignore()
+    def dragEnterEvent(event:Optional['QDragEnterEvent']) -> None:
+        if event is not None:
+            mimeData = event.mimeData()
+            if mimeData is not None:
+                if mimeData.hasUrls():
+                    event.accept()
+                else:
+                    event.ignore()
 
-    def dropEvent(self, event):
-        urls = event.mimeData().urls()
-        if urls and len(urls)>0:
-            self.inputLine.setText(urls[0].toString())
+    def dropEvent(self, event:Optional['QDropEvent']) -> None:
+        if event is not None:
+            mimeData = event.mimeData()
+            if mimeData is not None and mimeData.hasUrls():
+                urls = mimeData.urls()
+                if urls and len(urls)>0:
+                    self.inputLine.setText(urls[0].toString())
 
 
 class ArtisanComboBoxDialog(ArtisanDialog):
@@ -255,15 +275,17 @@ class ArtisanComboBoxDialog(ArtisanDialog):
         # connect the ArtisanDialog standard OK/Cancel buttons
         self.dialogbuttons.rejected.connect(self.reject)
         self.dialogbuttons.accepted.connect(self.accept)
-        self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok).setFocus()
+        okButton: Optional[QPushButton] = self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
+        if okButton is not None:
+            okButton.setFocus()
 
     @pyqtSlot()
-    def accept(self):
+    def accept(self) -> None:
         self.idx = self.comboBox.currentIndex()
         QDialog.accept(self)
 
 
-class PortComboBox(MyQComboBox):  # pyright: ignore # Argument to class must be a base class (reportGeneralTypeIssues)
+class PortComboBox(MyQComboBox):  # pyright: ignore [reportGeneralTypeIssues] # Argument to class must be a base class
 
     __slots__ = ['selection', 'select_device_name', 'ports','edited'] # save some memory by using slots
 
@@ -282,7 +304,6 @@ class PortComboBox(MyQComboBox):  # pyright: ignore # Argument to class must be 
         self.edited:Optional[str] = None
         if self.selection is not None:
             self.setCurrentText(self.selection)
-        self.editTextChanged.connect(self.textEdited)
         self.currentIndexChanged.connect(self.setSelection)
 
         # we prefer the device name if available over the selection port
@@ -292,6 +313,7 @@ class PortComboBox(MyQComboBox):  # pyright: ignore # Argument to class must be 
                 self.setCurrentIndex(pos)
         except Exception: # pylint: disable=broad-except
             pass
+        self.editTextChanged.connect(self.textEdited) # this has to be done after the setCurrentIndex above to avoid setting the self.edited to the currents ports name
 
     @pyqtSlot(str)
     def textEdited(self, txt:str) -> None:
@@ -304,16 +326,16 @@ class PortComboBox(MyQComboBox):  # pyright: ignore # Argument to class must be 
     def setSelection(self, i:int) -> None:
         if i >= 0:
             try:
-                self.selection = self.ports[i][0]
                 self.edited = None # reset the user text editing
+                self.selection = self.ports[i][0]
             except Exception: # pylint: disable=broad-except
                 pass
 
-    def eventFilter(self, obj, event):
+    def eventFilter(self, obj:Optional['QObject'], event:Optional['QEvent']) -> bool:
 # the next prevents correct setSelection on Windows
 #        if event.type() == QEvent.Type.FocusIn:
 #            self.setSelection(self.currentIndex())
-        if event.type() == QEvent.Type.MouseButtonPress:
+        if event is not None and event.type() == QEvent.Type.MouseButtonPress:
             self.updateMenu()
         return super().eventFilter(obj, event)
 
@@ -367,12 +389,14 @@ class ArtisanPortsDialog(ArtisanDialog):
         # connect the ArtisanDialog standard OK/Cancel buttons
         self.dialogbuttons.rejected.connect(self.reject)
         self.dialogbuttons.accepted.connect(self.accept)
-        self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok).setFocus()
+        okButton: Optional[QPushButton] = self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
+        if okButton is not None:
+            okButton.setFocus()
 
     def getSelection(self) -> Optional[str]:
         return self.comboBox.getSelection()
 
     @pyqtSlot()
-    def accept(self):
+    def accept(self) -> None:
         self.idx = self.comboBox.currentIndex()
         QDialog.accept(self)

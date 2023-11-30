@@ -6,8 +6,7 @@ from pathlib import Path
 import time as libtime
 import csv
 import logging
-from typing import List, Optional, TYPE_CHECKING
-from typing_extensions import Final  # Python <=3.7
+from typing import Final, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from artisanlib.types import ProfileData # pylint: disable=unused-import
@@ -19,23 +18,9 @@ except ImportError:
     from PyQt5.QtWidgets import QApplication # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtCore import QDateTime, Qt # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
 
-from artisanlib.util import fill_gaps, fromFtoC, RoRfromFtoC, encodeLocal
+from artisanlib.util import replace_duplicates, fromFtoCstrict, RoRfromFtoCstrict, encodeLocal
 
 _log: Final[logging.Logger] = logging.getLogger(__name__)
-
-def replace_duplicates(data):
-    lv = -1
-    data_core = []
-    for v in data:
-        if v == lv:
-            data_core.append(-1)
-        else:
-            data_core.append(v)
-            lv = v
-    # reconstruct first and last reading
-    if len(data)>0:
-        data_core[-1] = data[-1]
-    return fill_gaps(data_core, interpolate_max=100)
 
 # returns a dict containing all profile information contained in the given IKAWA CSV file
 def extractProfileLoringCSV(file,aw):
@@ -59,7 +44,7 @@ def extractProfileLoringCSV(file,aw):
         extra2:List[float] = [] # inlet
         extra3:List[float] = [] # stack
         extra4:List[float] = [] # ror
-        timeindex:List[int] = [-1,0,0,0,0,0,0,0] #CHARGE index init set to -1 as 0 could be an actal index used
+        timeindex:List[int] = [-1,0,0,0,0,0,0,0] #CHARGE index init set to -1 as 0 could be an actual index used
 
         power_event:bool = False
 
@@ -68,7 +53,7 @@ def extractProfileLoringCSV(file,aw):
         sampling_interval:float = 6
         roasting:int = 0
 
-        mode = 'C' # by default we assume temperature data in degree Celcius
+        mode = 'C' # by default we assume temperature data in degree Celsius
 
         i = 0
         for row in data:
@@ -80,7 +65,7 @@ def extractProfileLoringCSV(file,aw):
             try:
                 if 'Time' in item and 'RoastTimeSeconds' in item and 'RoastingOnOff' in item and item['RoastingOnOff'] != '':
 
-                    #time = int(item['RoastTimeSeconds']) # seems to be unprecise and does not correspond exactly to the 6s interval given by 'Time'
+                    #time = int(item['RoastTimeSeconds']) # seems to be imprecise and does not correspond exactly to the 6s interval given by 'Time'
 
                     datetime:QDateTime = QDateTime.fromString(item['Time'], 'M/d/yyyy h:mm:ss AP')
 
@@ -168,7 +153,7 @@ def extractProfileLoringCSV(file,aw):
                     if 'ReturnAirTemperature' in item and item['ReturnAirTemperature'] != '':
                         ET = float(item['ReturnAirTemperature'])/10 # °C x 10
                         if mode == 'F':
-                            ET = fromFtoC(ET)
+                            ET = fromFtoCstrict(ET)
                     else:
                         ET = -1
                     temp1.append(ET)
@@ -176,7 +161,7 @@ def extractProfileLoringCSV(file,aw):
                     if 'BeanTemperature' in item and item['BeanTemperature'] != '':
                         BT = float(item['BeanTemperature'])/10 # °C x 10
                         if mode == 'F':
-                            BT = fromFtoC(BT)
+                            BT = fromFtoCstrict(BT)
                     else:
                         BT = -1
                     temp2.append(BT)
@@ -217,7 +202,7 @@ def extractProfileLoringCSV(file,aw):
                     if 'InletAirTemperature' in item and item['InletAirTemperature'] != '':
                         X2 = float(item['InletAirTemperature'])/10 # °C x 10
                         if mode == 'F':
-                            X2 = fromFtoC(X2)
+                            X2 = fromFtoCstrict(X2)
                     else:
                         X2 = -1
                     extra2.append(X2)
@@ -225,7 +210,7 @@ def extractProfileLoringCSV(file,aw):
                     if 'StackTemperature' in item and item['StackTemperature'] != '':
                         X3 = float(item['StackTemperature'])/10 # °C x 10
                         if mode == 'F':
-                            X3 = fromFtoC(X3)
+                            X3 = fromFtoCstrict(X3)
                     else:
                         X3 = -1
                     extra3.append(X3)
@@ -233,7 +218,7 @@ def extractProfileLoringCSV(file,aw):
                     if 'BeanTemperatureRateOfRise' in item and item['BeanTemperatureRateOfRise'] != '':
                         X4 = float(item['BeanTemperatureRateOfRise'])/10 # °C x 10
                         if mode == 'F':
-                            X4 = RoRfromFtoC(X4)
+                            X4 = RoRfromFtoCstrict(X4)
                     else:
                         X4 = -1
                     extra4.append(X4)

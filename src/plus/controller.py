@@ -37,12 +37,13 @@ import os
 import platform
 import threading
 import logging
-from typing import Optional
-from typing_extensions import Final  # Python <=3.7
+from typing import Final, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from artisanlib.main import ApplicationWindow # noqa: F401 # pylint: disable=unused-import
 
 from artisanlib.util import getResourcePath
 from plus import config, connection, stock, queue, sync, roast
-
 
 
 _log: Final[logging.Logger] = logging.getLogger(__name__)
@@ -65,7 +66,7 @@ def is_on() -> bool:
 
 # returns True if current profile is under sync (i.e. in the sync-cache) or
 # no profile is loaded currently
-def is_synced():
+def is_synced() -> bool:
     aw = config.app_window
     if aw is not None:
         if aw.qmc.roastUUID is None:
@@ -75,14 +76,14 @@ def is_synced():
     return False
 
 
-def start(app_window):
+def start(app_window:'ApplicationWindow') -> None:
     config.app_window = app_window
     QTimer.singleShot(2, connect)
 
 
 # toggles between connected and disconnected modes. If connected and
 # not is_synced() send current data to server
-def toggle(app_window):
+def toggle(app_window:'ApplicationWindow') -> None:
     _log.debug('toggle()')
     config.app_window = app_window
     if config.app_window is not None and config.app_window.plus_account is None:  # @UndefinedVariable

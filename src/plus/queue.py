@@ -36,12 +36,10 @@ from plus import config, util, roast, connection, sync, controller
 import threading
 import time
 import logging
-from typing import Any, List, Dict, Optional, TYPE_CHECKING  #for Python >= 3.9: can remove 'List' and 'Dict' since type hints can use the generic 'list' and 'dict'
+from typing import Final, Any, List, Dict, Optional, TYPE_CHECKING  #for Python >= 3.9: can remove 'List' and 'Dict' since type hints can use the generic 'list' and 'dict'
 
 if TYPE_CHECKING:
     import persistqueue # type:ignore # pylint: disable=unused-import
-
-from typing_extensions import Final  # Python <=3.7
 
 
 _log: Final[logging.Logger] = logging.getLogger(__name__)
@@ -61,7 +59,7 @@ worker:Optional['Worker'] = None
 worker_thread:Optional[QThread] = None
 
 
-class Worker(QObject): # pyright: ignore # Argument to class must be a base class (reportGeneralTypeIssues)
+class Worker(QObject): # pyright: ignore [reportGeneralTypeIssues] # Argument to class must be a base class
     startSignal = pyqtSignal()
     replySignal = pyqtSignal(float, float, str, int, list) # rlimit:float, rused:float, pu:str, notifications:int, machines:List[str]
 
@@ -135,7 +133,6 @@ class Worker(QObject): # pyright: ignore # Argument to class must be a base clas
                                 r.raise_for_status()
                                 # successfully transmitted, we add/update the
                                 # roasts UUID sync-cache
-                                iters = 0
                                 self.addSyncItem(item)
                                 # if current roast was just successfully uploaded,
                                 # we set the syncRecordHash to the full sync record
@@ -152,10 +149,9 @@ class Worker(QObject): # pyright: ignore # Argument to class must be a base clas
                                         self.replySignal.emit(rlimit,rused,pu,notifications,machines)
                                 except Exception as e:  # pylint: disable=broad-except
                                     _log.exception(e)
-                            else:
-                                # partial sync updates for roasts not registered
-                                # for syncing are ignored
-                                iters = 0
+                            # partial sync updates for roasts not registered
+                            # for syncing are ignored
+                            iters = 0
                         except RequestsConnectionError as e:
                             try:
                                 if controller.is_connected():
@@ -216,7 +212,7 @@ class Worker(QObject): # pyright: ignore # Argument to class must be a base clas
                                 # or others something went wrong we don't mark
                                 # this task as done and retry
                                 iters = iters - 1
-                                time.sleep(config.queue_retry_delay)
+                                time.sleep(2*config.queue_retry_delay)
                     # we call task_done to remove the item from the queue
                     queue.task_done()
                     item = None
@@ -256,7 +252,7 @@ def start() -> None:
 
     if queue is None:
         # we initialize the queue
-        import persistqueue # type: ignore
+        import persistqueue
         queue = persistqueue.SQLiteQueue(
             queue_path, multithreading=True, auto_commit=False
         )

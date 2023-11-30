@@ -36,8 +36,7 @@ import dateutil.parser
 import logging
 import os
 import numpy
-from typing import Optional, Union, Any, Dict, List, Tuple, TYPE_CHECKING  #for Python >= 3.9: can remove 'List' since type hints can now use the generic 'list'
-from typing_extensions import Final  # Python <=3.7
+from typing import Final, Optional, Union, Any, Dict, List, Tuple, TYPE_CHECKING  #for Python >= 3.9: can remove 'List' since type hints can now use the generic 'list'
 
 if TYPE_CHECKING:
     from artisanlib.types import ProfileData, ComputedProfileInformation # pylint: disable=unused-import
@@ -102,7 +101,7 @@ def getGMToffset() -> int:
 
 # extra simple information from a dict
 # res is assumed to be a dict and the projection result to be a non-empty string or a number
-def extractInfo(res:Dict, attr: Union[str, int, float], default:Any) -> Any:
+def extractInfo(res:Dict[str,Any], attr: str, default:Optional[Union[str,int,float,List[str]]]) -> Any:
     if attr in res and ((isinstance(res[attr], str) and res[attr] != '') or (isinstance(res[attr],(int, float)))):
         return res[attr]
     return default
@@ -233,7 +232,7 @@ def addNum2dict(
 ) -> None:
     if key_source in dict_source and dict_source[key_source]: # type: ignore # TypedDict key must be a string literal; expected one of
         n = dict_source[key_source]  # type:ignore # TypedDict key must be a string literal; expected one of
-        if n is not None and factor is not None:
+        if n is not None and factor is not None and isinstance(n, (float, int)):
             n = n * factor
         n = limitnum(minn, maxn, n)  # may return None
         if n:
@@ -290,7 +289,7 @@ def addAllTime2dict(dict_source:Union['ProfileData', 'ComputedProfileInformation
 
 
 # mode indicates the temperature unit, "C" or "F", of the data if not None
-def addTemp2dict(dict_source:Union['ProfileData', 'ComputedProfileInformation'], key_source:str, dict_target:Dict[str, Any], key_target:str, mode=None) -> None:
+def addTemp2dict(dict_source:Union['ProfileData', 'ComputedProfileInformation'], key_source:str, dict_target:Dict[str, Any], key_target:str, mode:Optional[str]=None) -> None:
     if key_source in dict_source and dict_source[key_source]:  # type:ignore # TypedDict key must be a string literal; expected one of
         temp = limittemp(temp2C(dict_source[key_source],mode))  # type:ignore # TypedDict key must be a string literal; expected one of
         if temp is not None and temp != -1 and not numpy.isnan(temp):
@@ -352,7 +351,7 @@ def updateLimits(rlimit:float, rused:float, pu:str, notifications:int, machines:
 
 # takes the JSON response dict and returns the account state as tuple
 # rlimit:float, rused:float, pu:str, notifications:int
-def extractAccountState(response: Dict) -> Tuple[float, float, str, int, List[str]]:
+def extractAccountState(response: Dict[str,Any]) -> Tuple[float, float, str, int, List[str]]:
     rlimit:float = -1.
     rused:float = -1.
     pu:str = ''
@@ -379,7 +378,7 @@ def extractAccountState(response: Dict) -> Tuple[float, float, str, int, List[st
     return rlimit, rused, pu, notifications, machines
 
 @pyqtSlot(dict)
-def updateLimitsFromResponse(response: Dict) -> None:
+def updateLimitsFromResponse(response: Dict[str,Any]) -> None:
     rlimit,rused,pu,notifications,machines = extractAccountState(response)
     updateLimits(rlimit,rused,pu,notifications,machines)
 

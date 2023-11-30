@@ -1,3 +1,18 @@
+; ABOUT
+; NSIS script file for Artisan Windows installer.
+;
+; LICENSE
+; This program or module is free software: you can redistribute it and/or
+; modify it under the terms of the GNU General Public License as published
+; by the Free Software Foundation, either version 2 of the License, or
+; version 3 of the License, or (at your option) any later versison. It is
+; provided for educational purposes and is distributed in the hope that
+; it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+; warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
+; the GNU General Public License for more details.
+;
+; AUTHOR
+; Dave Baxter, Marko Luther 2023
 ;
 ; .nsi command line options:
 ;    /DPRODUCT_VERSION=ww.xx.yy.zz  -explicitly set the product version, default is 0.0.0.0
@@ -123,12 +138,13 @@ RequestExecutionLevel admin
 !define /ifndef SIGN "False"
 !define /ifndef LEGACY "False"
 
+!define /date CUR_YEAR "%Y"
 Caption "${PRODUCT_NAME} Installer"
 VIProductVersion ${PRODUCT_VERSION}
 VIAddVersionKey ProductName "${PRODUCT_NAME}"
 VIAddVersionKey Comments "Installer for Artisan"
 VIAddVersionKey CompanyName ""
-VIAddVersionKey LegalCopyright "Copyright 2010-2023, Artisan developers. GNU General Public License"
+VIAddVersionKey LegalCopyright "Copyright 2010-${CUR_YEAR}, Artisan developers. GNU General Public License"
 VIAddVersionKey FileVersion "${PRODUCT_VERSION}"
 VIAddVersionKey FileDescription "${PRODUCT_NAME} Installer"
 VIAddVersionKey ProductVersion "${PRODUCT_VERSION}"
@@ -364,6 +380,8 @@ Section Uninstall
   RMDir /r "$INSTDIR\yoctopuce"
   RMDir /r "$INSTDIR\zope"
 
+  RMDir /r "$INSTDIR\_internal"
+
   !insertmacro Rmdir_Wildcard "$INSTDIR\PyQt*" ${__LINE__}
   !insertmacro Rmdir_Wildcard "$INSTDIR\qt*_plugins" ${__LINE__}
   !insertmacro Rmdir_Wildcard "$INSTDIR\altgraph*.dist-info" ${__LINE__}
@@ -397,6 +415,8 @@ Section Uninstall
   Delete "$INSTDIR\artisanSettings.ico"
   Delete "$INSTDIR\Humor-Sans.ttf"
   Delete "$INSTDIR\dijkstra.ttf"
+  Delete "$INSTDIR\xkcd-script.ttf"
+  Delete "$INSTDIR\ComicNeue-Regular.ttf"
   Delete "$INSTDIR\WenQuanYiZenHei-01.ttf"
   Delete "$INSTDIR\WenQuanYiZenHeiMonoMedium.ttf"
   Delete "$INSTDIR\SourceHanSansCN-Regular.otf"
@@ -408,6 +428,16 @@ Section Uninstall
   Delete "$INSTDIR\alarmclock.svg"
   Delete "$INSTDIR\alarmclock.ttf"
   Delete "$INSTDIR\alarmclock.woff"
+  Delete "$INSTDIR\android-chrome-192x192.png"
+  Delete "$INSTDIR\android-chrome-512x512.png"
+  Delete "$INSTDIR\apple-touch-icon.png"
+  Delete "$INSTDIR\browserconfig.xml"
+  Delete "$INSTDIR\favicon-16x16.png"
+  Delete "$INSTDIR\favicon-32x32.png"
+  Delete "$INSTDIR\favicon.ico"
+  Delete "$INSTDIR\mstile-150x150.png"
+  Delete "$INSTDIR\safari-pinned-tab.svg"
+  Delete "$INSTDIR\site.webmanifest"
   Delete "$INSTDIR\artisan.tpl"
   Delete "$INSTDIR\bigtext.js"
   Delete "$INSTDIR\sorttable.js"

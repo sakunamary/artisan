@@ -15,6 +15,14 @@
 # AUTHOR
 # Marko Luther, 2023
 
+
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from artisanlib.main import ApplicationWindow # noqa: F401 # pylint: disable=unused-import
+    from PyQt6.QtWidgets import QWidget # noqa: F401 # pylint: disable=unused-import
+    from PyQt6.QtGui import QCloseEvent # pylint: disable=unused-import
+
 from artisanlib import __version__
 
 from artisanlib.dialogs import ArtisanDialog
@@ -32,7 +40,7 @@ except ImportError:
 ##########################################################################
 
 class serialLogDlg(ArtisanDialog):
-    def __init__(self, parent, aw) -> None:
+    def __init__(self, parent:'QWidget', aw:'ApplicationWindow') -> None:
         super().__init__(parent, aw)
         self.setModal(True)
         self.setWindowTitle(QApplication.translate('Form Caption','Serial Log'))
@@ -48,7 +56,7 @@ class serialLogDlg(ArtisanDialog):
         layout.addWidget(self.serialEdit,1)
         self.setLayout(layout)
 
-    def getstring(self):
+    def getstring(self) -> str:
         #convert list of serial comm an html string
         htmlserial = 'version = ' +__version__ +'<br><br>'
         lenl = len(self.aw.seriallog)
@@ -56,18 +64,19 @@ class serialLogDlg(ArtisanDialog):
             htmlserial += '<b>' + str(lenl-i) + '</b> ' + self.aw.seriallog[-i-1] + '<br><br>'
         return htmlserial
 
-    def update(self):
+    def update_log(self) -> None:
         if self.aw.seriallogflag:
             self.serialEdit.setText(self.getstring())
 
     @pyqtSlot(int)
-    def serialcheckboxChanged(self,_):
+    def serialcheckboxChanged(self, _:int) -> None:
         if self.serialcheckbox.isChecked():
             self.aw.seriallogflag = True
         else:
             self.aw.seriallogflag = False
 
-    def closeEvent(self,_):
+    @pyqtSlot('QCloseEvent')
+    def closeEvent(self, _:Optional['QCloseEvent'] = None) -> None:
         self.close()
         self.aw.serial_dlg = None
 
@@ -76,7 +85,7 @@ class serialLogDlg(ArtisanDialog):
 ##########################################################################
 
 class errorDlg(ArtisanDialog):
-    def __init__(self, parent, aw) -> None:
+    def __init__(self, parent:'QWidget', aw:'ApplicationWindow') -> None:
         super().__init__(parent, aw)
         self.setModal(True)
         self.setWindowTitle(QApplication.translate('Form Caption','Error Log'))
@@ -89,7 +98,7 @@ class errorDlg(ArtisanDialog):
         self.setLayout(layout)
         self.update()
 
-    def update(self):
+    def update_log(self) -> None:
         #convert list of errors to an html string
         lenl = len(self.aw.qmc.errorlog)
         htmlerr = ''.join([f'<b>{lenl-i}</b> {m}<br><br>' for i,m in enumerate(reversed(self.aw.qmc.errorlog))])
@@ -99,7 +108,8 @@ class errorDlg(ArtisanDialog):
         self.elabel.setText(labelstr)
         self.errorEdit.setHtml('version = ' +__version__ +'<br><br>' + htmlerr)
 
-    def closeEvent(self,_):
+    @pyqtSlot('QCloseEvent')
+    def closeEvent(self, _:Optional['QCloseEvent'] = None) -> None:
         self.close()
         self.aw.error_dlg = None
 
@@ -109,7 +119,7 @@ class errorDlg(ArtisanDialog):
 ##########################################################################
 
 class messageDlg(ArtisanDialog):
-    def __init__(self, parent, aw) -> None:
+    def __init__(self, parent:'QWidget', aw:'ApplicationWindow') -> None:
         super().__init__(parent, aw)
         self.setModal(True)
         self.setWindowTitle(QApplication.translate('Form Caption','Message History'))
@@ -120,12 +130,13 @@ class messageDlg(ArtisanDialog):
         self.setLayout(layout)
         self.update()
 
-    def update(self):
+    def update_log(self) -> None:
         #convert list of messages to an html string
         lenl = len(self.aw.messagehist)
         htmlmessage = ''.join([f'<b>{lenl-i}</b> {m}<br><br>' for i,m in enumerate(reversed(self.aw.messagehist))])
         self.messageEdit.setHtml(htmlmessage)
 
-    def closeEvent(self,_):
+    @pyqtSlot('QCloseEvent')
+    def closeEvent(self, _:Optional['QCloseEvent'] = None) -> None:
         self.close()
         self.aw.message_dlg = None

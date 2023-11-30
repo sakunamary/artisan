@@ -16,8 +16,7 @@
 # Marko Luther, 2023
 
 import logging
-from typing import List, Optional, Union, Tuple, Callable
-from typing_extensions import Final  # Python <=3.7
+from typing import Final, List, Optional, Union, Tuple, Callable
 
 
 from artisanlib.ble import UUID, BLE_CHAR_TYPE
@@ -25,7 +24,7 @@ from artisanlib.ble import UUID, BLE_CHAR_TYPE
 _log: Final[logging.Logger] = logging.getLogger(__name__)
 
 
-class AcaiaBLE():
+class AcaiaBLE:
 
     # Acaia Pearl, Lunar:
     DEVICE_NAME_PEARL:Final[str] = 'PROCHBT'
@@ -121,7 +120,7 @@ class AcaiaBLE():
         self.protocolParseDataLen = 0
         self.protocolParseDataIndex = 0
 
-    def acaiaProtocolParser(self, write:Callable[[Optional[bytes]],None], dataIn) -> None:
+    def acaiaProtocolParser(self, write:Callable[[Optional[bytes]],None], dataIn:bytes) -> None:
         for c_in in dataIn:
             if self.protocolParseStep==self.E_PRS_CHECKHEADER1:
                 if c_in == self.HEADER1:
@@ -170,7 +169,7 @@ class AcaiaBLE():
                 self.resetProtocolParser()
 
 
-    def reset(self):
+    def reset(self) -> None:
         self.__init__() # type: ignore # pylint: disable=unnecessary-dunder-call
 
     # return a bytearray of len 2 containing the even and odd CRCs over the given payload

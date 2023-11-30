@@ -117,7 +117,19 @@ DATA_FILES = [
     ('../Resources', [r'includes/SourceHanSansKR-Regular.otf']),
     ('../Resources', [r'includes/SourceHanSansTW-Regular.otf']),
     ('../Resources', [r'includes/dijkstra.ttf']),
+    ('../Resources', [r'includes/ComicNeue-Regular.ttf']),
+    ('../Resources', [r'includes/xkcd-script.ttf']),
     ('../Resources', [r'includes/jquery-1.11.1.min.js']),
+    ('../Resources', [r'includes/android-chrome-192x192.png']),
+    ('../Resources', [r'includes/android-chrome-512x512.png']),
+    ('../Resources', [r'includes/apple-touch-icon.png']),
+    ('../Resources', [r'includes/browserconfig.xml']),
+    ('../Resources', [r'includes/favicon-16x16.png']),
+    ('../Resources', [r'includes/favicon-32x32.png']),
+    ('../Resources', [r'includes/favicon.ico']),
+    ('../Resources', [r'includes/mstile-150x150.png']),
+    ('../Resources', [r'includes/safari-pinned-tab.svg']),
+    ('../Resources', [r'includes/site.webmanifest']),
     ('../Resources', [r'includes/Machines']),
     ('../Resources', [r'includes/Themes']),
     ('../Resources', [r'includes/Icons']),
@@ -214,7 +226,7 @@ for lang in ['ar', 'da', 'de','el','en','es','fa','fi','fr','gd', 'he','hu','id'
 
 
 # copy brew installed libusb (note the slight name change of the dylib!)
-    # cannot be run brew as root thus the folllowing does not work
+    # cannot be run brew as root thus the following does not work
     # subprocess.check_call(r'cp $(brew list libusb | grep libusb-1.0.0.dylib) Artisan.app/Contents/Frameworks/libusb-1.0.dylib',shell = True)
 
 # you need to do a

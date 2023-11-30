@@ -20,8 +20,7 @@
 import time
 import numpy
 import logging
-from typing import List, Optional, Callable
-from typing_extensions import Final  # Python <=3.7
+from typing import Final, List, Optional, Callable
 
 try:
     from PyQt6.QtCore import QSemaphore # @Reimport @UnresolvedImport @UnusedImport
@@ -31,7 +30,7 @@ except ImportError:
 _log: Final[logging.Logger] = logging.getLogger(__name__)
 
 # expects a function control that takes a value from [<outMin>,<outMax>] to control the heater as called on each update()
-class PID():
+class PID:
 
     __slots__ = [ 'pidSemaphore', 'outMin', 'outMax', 'dutySteps', 'dutyMin', 'dutyMax', 'control', 'Kp',
             'Ki', 'Kd', 'pOnE', 'Pterm', 'errSum', 'Iterm', 'lastError', 'lastInput', 'lastOutput', 'lastTime',
@@ -142,63 +141,61 @@ class PID():
             if self.lastError is None or self.lastTime is None:
                 self.lastTime = now
                 self.lastError = err
-            else:
-                dt = now - self.lastTime
-                if dt>0.2:
-                    derr = (err - self.lastError) / dt
-                    if self.lastInput:
-                        dinput = i - self.lastInput
-                        dtinput = dinput / dt
-                    else:
-                        dinput = 0
-                        dtinput = 0
+            elif (dt := now - self.lastTime) > 0.2:
+                derr = (err - self.lastError) / dt
+                if self.lastInput:
+                    dinput = i - self.lastInput
+                    dtinput = dinput / dt
+                else:
+                    dinput = 0
+                    dtinput = 0
 
-#                    # apply some simple moving average filter to avoid major spikes (used only for D)
-#                    if self.lastDerr:
-#                        derr = (derr + self.lastDerr) / 2.0
+#                # apply some simple moving average filter to avoid major spikes (used only for D)
+#                if self.lastDerr:
+#                    derr = (derr + self.lastDerr) / 2.0
 ## This smoothing is dangerous if time between readings is not considered!
-#                    self.lastDerr = derr
+#                self.lastDerr = derr
 
-                    self.lastTime = now
-                    self.lastError = err
-                    self.lastInput = i
+                self.lastTime = now
+                self.lastError = err
+                self.lastInput = i
 
-                    # limit the effect of I
-                    self.Iterm += self.Ki * err * dt
+                # limit the effect of I
+                self.Iterm += self.Ki * err * dt
 
-                    # clamp Iterm to [outMin,outMax] and avoid integral windup
-                    self.Iterm = max(self.outMin,min(self.outMax,self.Iterm))
+                # clamp Iterm to [outMin,outMax] and avoid integral windup
+                self.Iterm = max(self.outMin,min(self.outMax,self.Iterm))
 
-                    # compute P-Term
-                    if self.pOnE:
-                        self.Pterm = self.Kp * err
-                    else:
-                        self.Pterm = self.Pterm -self.Kp * dinput
+                # compute P-Term
+                if self.pOnE:
+                    self.Pterm = self.Kp * err
+                else:
+                    self.Pterm = self.Pterm -self.Kp * dinput
 
-                    # compute D-Term
-                    D:float
-                    if self.derivative_on_error:
-                        D = self.Kd * derr
-                    else:
-                        D = - self.Kd * dtinput
+                # compute D-Term
+                D:float
+                if self.derivative_on_error:
+                    D = self.Kd * derr
+                else:
+                    D = - self.Kd * dtinput
 
-                    output:float = self.Pterm + self.Iterm + D
+                output:float = self.Pterm + self.Iterm + D
 
-                    output = self._smooth_output(output)
+                output = self._smooth_output(output)
 
-                    # clamp output to [outMin,outMax] and avoid integral windup
-                    if output > self.outMax:
-                        output = self.outMax
-                    elif output < self.outMin:
-                        output = self.outMin
+                # clamp output to [outMin,outMax] and avoid integral windup
+                if output > self.outMax:
+                    output = self.outMax
+                elif output < self.outMin:
+                    output = self.outMin
 
-                    int_output = min(self.dutyMax,max(self.dutyMin,int(round(output))))
-                    if self.lastOutput is None or self.iterations_since_duty >= self.force_duty or int_output >= self.lastOutput + self.dutySteps or int_output <= self.lastOutput - self.dutySteps:
-                        if self.active:
-                            self.control(int_output)
-                            self.iterations_since_duty = 0
-                        self.lastOutput = output # kept to initialize Iterm on reactivating the PID
-                    self.iterations_since_duty += 1
+                int_output = min(self.dutyMax,max(self.dutyMin,int(round(output))))
+                if self.lastOutput is None or self.iterations_since_duty >= self.force_duty or int_output >= self.lastOutput + self.dutySteps or int_output <= self.lastOutput - self.dutySteps:
+                    if self.active:
+                        self.control(int_output)
+                        self.iterations_since_duty = 0
+                    self.lastOutput = output # kept to initialize Iterm on reactivating the PID
+                self.iterations_since_duty += 1
         except Exception as e: # pylint: disable=broad-except
             _log.exception(e)
         finally:

@@ -20,8 +20,7 @@ import time as libtime
 import re
 import platform
 import logging
-from typing import Optional, TYPE_CHECKING
-from typing_extensions import Final  # Python <=3.7
+from typing import Final, Optional, List, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from artisanlib.main import ApplicationWindow # noqa: F401 # pylint: disable=unused-import
@@ -118,7 +117,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         limit = len(dev)
         for _ in range(limit):
             for i, _ in enumerate(dev):
-                if dev[i][0] == '+' or dev[i][0] == '-':
+                if dev[i][0] in {'+', '-'}:
                     dev.pop(i)              #note: pop() makes the list smaller that's why there are 2 FOR statements
                     break
         self.sorted_devices = sorted(dev)
@@ -144,7 +143,11 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 
         # hack to access the Qt automatic translation of the RestoreDefaults button
         db_help = QDialogButtonBox(QDialogButtonBox.StandardButton.Help)
-        help_text_translated = db_help.button(QDialogButtonBox.StandardButton.Help).text()
+        help_button = db_help.button(QDialogButtonBox.StandardButton.Help)
+        if help_button is not None:
+            help_text_translated = help_button.text()
+        else:
+            help_text_translated = QApplication.translate('Button','Help')
         helpprogrambutton =  QPushButton(help_text_translated)
         self.setButtonTranslations(helpprogrambutton,'Help',QApplication.translate('Button','Help'))
         helpprogrambutton.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -193,7 +196,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         self.arduinoBTComboBox = QComboBox()
         self.arduinoBTComboBox.addItems(arduinoChannels)
         #check previous settings for radio button
-        if self.aw.qmc.device in (0, 26):   #if Fuji pid or Delta DTA pid
+        if self.aw.qmc.device in {0, 26}:   #if Fuji pid or Delta DTA pid
             self.pidButton.setChecked(True)
         elif self.aw.qmc.device == 19:                       #if arduino
             self.arduinoButton.setChecked(True)
@@ -266,8 +269,12 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         self.addButton.clicked.connect(self.adddevice)
         # hack to access the Qt automatic translation of the RestoreDefaults button
         db_reset = QDialogButtonBox(QDialogButtonBox.StandardButton.Reset)
-        reset_text_translated = db_reset.button(QDialogButtonBox.StandardButton.Reset).text()
-        resetButton =  QPushButton(reset_text_translated)
+        db_reset_button = db_reset.button(QDialogButtonBox.StandardButton.Reset)
+        if db_reset_button is not None:
+            reset_text_translated = db_reset_button.text()
+        else:
+            reset_text_translated = QApplication.translate('Button','Reset')
+        resetButton = QPushButton(reset_text_translated)
         self.setButtonTranslations(resetButton,'Reset',QApplication.translate('Button','Reset'))
         resetButton.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         resetButton.setMinimumWidth(100)
@@ -942,7 +949,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         phidgetBox1018.addWidget(ratioLabel,6,0,Qt.AlignmentFlag.AlignRight)
         phidget1018HBox = QVBoxLayout()
         phidget1018HBox.addLayout(phidgetBox1018)
-        phidget1018GroupBox = QGroupBox('1010/1011/1013/1018/1019/HUB0000/SBC/DAQ1400/VCP100x IO')
+        phidget1018GroupBox = QGroupBox('1010/1011/1013/1018/1019/HUB0000/SBC/DAQ1000/DAQ1400/VCP100x IO')
         phidget1018GroupBox.setLayout(phidget1018HBox)
         phidget1018HBox.setContentsMargins(0,0,0,0)
         self.phidgetBoxRemoteFlag = QCheckBox()
@@ -1383,10 +1390,10 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         Mlayout.setSpacing(0)
         Mlayout.setContentsMargins(5,10,5,5)
         self.setLayout(Mlayout)
-        if platform.system() == 'Windows':
-            self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
-        else:
-            self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok).setFocus()
+        if platform.system() != 'Windows':
+            ok_button = self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
+            if ok_button is not None:
+                ok_button.setFocus()
         settings = QSettings()
         if settings.contains('DeviceAssignmentGeometry'):
             self.restoreGeometry(settings.value('DeviceAssignmentGeometry'))
@@ -1425,15 +1432,15 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         self.kaleidoPort.setEnabled(not self.aw.kaleidoSerial)
 
     @pyqtSlot(str)
-    def phidgetHostChanged(self,s):
+    def phidgetHostChanged(self, s:str) -> None:
         self.phidgetPassword.setEnabled(s != '')
 
     @pyqtSlot(int)
-    def changeOutprogramFlag(self,_):
+    def changeOutprogramFlag(self,_:int) -> None:
         self.aw.ser.externaloutprogramFlag = not self.aw.ser.externaloutprogramFlag
 
     @pyqtSlot(int)
-    def asyncFlagStateChanged1048(self, x:int):
+    def asyncFlagStateChanged1048(self, x:int) -> None:
         try:
             sender = self.sender()
             assert isinstance(sender, QCheckBox)
@@ -1448,7 +1455,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             _log.exception(e)
 
     @pyqtSlot(int)
-    def asyncFlagStateChanged1045(self,x):
+    def asyncFlagStateChanged1045(self, x:int) -> None:
         if x == 0:
             # disable ChangeTrigger selection
             self.changeTriggerCombos1045.setEnabled(False)
@@ -1457,7 +1464,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             self.changeTriggerCombos1045.setEnabled(True)
 
     @pyqtSlot(int)
-    def asyncFlagStateChanged1200(self,x):
+    def asyncFlagStateChanged1200(self, x:int) -> None:
         if x == 0:
             # disable ChangeTrigger selection
             self.changeTriggerCombo1200.setEnabled(False)
@@ -1466,7 +1473,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             self.changeTriggerCombo1200.setEnabled(True)
 
     @pyqtSlot(int)
-    def asyncFlagStateChanged1200_2(self,x):
+    def asyncFlagStateChanged1200_2(self, x:int) -> None:
         if x == 0:
             # disable ChangeTrigger selection
             self.changeTriggerCombo1200_2.setEnabled(False)
@@ -1475,7 +1482,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             self.changeTriggerCombo1200_2.setEnabled(True)
 
     @pyqtSlot(int)
-    def asyncFlagStateChanged(self,x):
+    def asyncFlagStateChanged(self, x:int) -> None:
         try:
             sender = self.sender()
             assert isinstance(sender, QCheckBox)
@@ -1548,7 +1555,9 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             self.devicetable.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
             self.devicetable.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
             self.devicetable.setShowGrid(True)
-            self.devicetable.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+            vheader = self.devicetable.verticalHeader()
+            if vheader is not None:
+                vheader.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
             if nddevices:
                 dev = self.aw.qmc.devices[:]             #deep copy
                 limit = len(dev)
@@ -1562,6 +1571,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                     try:
                         # 0: device type
                         typeComboBox =  MyQComboBox()
+#                        typeComboBox.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContentsOnFirstShow) # default
                         typeComboBox.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
 #                        typeComboBox.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
                         typeComboBox.addItems(devices[:])
@@ -1667,14 +1677,23 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                     except Exception as e: # pylint: disable=broad-except
                         _log.exception(e)
                 header = self.devicetable.horizontalHeader()
-                header.setStretchLastSection(True)
+                if header is not None:
+                    header.setStretchLastSection(True)
                 self.devicetable.resizeColumnsToContents()
-                # remember the columnwidth
-                for i, _ in enumerate(self.aw.qmc.devicetablecolumnwidths):
-                    try:
-                        self.devicetable.setColumnWidth(i, self.aw.qmc.devicetablecolumnwidths[i])
-                    except Exception: # pylint: disable=broad-except
-                        pass
+                if not self.aw.qmc.devicetablecolumnwidths:
+                    self.devicetable.setColumnWidth(0, 100)
+                    self.devicetable.setColumnWidth(3, 100)
+                    self.devicetable.setColumnWidth(4, 100)
+                    self.devicetable.setColumnWidth(5, 40)
+                    self.devicetable.setColumnWidth(6, 40)
+                    self.devicetable.setColumnWidth(14, 30)
+                else:
+                    # remember the columnwidth
+                    for i, _ in enumerate(self.aw.qmc.devicetablecolumnwidths):
+                        try:
+                            self.devicetable.setColumnWidth(i, self.aw.qmc.devicetablecolumnwidths[i])
+                        except Exception: # pylint: disable=broad-except
+                            pass
         except Exception as e: # pylint: disable=broad-except
             _, _, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message', 'Exception:') + ' createDeviceTable(): {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
@@ -1691,7 +1710,9 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             fields = []
             re_strip = re.compile('[\u2009]')  #thin space is not read properly by prettytable
             for c in range(ncols):
-                fields.append(re_strip.sub('',self.devicetable.horizontalHeaderItem(c).text()))
+                item = self.devicetable.horizontalHeaderItem(c)
+                if item is not None:
+                    fields.append(re_strip.sub('',item.text()))
             tbl.field_names = fields
             for r in range(nrows):
                 rows = []
@@ -1759,9 +1780,11 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             clipboard = tbl.get_string()
         else:
             for c in range(ncols):
-                clipboard += self.devicetable.horizontalHeaderItem(c).text()
-                if c != (ncols-1):
-                    clipboard += '\t'
+                item = self.devicetable.horizontalHeaderItem(c)
+                if item is not None:
+                    clipboard += item.text()
+                    if c != (ncols-1):
+                        clipboard += '\t'
             clipboard += '\n'
             for r in range(nrows):
                 # device type
@@ -1826,7 +1849,8 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                 clipboard += str(Fill2SpinBox.value()) + '\n'
         # copy to the system clipboard
         sys_clip = QApplication.clipboard()
-        sys_clip.setText(clipboard)
+        if sys_clip is not None:
+            sys_clip.setText(clipboard)
         self.aw.sendmessage(QApplication.translate('Message','Device table copied to clipboard'))
 
     @pyqtSlot(bool)
@@ -2228,7 +2252,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         self.reject()
 
     @pyqtSlot()
-    def okEvent(self): # pyright: ignore # Code is too complex to analyze; reduce complexity by refactoring into subroutines or reducing conditional code paths (reportGeneralTypeIssues)
+    def okEvent(self): # pyright: ignore [reportGeneralTypeIssues] # Code is too complex to analyze; reduce complexity by refactoring into subroutines or reducing conditional code paths
 
         try:
             self.aw.qmc.device_logging = self.deviceLoggingFlag.isChecked()
@@ -3052,7 +3076,53 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                 ##########################
                 ####  DEVICE 145 is +IKAWA State but +DEVICE cannot be set as main device
                 ##########################
-
+                ##########################
+                elif meter == 'Phidget DAQ1000 01':
+                    self.aw.qmc.device = 146
+                    message = QApplication.translate('Message','Device set to {0}').format(meter)
+                ##########################
+                ####  DEVICE 147 is +Phidget DAQ1000 23 but +DEVICE cannot be set as main device
+                ##########################
+                ##########################
+                ####  DEVICE 148 is +Phidget DAQ1000 45 but +DEVICE cannot be set as main device
+                ##########################
+                ##########################
+                ####  DEVICE 149 is +Phidget DAQ1000 67 but +DEVICE cannot be set as main device
+                ##########################
+                ####  DEVICE 150 is +MODBUS_910 but +DEVICE cannot be set as main device
+                ##########################
+                ####  DEVICE 151 is +S7_1112 but +DEVICE cannot be set as main device
+                ##########################
+                ##########################
+                elif meter == 'Phidget DAQ1200 01':
+                    self.aw.qmc.device = 152
+                    message = QApplication.translate('Message','Device set to {0}').format(meter)
+                ##########################
+                ##########################
+                ####  DEVICE 153 is +Phidget DAQ1200 23 but +DEVICE cannot be set as main device
+                ##########################
+                ##########################
+                elif meter == 'Phidget DAQ1300 01':
+                    self.aw.qmc.device = 154
+                    message = QApplication.translate('Message','Device set to {0}').format(meter)
+                ##########################
+                ##########################
+                ####  DEVICE 155 is +Phidget DAQ1300 23 but +DEVICE cannot be set as main device
+                ##########################
+                ##########################
+                elif meter == 'Phidget DAQ1301 01':
+                    self.aw.qmc.device = 156
+                    message = QApplication.translate('Message','Device set to {0}').format(meter)
+                ##########################
+                ##########################
+                ####  DEVICE 157 is +Phidget DAQ1301 23 but +DEVICE cannot be set as main device
+                ##########################
+                ##########################
+                ####  DEVICE 158 is +Phidget DAQ1301 45 but +DEVICE cannot be set as main device
+                ##########################
+                ##########################
+                ####  DEVICE 159 is +Phidget DAQ1301 67 but +DEVICE cannot be set as main device
+                ##########################
 
                 # ADD DEVICE:
 
@@ -3066,12 +3136,12 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
     # - add an elif entry above to specify the default serial settings
             #extra devices serial config
             #set of different serial settings modes options
-            ssettings: Final = [[9600,8,'O',1,0.5],[19200,8,'E',1,0.5],[2400,7,'E',1,1],[9600,8,'N',1,0.5],
-                         [19200,8,'N',1,0.5],[2400,8,'N',1,1],[9600,8,'E',1,0.5],[38400,8,'E',1,0.5],[115200,8,'N',1,0.4],[57600,8,'N',1,0.4]]
+            ssettings: Final[List[Tuple[int,int,str,int,float]]] = [(9600,8,'O',1,0.5),(19200,8,'E',1,0.5),(2400,7,'E',1,1),(9600,8,'N',1,0.5),
+                         (19200,8,'N',1,0.5),(2400,8,'N',1,1),(9600,8,'E',1,0.5),(38400,8,'E',1,0.5),(115200,8,'N',1,0.4),(57600,8,'N',1,0.4)]
             #map device index to a setting mode (choose the one that matches the device)
     # ADD DEVICE: to add a device you have to modify several places. Search for the tag "ADD DEVICE:"in the code
     # - add an entry to devsettings below (and potentially to ssettings above)
-            devssettings: Final = [
+            devssettings: Final[List[int]] = [
                 0, # 0
                 1, # 1
                 2, # 2
@@ -3217,12 +3287,26 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                 9, # 142
                 9, # 143
                 9, # 144
-                9  # 145
+                9, # 145
+                1, # 146
+                1, # 147
+                1, # 148
+                1, # 149
+                7, # 150
+                1, # 151
+                1, # 152
+                1, # 153
+                1, # 154
+                1, # 155
+                1, # 156
+                1, # 157
+                1, # 158
+                1  # 159
                 ]
             #init serial settings of extra devices
             for i, _ in enumerate(self.aw.qmc.extradevices):
                 if self.aw.qmc.extradevices[i] < len(devssettings) and devssettings[self.aw.qmc.extradevices[i]] < len(ssettings):
-                    dsettings = ssettings[devssettings[self.aw.qmc.extradevices[i]]]
+                    dsettings: Tuple[int,int,str,int,float] = ssettings[devssettings[self.aw.qmc.extradevices[i]]]
                     if i < len(self.aw.extrabaudrate):
                         self.aw.extrabaudrate[i] = dsettings[0]
                     else:
@@ -3255,7 +3339,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             self.aw.qmc.ETfunction = str(self.ETfunctionedit.text())
             self.aw.qmc.BTfunction = str(self.BTfunctionedit.text())
             if self.aw.qmc.BTcurve != self.BTcurve.isChecked():
-                # we reset the chached main event annotation positions as those annotations are now rendered on the other curve
+                # we reset the cached main event annotation positions as those annotations are now rendered on the other curve
                 self.aw.qmc.l_annotations_dict = {}
             self.aw.qmc.ETcurve = self.ETcurve.isChecked()
             self.aw.qmc.BTcurve = self.BTcurve.isChecked()
@@ -3382,7 +3466,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 
     @pyqtSlot(bool)
     def showExtradevHelp(self):
-        from help import symbolic_help
+        from help import symbolic_help # type: ignore [attr-defined] # pylint: disable=no-name-in-module
         self.helpdialog = self.aw.showHelpDialog(
                 self,            # this dialog as parent
                 self.helpdialog, # the existing help dialog
@@ -3391,7 +3475,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 
     @pyqtSlot(bool)
     def showSymbolicHelp(self):
-        from help import symbolic_help
+        from help import symbolic_help # type: ignore [attr-defined] # pylint: disable=no-name-in-module
         self.helpdialog = self.aw.showHelpDialog(
                 self,            # this dialog as parent
                 self.helpdialog, # the existing help dialog
@@ -3400,7 +3484,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 
     @pyqtSlot(bool)
     def showhelpprogram(self,_=False):
-        from help import programs_help
+        from help import programs_help # type: ignore [attr-defined] # pylint: disable=no-name-in-module
         self.helpdialog = self.aw.showHelpDialog(
                 self,            # this dialog as parent
                 self.helpdialog, # the existing help dialog

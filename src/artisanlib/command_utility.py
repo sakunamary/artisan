@@ -27,16 +27,16 @@ def handleCommands():
 
     for arg in sys.argv:
 
-        if arg in ('-v', '--Version'):
+        if arg in {'-v', '--Version'}:
             print (f'Artisan  Version {__version__}')
 
             return False
 
-        if arg in ('-h', '--Help'):
+        if arg in {'-h', '--Help'}:
             # To write a text that is not indented
             # the text must be written like this
-            helpText ="""
-Artisan  Version {}
+            helpText = """
+Artisan Version {}
 
 Usage:
 artisan
@@ -52,7 +52,7 @@ Options:
     -v, --Version Show version number
 """
 
-            print(helpText)
+            print(helpText.format(__version__))
             return False
 
     return True

@@ -18,12 +18,11 @@
 import sys
 import time
 import logging
-from typing import Optional, List, Dict, Tuple, Union, TYPE_CHECKING
-from typing_extensions import Final  # Python <=3.7
+from typing import Final, Optional, List, Dict, Tuple, Union, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from artisanlib.main import ApplicationWindow # pylint: disable=unused-import
-    from pymodbus.client import ModbusSerialClient, ModbusTcpClient, ModbusUdpClient # pylint: disable=unused-import
+    from pymodbus.client import ModbusBaseClient # pylint: disable=unused-import
     from pymodbus.payload import BinaryPayloadBuilder # pylint: disable=unused-import
     from pymodbus.payload import BinaryPayloadDecoder # pylint: disable=unused-import
     from pymodbus.pdu import ModbusResponse # pylint: disable=unused-import
@@ -42,48 +41,54 @@ from artisanlib.util import debugLogLevelActive
 _log: Final[logging.Logger] = logging.getLogger(__name__)
 
 
-def convert_to_bcd(decimal):
-    ''' Converts a decimal value to a bcd value
+def convert_to_bcd(value:int) -> int:
+    """Converts a decimal value to a bcd value
 
-    :param value: The decimal value to to pack into bcd
-    :returns: The number in bcd form
-    '''
+    Args:
+        value: the decimal value to to pack into bcd
+
+    Returns:
+        The number in bcd form
+    """
     place, bcd = 0, 0
-    while decimal > 0:
-        nibble = decimal % 10
+    while value > 0:
+        nibble = value % 10
         bcd += nibble << place
-        decimal = decimal // 10
+        value = value // 10
         place += 4
     return bcd
 
 
-def convert_from_bcd(bcd):
-    ''' Converts a bcd value to a decimal value
+def convert_from_bcd(value: int) -> int:
+    """Converts a bcd value to a decimal value
 
-    :param value: The value to unpack from bcd
-    :returns: The number in decimal form
-    '''
+    Args:
+        value: the value to unpack from bcd
+
+    Returns:
+        The number in decimal form
+    """
     place, decimal = 1, 0
-    while bcd > 0:
-        nibble = bcd & 0xf
+    while value > 0:
+        nibble = value & 0xf
         decimal += nibble * place
-        bcd >>= 4
+        value >>= 4
         place *= 10
     return decimal
 
 def getBinaryPayloadBuilder(byteorderLittle:bool = True, wordorderLittle:bool = False) -> 'BinaryPayloadBuilder':
     from pymodbus.constants import Endian
     from pymodbus.payload import BinaryPayloadBuilder
-    byteorder = Endian.Little if byteorderLittle else Endian.Big
-    wordorder = Endian.Little if wordorderLittle else Endian.Big
+    byteorder = Endian.LITTLE if byteorderLittle else Endian.BIG
+    wordorder = Endian.LITTLE if wordorderLittle else Endian.BIG
     return BinaryPayloadBuilder(byteorder=byteorder, wordorder=wordorder)
 
-def getBinaryPayloadDecoderFromRegisters(registers, byteorderLittle:bool = True, wordorderLittle:bool = False) -> 'BinaryPayloadDecoder':
+def getBinaryPayloadDecoderFromRegisters(registers:List[int], byteorderLittle:bool = True, wordorderLittle:bool = False) -> 'BinaryPayloadDecoder':
     from pymodbus.constants import Endian
     from pymodbus.payload import BinaryPayloadDecoder
-    byteorder = Endian.Little if byteorderLittle else Endian.Big
-    wordorder = Endian.Little if wordorderLittle else Endian.Big
-    return BinaryPayloadDecoder.fromRegisters(registers, byteorder=byteorder, wordorder=wordorder)
+    byteorder = Endian.LITTLE if byteorderLittle else Endian.BIG
+    wordorder = Endian.LITTLE if wordorderLittle else Endian.BIG
+    return BinaryPayloadDecoder.fromRegisters(registers, byteorder=byteorder, wordorder=wordorder) # type:ignore
 
 
 ###########################################################################################
@@ -92,7 +97,7 @@ def getBinaryPayloadDecoderFromRegisters(registers, byteorderLittle:bool = True,
 
 
 # pymodbus version
-class modbusport():
+class modbusport:
     """ this class handles the communications with all the modbus devices"""
 
     __slots__ = [ 'aw', 'modbus_serial_read_delay', 'modbus_serial_extra_read_delay', 'modbus_serial_write_delay', 'maxCount', 'readRetries', 'default_comport', 'comport', 'baudrate', 'bytesize', 'parity', 'stopbits',
@@ -129,7 +134,7 @@ class modbusport():
         self.PID_ON_action:str = ''
         self.PID_OFF_action:str = ''
 
-        self.channels:Final[int] = 8
+        self.channels:Final[int] = 10
         self.inputSlaves:List[int] = [0]*self.channels
         self.inputRegisters:List[int] = [0]*self.channels
         # decoding (default: 16bit uInt)
@@ -165,7 +170,7 @@ class modbusport():
         self.PIDmultiplier:int = 0  # 0:no, 1:10x, 2:100x # :Literal[0,1,2]
         self.byteorderLittle:bool = False
         self.wordorderLittle:bool = True
-        self.master:Optional[Union['ModbusSerialClient', 'ModbusTcpClient', 'ModbusUdpClient']] = None
+        self.master:Optional['ModbusBaseClient'] = None
         self.COMsemaphore:QSemaphore = QSemaphore(1)
         self.default_host:Final[str] = '127.0.0.1'
         self.host:str = self.default_host # the TCP/UDP host
@@ -179,42 +184,42 @@ class modbusport():
         #    4: UDP
         self.lastReadResult:Optional[int] = None # this is set by eventaction following some custom button/slider Modbus actions with "read" command
 
-        self.commError:int = 0 # number of errors that occured after the last connect; cleared by receiving proper data
+        self.commError:int = 0 # number of errors that occurred after the last connect; cleared by receiving proper data
 
     # this guarantees a minimum of 30 milliseconds between readings and 80ms between writes (according to the Modbus spec) on serial connections
     # this sleep delays between requests seems to be beneficial on slow RTU serial connections like those of the FZ-94
     def sleepBetween(self, write:bool = False) -> None:
         if write:
             pass # handled in MODBUS lib
-#            if self.type in [3,4]: # TCP or UDP
+#            if self.type in {3,4}: # TCP or UDP
 #                pass
 #            else:
 #                time.sleep(self.modbus_serial_write_delay)
-        elif self.type in [3, 4]: # delay between writes only on serial connections
+        elif self.type in {3, 4}: # delay between writes only on serial connections
             pass
         else:
             time.sleep(self.modbus_serial_read_delay + self.modbus_serial_extra_read_delay)
 
     @staticmethod
-    def address2register(addr, code:int = 3) -> int:
-        if code in [3, 6]:
-            return addr - 40001
-        return addr - 30001
+    def address2register(addr:Union[float, int], code:int = 3) -> int:
+        if code in {3, 6}:
+            return int(addr) - 40001
+        return int(addr) - 30001
 
     def isConnected(self) -> bool:
-        return self.master is not None and bool(self.master.socket)
+        return self.master is not None and bool(self.master.connected) # and bool(self.master.socket)
 
     def disconnect(self) -> None:
-        _log.debug('disconnect()')
         try:
             if self.master is not None:
+                _log.debug('disconnect()')
                 self.master.close()
+                self.clearReadingsCache()
                 self.aw.sendmessage(QApplication.translate('Message', 'MODBUS disconnected'))
                 del self.master
         except Exception as e: # pylint: disable=broad-except
             _log.exception(e)
         self.master = None
-        self.clearReadingsCache()
 
     def clearCommError(self) -> None:
         if self.commError>0:
@@ -222,7 +227,7 @@ class modbusport():
         self.commError = 0
 
     def disconnectOnError(self) -> None:
-        # we only disconnect on error if mechanism is active, we are no longer connected or there is a IO commError, [ and we are on serial MODBUS (IP MODBUS reconnects automtically) NOTE: this seems to succeed in any case!?]
+        # we only disconnect on error if mechanism is active, we are no longer connected or there is a IO commError, [ and we are on serial MODBUS (IP MODBUS reconnects automatically) NOTE: this seems to succeed in any case!?]
         if self.disconnect_on_error and (self.commError>self.acceptable_errors or not self.isConnected()): # and self.type < 3:
             _log.info('MODBUS disconnectOnError: %s', self.commError)
             self.disconnect()
@@ -237,9 +242,7 @@ class modbusport():
         _log.info('reconnect()')
 
     def connect(self) -> None:
-#        if self.master and not self.master.socket:
-#            self.master = None
-        if self.master is None or not self.master.socket:
+        if not self.isConnected():
             self.commError = 0
             try:
                 # as in the following the port is None, no port is opened on creation of the (py)serial object
@@ -248,7 +251,7 @@ class modbusport():
                     from pymodbus.transaction import ModbusAsciiFramer
                     self.master = ModbusSerialClient(
                         framer=ModbusAsciiFramer,
-                        #method='ascii', # depricated in pymodbus 3.x
+                        #method='ascii', # deprecated in pymodbus 3.x
                         port=self.comport,
                         baudrate=self.baudrate,
                         bytesize=self.bytesize,
@@ -268,7 +271,7 @@ class modbusport():
                     from pymodbus.transaction import ModbusBinaryFramer
                     self.master = ModbusSerialClient(
                         framer=ModbusBinaryFramer,
-                        #method='binary', # depricated in pymodbus 3.x
+                        #method='binary', # deprecated in pymodbus 3.x
                         port=self.comport,
                         baudrate=self.baudrate,
                         bytesize=self.bytesize,
@@ -332,7 +335,7 @@ class modbusport():
                     from pymodbus.transaction import ModbusRtuFramer
                     self.master = ModbusSerialClient(
                         framer=ModbusRtuFramer,
-                        #method='rtu', # depricated in pymodbus 3.x
+                        #method='rtu', # deprecated in pymodbus 3.x
                         port=self.comport,
                         baudrate=self.baudrate,
                         bytesize=self.bytesize,
@@ -402,7 +405,7 @@ class modbusport():
     # first result signals an error
     # second result signals a server error which requires a disconnect/reconnect
     @staticmethod
-    def invalidResult(res, count:int) -> Tuple[bool, bool]:
+    def invalidResult(res:Any, count:int) -> Tuple[bool, bool]:
         from pymodbus.pdu import ExceptionResponse
         if res is None:
             _log.info('invalidResult(%d) => None', count)
@@ -483,15 +486,15 @@ class modbusport():
                                 #note: logged chars should be unicode not binary
                                 if self.aw.seriallogflag and res is not None and hasattr(res, 'registers'):
                                     if self.type < 3: # serial MODBUS
-                                        ser_str = f'MODBUS readActiveregisters : {self.formatMS(tx,time.time())}ms => {self.comport},{self.baudrate},{self.bytesize},{self.parity},{self.stopbits},{self.timeout} || Slave = {slave} || Register = {register} || Code = {code} || Rx# = {len(res.registers)}' # pyright: ignore # Cannot access member "registers" for type "ModbusResponse"  Member "registers" is unknown (reportGeneralTypeIssues)
+                                        ser_str = f'MODBUS readActiveregisters : {self.formatMS(tx,time.time())}ms => {self.comport},{self.baudrate},{self.bytesize},{self.parity},{self.stopbits},{self.timeout} || Slave = {slave} || Register = {register} || Code = {code} || Rx# = {len(res.registers)}'
                                     else: # IP MODBUS
-                                        ser_str = f'MODBUS readActiveregisters : {self.formatMS(tx,time.time())}ms => {self.host}:{self.port} || Slave = {slave} || Register = {register} || Code = {code} || Rx# = {len(res.registers)}' # pyright: ignore # Cannot access member "registers" for type "ModbusResponse" Member "registers" is unknown (reportGeneralTypeIssues)
+                                        ser_str = f'MODBUS readActiveregisters : {self.formatMS(tx,time.time())}ms => {self.host}:{self.port} || Slave = {slave} || Register = {register} || Code = {code} || Rx# = {len(res.registers)}'
                                     _log.debug(ser_str)
                                     self.aw.addserial(ser_str)
 
                                 if res is not None and hasattr(res, 'registers'):
                                     self.clearCommError()
-                                    self.cacheReadings(code,slave,register,res.registers)  # pyright: ignore # Cannot access member "registers" for type "ModbusResponse" Member "registers" is unknown (reportGeneralTypeIssues)
+                                    self.cacheReadings(code,slave,register,res.registers)
 
         except Exception as ex: # pylint: disable=broad-except
             _log.debug(ex)
@@ -675,7 +678,7 @@ class modbusport():
                 builder.add_32bit_float(float(value))
                 payload = builder.build()
                 #payload:List[int] = [int.from_bytes(b,("little" if self.byteorderLittle else "big")) for b in builder.build()]
-                self.master.write_registers(int(register),payload,slave=int(slave),skip_encode=True) # type: ignore # mypy/pyright: ignore # Argument of type "list[bytes]" cannot be assigned to parameter "values" of type "List[int] | int" in function "write_registers"
+                self.master.write_registers(int(register),payload,slave=int(slave),skip_encode=True) # type: ignore # pyright: ignore [reportGeneralTypeIssues] # Argument of type "list[bytes]" cannot be assigned to parameter "values" of type "List[int] | int" in function "write_registers"
                 time.sleep(.03)
         except Exception as ex: # pylint: disable=broad-except
             _log.info('writeWord(%d,%d,%s) failed', slave, register, value)
@@ -704,7 +707,7 @@ class modbusport():
                 builder.add_16bit_uint(r)
                 payload = builder.build()
                 #payload:List[int] = [int.from_bytes(b,("little" if self.byteorderLittle else "big")) for b in builder.build()]
-                self.master.write_registers(int(register),payload,slave=int(slave),skip_encode=True) # type:ignore # mypy/pyright: ignore # Argument of type "list[bytes]" cannot be assigned to parameter "values" of type "List[int] | int" in function "write_registers"
+                self.master.write_registers(int(register),payload,slave=int(slave),skip_encode=True) # type:ignore # pyright: ignore [reportGeneralTypeIssues] # Argument of type "list[bytes]" cannot be assigned to parameter "values" of type "List[int] | int" in function "write_registers"
                 time.sleep(.03)
         except Exception as ex: # pylint: disable=broad-except
             _log.info('writeBCD(%d,%d,%s) failed', slave, register, value)
@@ -734,7 +737,7 @@ class modbusport():
                 builder.add_32bit_int(int(value))
                 payload = builder.build()
                 #payload:List[int] = [int.from_bytes(b,("little" if self.byteorderLittle else "big")) for b in builder.build()]
-                self.master.write_registers(int(register),payload,slave=int(slave),skip_encode=True) # type: ignore # mypy/pyright: ignore # Argument of type "list[bytes]" cannot be assigned to parameter "values" of type "List[int] | int" in function "write_registers"
+                self.master.write_registers(int(register),payload,slave=int(slave),skip_encode=True) # type: ignore # pyright: ignore [reportGeneralTypeIssues] # Argument of type "list[bytes]" cannot be assigned to parameter "values" of type "List[int] | int" in function "write_registers"
                 time.sleep(.03)
         except Exception as ex: # pylint: disable=broad-except
             _log.info('writeLong(%d,%d,%s) failed', slave, register, value)
@@ -779,10 +782,14 @@ class modbusport():
             if self.isConnected():
                 assert self.master is not None
                 while True:
-                    if code==3:
-                        res = self.master.read_holding_registers(int(register),2,slave=int(slave))
-                    else:
-                        res = self.master.read_input_registers(int(register),2,slave=int(slave))
+                    try:
+                        if code==3:
+                            res = self.master.read_holding_registers(int(register),2,slave=int(slave))
+                        else:
+                            res = self.master.read_input_registers(int(register),2,slave=int(slave))
+                    except Exception as ex: # pylint: disable=broad-except
+                        _log.debug(ex)
+                        res = None
                     error, disconnect = self.invalidResult(res,2)
                     if error:
                         error_disconnect = error_disconnect or disconnect
@@ -795,7 +802,7 @@ class modbusport():
                     else:
                         break
                 if res is not None and hasattr(res, 'registers'):
-                    decoder = getBinaryPayloadDecoderFromRegisters(res.registers, self.byteorderLittle, self.wordorderLittle)  # pyright: ignore # Cannot access member "registers" for type "ModbusResponse"
+                    decoder = getBinaryPayloadDecoderFromRegisters(res.registers, self.byteorderLittle, self.wordorderLittle)
                     r = decoder.decode_32bit_float()
                     # we clear the previous error and send a message
                     self.clearCommError()
@@ -857,10 +864,14 @@ class modbusport():
             if self.isConnected():
                 assert self.master is not None
                 while True:
-                    if code==3:
-                        res = self.master.read_holding_registers(int(register),2,slave=int(slave))
-                    else:
-                        res = self.master.read_input_registers(int(register),2,slave=int(slave))
+                    try:
+                        if code==3:
+                            res = self.master.read_holding_registers(int(register),2,slave=int(slave))
+                        else:
+                            res = self.master.read_input_registers(int(register),2,slave=int(slave))
+                    except Exception as ex: # pylint: disable=broad-except
+                        _log.debug(ex)
+                        res = None
                     error, disconnect = self.invalidResult(res,2)
                     if error:
                         error_disconnect = error_disconnect or disconnect
@@ -873,11 +884,11 @@ class modbusport():
                     else:
                         break
                 if res is not None and hasattr(res, 'registers'):
-                    decoder = getBinaryPayloadDecoderFromRegisters(res.registers, self.byteorderLittle, self.wordorderLittle)  # pyright: ignore # Cannot access member "registers" for type "ModbusResponse"
-                    r = decoder.decode_32bit_uint()
-                    self.clearCommError()
-                    time.sleep(0.020) # we add a small sleep between requests to help out the slow Loring electronic
-                    return convert_from_bcd(r)
+                    decoder = getBinaryPayloadDecoderFromRegisters(res.registers, self.byteorderLittle, self.wordorderLittle)
+                    if (r := decoder.decode_32bit_uint()) is not None:
+                        self.clearCommError()
+                        time.sleep(0.020) # we add a small sleep between requests to help out the slow Loring electronic
+                        return convert_from_bcd(r)
             return None
         except Exception as ex: # pylint: disable=broad-except
             _log.info('readBCD(%d,%d,%d,%s) failed', slave, register, code, force)
@@ -925,13 +936,13 @@ class modbusport():
             _log.debug(ex)
         error, _ = self.invalidResult(res,1)
         if res is not None and not error:
-            if code in [1,2]:
-                if hasattr(res, 'bits') and res.bits[0]:  # pyright: ignore # Cannot access member "bits" for type "ModbusResponse"
+            if code in {1, 2}:
+                if hasattr(res, 'bits') and res.bits[0]:
                     return 1
                 return 0
             if hasattr(res, 'registers'):
-                decoder = getBinaryPayloadDecoderFromRegisters(res.registers, self.byteorderLittle, self.wordorderLittle)  # pyright: ignore # Cannot access member "registers" for type "ModbusResponse"
-                r = decoder.decode_16bit_uint()
+                decoder = getBinaryPayloadDecoderFromRegisters(res.registers, self.byteorderLittle, self.wordorderLittle)
+                r = int(decoder.decode_16bit_uint())
 #                _log.debug('  res.registers => %s', res.registers)
                 _log.debug('  decoder.decode_16bit_uint() => %s', r)
                 return r
@@ -999,13 +1010,13 @@ class modbusport():
                     else:
                         break
                 if res is not None:
-                    if code in [1,2] and hasattr(res, 'bits'):
-                        r = 1 if res is not None and res.bits[0] else 0  # pyright: ignore # Cannot access member "registers" for type "bits"
+                    if code in {1, 2} and hasattr(res, 'bits'):
+                        r = 1 if res is not None and res.bits[0] else 0
                         # we clear the previous error and send a message
                         self.clearCommError()
                         return r
                     if hasattr(res, 'registers'):
-                        decoder = getBinaryPayloadDecoderFromRegisters(res.registers, self.byteorderLittle, self.wordorderLittle) # pyright: ignore # Cannot access member "registers" for type "ModbusResponse"
+                        decoder = getBinaryPayloadDecoderFromRegisters(res.registers, self.byteorderLittle, self.wordorderLittle)
                         if signed:
                             r = decoder.decode_16bit_int()
                         else:
@@ -1087,7 +1098,7 @@ class modbusport():
                     else:
                         break
                 if res is not None and hasattr(res, 'registers'):
-                    decoder = getBinaryPayloadDecoderFromRegisters(res.registers, self.byteorderLittle, self.wordorderLittle) # pyright: ignore # Cannot access member "registers" for type "ModbusResponse"
+                    decoder = getBinaryPayloadDecoderFromRegisters(res.registers, self.byteorderLittle, self.wordorderLittle)
                     if signed:
                         r = decoder.decode_32bit_int()
                     else:
@@ -1170,12 +1181,12 @@ class modbusport():
                     else:
                         break
                 if res is not None and hasattr(res, 'registers'):
-                    decoder = getBinaryPayloadDecoderFromRegisters(res.registers, self.byteorderLittle, self.wordorderLittle) # pyright: ignore # Cannot access member "registers" for type "ModbusResponse"
-                    r = decoder.decode_16bit_uint()
-                    # we clear the previous error and send a message
-                    self.clearCommError()
-                    time.sleep(0.020) # we add a small sleep between requests to help out the slow Loring electronic
-                    return convert_from_bcd(r)
+                    decoder = getBinaryPayloadDecoderFromRegisters(res.registers, self.byteorderLittle, self.wordorderLittle)
+                    if (r := decoder.decode_16bit_uint()) is not None:
+                        # we clear the previous error and send a message
+                        self.clearCommError()
+                        time.sleep(0.020) # we add a small sleep between requests to help out the slow Loring electronic
+                        return convert_from_bcd(r)
             return None
         except Exception as ex: # pylint: disable=broad-except
             _log.info('readBCDint(%d,%d,%d,%s) failed', slave, register, code, force)

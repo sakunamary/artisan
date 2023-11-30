@@ -23,8 +23,8 @@ try:
 except ImportError:
     from PyQt5.QtCore import QDateTime  # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
 
-from typing import Optional,  Tuple, List, Union, TYPE_CHECKING
-from typing_extensions import TypedDict  # Python <=3.7
+from typing import TypedDict, Optional,  Tuple, List, Union, TYPE_CHECKING
+from typing_extensions import Required # Python <3.11
 
 if TYPE_CHECKING:
     from plus.stock import BlendList, Blend
@@ -188,6 +188,7 @@ class ProfileData(TypedDict, total=False):
     specialeventstype: List[int]
     specialeventsvalue: List[float]
     specialeventsStrings: List[str]
+    default_etypes: List[bool]
     etypes: List[str]
     cuppingnotes: str
     roastingnotes: str
@@ -286,7 +287,7 @@ class ProfileData(TypedDict, total=False):
     plus_sync_record_hash: str
 
 
-class ExtraDeviceSettings(TypedDict): #, total=False):
+class ExtraDeviceSettings(TypedDict):
     extradevices           : List[int]
     extradevicecolor1      : List[str]
     extradevicecolor2      : List[str]
@@ -321,7 +322,7 @@ Palette = Tuple[
     List[int],    # 3: event button visibility (same length as event button actions)
     List[str],    # 4: event button actions (same length as event button actions)
     List[str],    # 5: event button labels (same length as event button actions)
-    List[str],    # 6: event button descriptons (same length as event button actions)
+    List[str],    # 6: event button descriptions (same length as event button actions)
     List[str],    # 7: event button colors (same length as event button actions)
     List[str],    # 8: event button text colors (same length as event button actions)
     List[int],    # 9: slider visibilities; len=self.eventsliders
@@ -345,7 +346,7 @@ Palette = Tuple[
     List[int]     # 27 quantifier SV flags; len=self.eventsliders
     ]
 
-class BTU(TypedDict, total=False):
+class BTU(TypedDict):
     load_pct    : float
     duration    : float
     BTUs        : float
@@ -448,11 +449,11 @@ class CurveSimilarity(TypedDict):
     segmentresultstr: str
 
 class RecentRoast(TypedDict, total=False):
-    title: str
+    title: Required[str]
     beans: str
-    weightIn: float
+    weightIn: Required[float]
     weightOut: float
-    weightUnit: str
+    weightUnit: Required[str]
     volumeIn: float
     volumeOut: float
     volumeUnit: str
@@ -476,7 +477,7 @@ class RecentRoast(TypedDict, total=False):
     plus_coffee_label:Optional[str]
     plus_blend_label:Optional[str]
     plus_blend_spec:Optional['Blend']
-    plus_blend_spec_labels: List[str]
+    plus_blend_spec_labels: Optional[List[str]]
 
 class SerialSettings(TypedDict):
     port: str
@@ -485,3 +486,15 @@ class SerialSettings(TypedDict):
     stopbits: int
     parity: str
     timeout: float
+
+class BTBreakParams(TypedDict, total=False):
+    offset_charge: float
+    offset_drop: float
+    d_drop: float
+    d_charge: float
+    tight: int
+    loose: int
+    f: float
+    maxdpre: float
+    f_dtwice: float
+    dpre_dpost_diff: float

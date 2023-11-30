@@ -17,6 +17,12 @@
 
 from artisanlib.dialogs import ArtisanDialog
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from artisanlib.main import ApplicationWindow # pylint: disable=unused-import
+    from PyQt6.QtWidgets import QWidget # pylint: disable=unused-import
+
 try:
     from PyQt6.QtCore import Qt, pyqtSlot, QSettings # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtWidgets import (QApplication, QLabel, QHBoxLayout, QVBoxLayout, QCheckBox, # @UnusedImport @Reimport  @UnresolvedImport
@@ -27,7 +33,7 @@ except ImportError:
                                  QDialogButtonBox, QGridLayout, QLineEdit, QSpinBox, QLayout) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
 
 class batchDlg(ArtisanDialog):
-    def __init__(self, parent, aw) -> None:
+    def __init__(self, parent:'QWidget', aw:'ApplicationWindow') -> None:
         super().__init__(parent, aw)
         self.setModal(True)
         self.setWindowTitle(QApplication.translate('Form Caption','Batch'))
@@ -96,7 +102,9 @@ class batchDlg(ArtisanDialog):
         mainLayout.addSpacing(10)
         mainLayout.addLayout(buttonLayout)
         self.setLayout(mainLayout)
-        self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok).setFocus()
+        ok_button = self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
+        if ok_button is not None:
+            ok_button.setFocus()
 
         settings = QSettings()
         if settings.contains('BatchPosition'):
@@ -105,7 +113,7 @@ class batchDlg(ArtisanDialog):
         mainLayout.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
 
     @pyqtSlot(int)
-    def toggleCounterFlag(self,_):
+    def toggleCounterFlag(self, _:int) -> None:
         if self.batchcheckbox.isChecked():
             self.prefixEdit.setEnabled(True)
             self.counterSpinBox.setEnabled(True)
@@ -116,7 +124,7 @@ class batchDlg(ArtisanDialog):
             self.neverOverwriteCheckbox.setEnabled(False)
 
     @pyqtSlot()
-    def batchChanged(self):
+    def batchChanged(self) -> None:
         self.aw.qmc.batchprefix = self.prefixEdit.text()
         if self.batchcheckbox.isChecked():
             self.aw.qmc.batchcounter = self.counterSpinBox.value()
@@ -128,8 +136,8 @@ class batchDlg(ArtisanDialog):
         self.close()
 
     @pyqtSlot()
-    def close(self):
+    def close(self) -> bool:
         #save window position (only; not size!)
         settings = QSettings()
         settings.setValue('BatchPosition',self.frameGeometry().topLeft())
-        super().close()
+        return super().close()

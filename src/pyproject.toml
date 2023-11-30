@@ -1,8 +1,50 @@
+[project]
+name = 'Artisan'
+dynamic = ['version']
+description = "Artisan is a software that helps coffee roasters record, analyze, and control roast profiles."
+readme = {file = 'README.txt', content-type='text/markdown'}
+authors = [
+    {name = 'Rafael Cobo'},
+    {name = 'Marko Luther'},
+    {name = 'Dave Baxter'}
+]
+maintainers = [
+    {name = 'Marko Luther'},
+    {name = 'Dave Baxter'}
+]
+license = {file = 'LICENSE'}
+requires-python = '>=3.8'
+keywords = ['roasting', 'roast logging', 'speciality coffee']
+classifiers = [
+    'Development Status :: 5 - Production/Stable',
+    'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
+    "Operating System :: Windows",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    'Programming Language :: Python',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3 :: Only',
+    'Programming Language :: Python :: Implementation :: CPython',
+    'Topic :: Other/Nonlisted Topic'
+]
+
+[project.urls]
+'Homepage' = 'https://artisan-scope.org/'
+'Documentation' = 'https://artisan-scope.org/docs/quick-start-guide/'
+'Repository' = 'https://github.com/artisan-roaster-scope/artisan'
+'Issue Tracker' = 'https://github.com/artisan-roaster-scope/artisan/issues'
+'Changelog' = 'https://github.com/artisan-roaster-scope/artisan/blob/master/wiki/ReleaseHistory.md'
+
+
 ## black
 
 [tool.black]
-line-length = 79
-target-version = ['py39']
+line-length = 100
+target-version = ['py38']
 include = '\.pyi?$'
 extend-exclude = '''
 # A regex preceded with ^/ will apply only to files and directories
@@ -14,6 +56,21 @@ extend-exclude = '''
 
 [tool.pylint.MASTER]
 load-plugins = [
+#    'pylint.extensions.bad_builtin', # suggest comprehension over filter/join/map
+    'pylint.extensions.check_elif',
+#    'pylint.extensions.code_style', # suggests the := operator; NOT YET
+    'pylint.extensions.comparison_placement',
+#    'pylint.extensions.confusing_elif', # nested if => functions; NOT YET
+    'pylint.extensions.docparams',
+    'pylint.extensions.docstyle',
+    'pylint.extensions.eq_without_hash',
+    'pylint.extensions.for_any_all',
+    'pylint.extensions.overlapping_exceptions',
+#    'pylint.extensions.private_import',
+    'pylint.extensions.set_membership',
+    'pylint.extensions.typing',
+#    'pylint.extensions.redefined_variable_type', # NOT YET
+#    'pylint.extensions.mccabe', # complexity rating for functions; NOT YET
     'pylint.extensions.no_self_use'
 ]
 ignore-paths = [ "^uic/.*$",
@@ -21,6 +78,16 @@ ignore-paths = [ "^uic/.*$",
                  "^dist/.*$",
                  "^proto/.*$",
                  "^test/.*$" ]
+
+# Use multiple processes to speed up Pylint. Specifying 0 will auto-detect the
+# number of processors available to use.
+jobs = "0"
+
+# Minimum supported python version
+py-version = "3.8"
+
+# Pickle collected data for later comparisons.
+persistent = "no"
 
 # A comma-separated list of package or module names from where C extensions may
 # be loaded. Extensions are loading into the active Python interpreter and may
@@ -173,14 +240,48 @@ enable='''c-extension-no-member,'''
 
 [tool.mypy]
 files = ["artisanlib/*.py", "plus/*.py"]
-##python_version = "3.7"
+exclude = ['build', 'dist', 'uic']
+python_version = "3.9"
+# "3.8" throws "matplotlib/backends/backend_agg.py:393: error: Parenthesized context managers are only supported in Python 3.9 and greater"
+
+# Ensure full coverage
 check_untyped_defs = true
+disallow_incomplete_defs = true
+#disallow_untyped_calls = true # Not yet
+#disallow_untyped_defs = true # Not yet
+disallow_untyped_decorators = true
+#disallow_any_unimported = true # Not yet
+
+# Restrict dynamic typing
+#disallow_any_generics = true # Not yet
+disallow_subclassing_any = true
+warn_return_any = true
+
+# Some more checks
+local_partial_types = true
+strict_equality = true
+
+# Know exactly what we're doing
+warn_redundant_casts = true
+warn_unused_configs = true
+#warn_unused_ignores = true
+warn_unreachable = true
+#show_error_codes = true
+
+# Explicit is better than implicit
+no_implicit_optional = true
+
 
 plugins = ["numpy.typing.mypy_plugin"]
 
 [[tool.mypy.overrides]]
-module = "matplotlib.*"
+module = ["matplotlib.*", "aiohttp.*", "aiohttp.web.*", "aiohttp_jinja2.*"]
 ignore_missing_imports = true
+
+
+[[tool.mypy.overrides]]
+module = "uic.*"
+follow_imports = 'skip'
 
 
 ## ruff conf
@@ -192,9 +293,9 @@ ignore_missing_imports = true
 # flake8-simplify (SIM), flake8-gettext (INT), flake8-unused-arguments (ARG),
 # Error (PLE), Refactor (PLR), Warning (PLW)
 ## next: flake8-use-pathlib (PTH), flake8-print (T20)
-select = ["E", "F", "UP", "B", "A", "YTT", "COM", "C4", "DTZ", "PIE", "RSE", "RET", "SIM", "ARG", "PLE", "PLR", "PLW", "INT"]
+select = ["E", "F", "UP", "B", "A", "YTT", "COM", "C4", "DTZ", "PIE", "RSE", "RET", "SIM", "ARG", "PLE", "PLR", "PLW", "INT", "RUF013"]
 
-format = "pylint" # one of: text, json, junit, grouped, github, gitlab, pylint, azure
+output-format = "pylint" # one of: text, json, junit, grouped, github, gitlab, pylint, azure
 
 # Same as Black.
 line-length = 80
@@ -205,8 +306,8 @@ ignore = ["E402", "E501", "E741", "PLR0913", "PLR2004", "COM812", "PLR0912", "PL
 # Exclude a variety of commonly ignored directories.
 exclude = ["dist", "build", "proto", ".pytype", ".mypy_cache", ".git"]
 
-# Assume Python 3.7.
-target-version = "py37"
+# Assume Python 3.8.
+target-version = "py38"
 
 [tool.ruff.per-file-ignores]
 "uic/*.py" = ["UP004", "F401", "ARG002"]
@@ -223,7 +324,7 @@ exclude = ["proto"]
 reportMissingImports = true
 reportMissingTypeStubs = false
 
-pythonVersion = "3.7"
+pythonVersion = "3.8"
 pythonPlatform = "All"
 
 #typeCheckingMode = "strict" # "off", "basic", "strict"
@@ -236,3 +337,22 @@ pythonPlatform = "All"
 #reportUnknownArgumentType = false
 #reportGeneralTypeIssues = false
 useLibraryCodeForTypes = false
+
+
+## pytest conf
+
+[tool.pytest.ini_options]
+minversion = "7.4"
+addopts = "-ra -v"
+testpaths = [
+    "test",
+]
+pythonpath = [
+  "."
+]
+
+[tool.codespell]
+skip = '*.ts,./coverage,./build,./dist*,./htmlcov,./*.spec'
+count = ''
+quiet-level = 3
+ignore-words-list = 'ser,alog,nd,iterm,dout,te,commandi,dout,exitt,currenty,exaust,controle,coment,controle,outweight,everytime,sade'

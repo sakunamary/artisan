@@ -22,18 +22,18 @@ import threading
 import json
 import random
 
-from typing import List, Dict, Optional, Any, TYPE_CHECKING
-from typing_extensions import Final  # Python <=3.7
+from typing import Final, List, Dict, Optional, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
     import websocket # type: ignore # pylint: disable=unused-import
+    from artisanlib.main import ApplicationWindow # pylint: disable=unused-import
 
 try:
     from PyQt6.QtWidgets import QApplication # @UnusedImport @Reimport  @UnresolvedImport
 except ImportError:
     from PyQt5.QtWidgets import QApplication # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
 
-class wsport():
+class wsport:
 
     __slots__ = [ 'aw', 'default_host', 'host', 'port', 'path', 'machineID',  'lastReadResult', 'channels', 'readings', 'channel_requests', 'channel_nodes',
                     'channel_modes', 'connect_timeout', 'request_timeout', 'reconnect_interval', 'ping_interval', 'ping_timeout', 'id_node', 'machine_node',
@@ -41,7 +41,7 @@ class wsport():
                     'DRY_node', 'FCs_node', 'FCe_node', 'SCs_node', 'SCe_node', 'STARTonCHARGE', 'OFFonDROP', 'open_event', 'pending_events', 'active',
                     'ws', 'wst' ]
 
-    def __init__(self,aw) -> None:
+    def __init__(self, aw:'ApplicationWindow') -> None:
         self.aw = aw
 
         # connects to "ws://<host>:<port>/<path>"
@@ -97,7 +97,7 @@ class wsport():
         self.OFFonDROP:bool = False
 
         self.open_event:Optional[threading.Event] = None # an event set on connecting
-        self.pending_events:Dict[int, Any] = {} # message ids associated with pending threading.Event object or result
+        self.pending_events:Dict[int, Union[threading.Event, Dict]] = {} # message ids associated with pending threading.Event object or result
 
         self.active:bool = False
         self.ws:Optional['websocket.WebSocketApp'] = None  # the WebService client object
@@ -130,7 +130,7 @@ class wsport():
                         else:
                             # markCharge with a delay waiting for the recorder to be started up
                             delay = self.aw.qmc.delay * 2 # we delay the markCharge action by 2 sampling periods
-                        self.aw.qmc.markChargeSignal.emit(delay)
+                        self.aw.qmc.markChargeDelaySignal.emit(delay)
                         if self.aw.seriallogflag:
                             self.aw.addserial(f'wsport markCHARGE() with delay={delay} signal sent')
                 elif self.drop_message != '' and pushMessage == self.drop_message:
@@ -298,7 +298,7 @@ class wsport():
                 self.pending_events[message_id] = v
 
     # returns the response received for request with id or None
-    def getRequestResponse(self, message_id):
+    def getRequestResponse(self, message_id:int) -> Optional[Dict]:
         if message_id in self.pending_events:
             v = self.pending_events[message_id]
             del self.pending_events[message_id]
@@ -309,7 +309,7 @@ class wsport():
     # takes a request as dict to be send as JSON
     # and returns a dict generated from the JSON response
     # or None on exception or if block=False
-    def send(self, request:Dict, block=True) -> Optional[Dict]:
+    def send(self, request:Dict, block:bool = True) -> Optional[Dict]:
         try:
             connected = self.connect()
             if connected and self.ws is not None:

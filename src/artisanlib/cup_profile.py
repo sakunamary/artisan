@@ -20,6 +20,13 @@ from matplotlib import rcParams
 from artisanlib.dialogs import ArtisanResizeablDialog
 from artisanlib.widgets import MyQDoubleSpinBox
 
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from artisanlib.main import ApplicationWindow # pylint: disable=unused-import
+    from PyQt6.QtWidgets import QWidget # pylint: disable=unused-import
+    from PyQt6.QtGui import QCloseEvent # pylint: disable=unused-import
+
 try:
     from PyQt6.QtCore import (Qt, pyqtSlot, QSettings) # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtWidgets import (QApplication, QCheckBox, QHBoxLayout, QVBoxLayout, QLabel, # @UnusedImport @Reimport  @UnresolvedImport
@@ -32,7 +39,7 @@ except ImportError:
                                  QTableWidget, QDoubleSpinBox, QGroupBox) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
 
 class flavorDlg(ArtisanResizeablDialog):
-    def __init__(self, parent, aw) -> None:
+    def __init__(self, parent:'QWidget', aw:'ApplicationWindow') -> None:
         super().__init__(parent, aw)
         self.setModal(True)
         rcParams['path.effects'] = []
@@ -127,7 +134,9 @@ class flavorDlg(ArtisanResizeablDialog):
         self.setLayout(mainLayout)
         self.aw.qmc.updateFlavorchartValues() # fast incremental redraw
         self.aw.qmc.flavorchart()
-        self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok).setFocus()
+        ok_button = self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
+        if ok_button is not None:
+            ok_button.setFocus()
 
     @pyqtSlot(float)
     def setaspect(self,_):
@@ -172,7 +181,8 @@ class flavorDlg(ArtisanResizeablDialog):
                 self.flavortable.setCellWidget(i,1,valueSpinBox)
             self.flavortable.resizeColumnsToContents()
             header = self.flavortable.horizontalHeader()
-            header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+            if header is not None:
+                header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
 
     @pyqtSlot(bool)
     def showbackground(self,_):
@@ -297,7 +307,8 @@ class flavorDlg(ArtisanResizeablDialog):
         self.createFlavorTable()
         self.aw.qmc.flavorchart()
 
-    def closeEvent(self,_):
+    @pyqtSlot('QCloseEvent')
+    def closeEvent(self,_:Optional['QCloseEvent'] = None) -> None:
         self.close()
 
 #    @pyqtSlot()

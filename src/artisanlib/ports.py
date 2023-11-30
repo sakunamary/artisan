@@ -19,8 +19,13 @@ import sys
 import time
 import platform
 import logging
-from typing import List, Optional
-from typing_extensions import Final  # Python <=3.7
+from typing import Final, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from artisanlib.main import ApplicationWindow # noqa: F401 # pylint: disable=unused-import
+    from artisanlib.dialogs import HelpDlg # noqa: F401 # pylint: disable=unused-import
+    from PyQt6.QtWidgets import QWidget # pylint: disable=unused-import
+    from PyQt6.QtGui import QCloseEvent, QKeyEvent # pylint: disable=unused-import
 
 from artisanlib.util import toFloat, uchr, comma2dot
 from artisanlib.dialogs import ArtisanDialog, ArtisanResizeablDialog, PortComboBox
@@ -33,97 +38,97 @@ try:
     from PyQt6.QtWidgets import (QApplication, QWidget, QCheckBox, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, # @UnusedImport @Reimport  @UnresolvedImport
                                  QPushButton, QTabWidget, QComboBox, QDialogButtonBox, QGridLayout,QSizePolicy, # @UnusedImport @Reimport  @UnresolvedImport
                                  QGroupBox, QTableWidget, QTableWidgetItem, QDialog, QTextEdit, QDoubleSpinBox, # @UnusedImport @Reimport  @UnresolvedImport
-                                 QHeaderView, QMessageBox)  # @UnusedImport @Reimport  @UnresolvedImport
+                                 QHeaderView, QMessageBox, QScrollArea, QFrame)  # @UnusedImport @Reimport  @UnresolvedImport
 except ImportError:
     from PyQt5.QtCore import (Qt, pyqtSlot, QSettings) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtGui import QIntValidator # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtWidgets import (QApplication, QWidget, QCheckBox, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
                                  QPushButton, QTabWidget, QComboBox, QDialogButtonBox, QGridLayout,QSizePolicy, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
                                  QGroupBox, QTableWidget, QTableWidgetItem, QDialog, QTextEdit, QDoubleSpinBox, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
-                                 QHeaderView, QMessageBox) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
+                                 QHeaderView, QMessageBox, QScrollArea, QFrame) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
 
 
 _log: Final[logging.Logger] = logging.getLogger(__name__)
 
 class scanModbusDlg(ArtisanDialog):
-    def __init__(self, parent, aw) -> None:
+    def __init__(self, parent:QWidget, aw:'ApplicationWindow') -> None:
         super().__init__(parent, aw)
         self.setModal(True)
         # current setup selected in the MODBUS tab
-        self.port = ''
-        self.baudrate = 19200
-        self.bytesize = 8
-        self.stopbits = 1
-        self.parity = 'N'
-        self.timeout = 1
-        self.mtype = 1
-        self.mhost = '127.0.0.1'
-        self.mport = 502
+        self.port:str = ''
+        self.baudrate:int = 19200
+        self.bytesize:int = 8
+        self.stopbits:int = 1
+        self.parity:str = 'N'
+        self.timeout:float = 0.5
+        self.mtype:int = 1
+        self.mhost:str = '127.0.0.1'
+        self.mport:int = 502
         # save current MODBUS serial, type, host, port settings
-        self.port_aw = self.aw.modbus.comport
-        self.baudrate_aw = self.aw.modbus.baudrate
-        self.bytesize_aw = self.aw.modbus.bytesize
-        self.parity_aw = self.aw.modbus.parity
-        self.stopbits_aw = self.aw.modbus.stopbits
-        self.timeout_aw = self.aw.modbus.timeout
-        self.mtype_aw = self.aw.modbus.type
-        self.mhost_aw = self.aw.modbus.host
-        self.mport_aw = self.aw.modbus.port
-        self.stop = False # if True stop the processing
+        self.port_aw:str = self.aw.modbus.comport
+        self.baudrate_aw:int = self.aw.modbus.baudrate
+        self.bytesize_aw:int = self.aw.modbus.bytesize
+        self.parity_aw:str = self.aw.modbus.parity
+        self.stopbits_aw:int = self.aw.modbus.stopbits
+        self.timeout_aw:float = self.aw.modbus.timeout
+        self.mtype_aw:int = self.aw.modbus.type
+        self.mhost_aw:str = self.aw.modbus.host
+        self.mport_aw:int = self.aw.modbus.port
+        self.stop:bool = False # if True stop the processing
         self.setWindowTitle(QApplication.translate('Form Caption','Scan Modbus'))
-        self.slave = 1
-        self.slaveLabel = QLabel(QApplication.translate('Label', 'Slave'))
-        self.slaveEdit = QLineEdit(str(self.slave))
+        self.slave:int = 1
+        self.slaveLabel:QLabel = QLabel(QApplication.translate('Label', 'Slave'))
+        self.slaveEdit:QLineEdit = QLineEdit(str(self.slave))
         self.slaveEdit.setValidator(QIntValidator(1,247,self.slaveEdit))
         self.slaveEdit.setFixedWidth(65)
         self.slaveEdit.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.min_register = 0
-        self.registerLabel = QLabel(QApplication.translate('Label', 'Register'))
-        self.toLabel = QLabel(uchr(8212))
-        self.minRegisterEdit = QLineEdit(str(self.min_register))
+        self.min_register:int = 0
+        self.registerLabel:QLabel = QLabel(QApplication.translate('Label', 'Register'))
+        self.toLabel:QLabel = QLabel(uchr(8212))
+        self.minRegisterEdit:QLineEdit = QLineEdit(str(self.min_register))
         self.minRegisterEdit.setValidator(QIntValidator(0,65536,self.minRegisterEdit))
         self.minRegisterEdit.setFixedWidth(65)
         self.minRegisterEdit.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.max_register = 65536
-        self.maxRegisterEdit = QLineEdit(str(self.max_register))
+        self.max_register:int = 65536
+        self.maxRegisterEdit:QLineEdit = QLineEdit(str(self.max_register))
         self.maxRegisterEdit.setValidator(QIntValidator(0,65536,self.maxRegisterEdit))
         self.maxRegisterEdit.setFixedWidth(65)
         self.maxRegisterEdit.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.code3 = True
-        self.code4 = False
-        self.checkbox3 = QCheckBox(QApplication.translate('CheckBox','Fct. 3'))
+        self.code3:bool = True
+        self.code4:bool = False
+        self.checkbox3:QCheckBox = QCheckBox(QApplication.translate('CheckBox','Fct. 3'))
         self.checkbox3.setChecked(self.code3)
         self.checkbox3.stateChanged.connect(self.checkbox3Changed)
-        self.checkbox4 = QCheckBox(QApplication.translate('CheckBox','Fct. 4'))
+        self.checkbox4:QCheckBox = QCheckBox(QApplication.translate('CheckBox','Fct. 4'))
         self.checkbox4.setChecked(self.code4)
         self.checkbox4.stateChanged.connect(self.checkbox4Changed)
-        self.modbusEdit = QTextEdit()
+        self.modbusEdit:QTextEdit = QTextEdit()
         self.modbusEdit.setReadOnly(True)
-        startButton = QPushButton(QApplication.translate('Button','Start'))
+        startButton:QPushButton = QPushButton(QApplication.translate('Button','Start'))
         startButton.setMaximumWidth(150)
         startButton.clicked.connect(self.start_pressed)
-        labellayout = QHBoxLayout()
+        labellayout:QHBoxLayout = QHBoxLayout()
         labellayout.addWidget(self.slaveLabel)
         labellayout.addStretch()
         labellayout.addWidget(self.registerLabel)
         labellayout.addStretch()
-        srlayout = QHBoxLayout()
+        srlayout:QHBoxLayout = QHBoxLayout()
         srlayout.addWidget(self.slaveEdit)
         srlayout.addStretch()
         srlayout.addWidget(self.minRegisterEdit)
         srlayout.addWidget(self.toLabel)
         srlayout.addWidget(self.maxRegisterEdit)
-        cblayout= QHBoxLayout()
+        cblayout:QHBoxLayout = QHBoxLayout()
         cblayout.addStretch()
         cblayout.addWidget(self.checkbox3)
         cblayout.addStretch()
         cblayout.addWidget(self.checkbox4)
         cblayout.addStretch()
-        hlayout = QHBoxLayout()
+        hlayout:QHBoxLayout = QHBoxLayout()
         hlayout.addStretch()
         hlayout.addWidget(startButton)
         hlayout.addStretch()
-        layout = QVBoxLayout()
+        layout:QVBoxLayout = QVBoxLayout()
         layout.addLayout(labellayout)
         layout.addLayout(srlayout)
         layout.addLayout(cblayout)
@@ -131,10 +136,11 @@ class scanModbusDlg(ArtisanDialog):
         layout.addLayout(hlayout)
         self.setLayout(layout)
 
-    def keyPressEvent(self,event):
-        key = int(event.key())
-        if key != 0:
-            self.stop = True
+    def keyPressEvent(self, event: Optional['QKeyEvent']) -> None:
+        if event is not None:
+            key = int(event.key())
+            if key != 0:
+                self.stop = True
 
     @pyqtSlot(bool)
     def start_pressed(self):
@@ -206,13 +212,14 @@ class scanModbusDlg(ArtisanDialog):
         else:
             self.code4 = False
 
-    def closeEvent(self,_):
+    @pyqtSlot('QCloseEvent')
+    def closeEvent(self,_:Optional['QCloseEvent'] = None) -> None:
         self.stop = True
         self.accept()
 
 
 class scanS7Dlg(ArtisanDialog):
-    def __init__(self, parent, aw) -> None:
+    def __init__(self, parent:'QWidget', aw:'ApplicationWindow') -> None:
         super().__init__(parent, aw)
         self.setModal(True)
         # current setup selected in the S7 tab
@@ -293,10 +300,11 @@ class scanS7Dlg(ArtisanDialog):
         layout.addLayout(hlayout)
         self.setLayout(layout)
 
-    def keyPressEvent(self,event):
-        key = int(event.key())
-        if key != 0:
-            self.stop = True
+    def keyPressEvent(self, event: Optional['QKeyEvent']) -> None:
+        if event is not None:
+            key = int(event.key())
+            if key != 0:
+                self.stop = True
 
     @pyqtSlot(bool)
     def start_pressed(self):
@@ -359,18 +367,19 @@ class scanS7Dlg(ArtisanDialog):
             self.typeFloat = False
             self.checkbox3.setChecked(not self.typeFloat)
 
-    def closeEvent(self,_):
+    @pyqtSlot('QCloseEvent')
+    def closeEvent(self,_:Optional['QCloseEvent'] = None) -> None:
         self.stop = True
         self.accept()
 
 
 class comportDlg(ArtisanResizeablDialog):
-    def __init__(self, parent, aw) -> None:
+    def __init__(self, parent:'QWidget', aw:'ApplicationWindow') -> None:
         super().__init__(parent, aw)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False) # overwrite the ArtisanDialog class default here!!
         self.setWindowTitle(QApplication.translate('Form Caption','Ports Configuration'))
         self.setModal(True)
-        self.helpdialog = None
+        self.helpdialog:Optional['HelpDlg'] = None
         ##########################    TAB 1 WIDGETS
         comportlabel =QLabel(QApplication.translate('Label', 'Comm Port'))
         self.comportEdit = PortComboBox(selection = self.aw.ser.comport)
@@ -409,8 +418,10 @@ class comportDlg(ArtisanResizeablDialog):
         self.serialtable = QTableWidget()
         self.serialtable.setTabKeyNavigation(True)
         self.serialtable.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Expanding)
-        self.serialtable.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        self.serialtable.horizontalHeader().setStretchLastSection(True)
+        hheader: Optional[QHeaderView] = self.serialtable.horizontalHeader()
+        if hheader is not None:
+            hheader.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+            hheader.setStretchLastSection(True)
         self.createserialTable()
         ##########################    TAB 3 WIDGETS   MODBUS
         modbus_comportlabel = QLabel(QApplication.translate('Label', 'Comm Port'))
@@ -745,7 +756,8 @@ class comportDlg(ArtisanResizeablDialog):
         self.supported_scales = list(self.aw.scale.devicefunctionlist.keys())
         self.scale_deviceEdit.addItems(self.supported_scales)
         try:
-            self.scale_deviceEdit.setCurrentIndex(self.supported_scales.index(self.aw.scale.device))
+            if self.aw.scale.device is not None:
+                self.scale_deviceEdit.setCurrentIndex(self.supported_scales.index(self.aw.scale.device))
         except Exception: # pylint: disable=broad-except
             self.scale_deviceEdit.setCurrentIndex(0)
         self.scale_deviceEdit.setEditable(False)
@@ -792,7 +804,8 @@ class comportDlg(ArtisanResizeablDialog):
         supported_color_meters = list(self.aw.color.devicefunctionlist.keys())
         self.color_deviceEdit.addItems(supported_color_meters)
         try:
-            self.color_deviceEdit.setCurrentIndex(supported_color_meters.index(self.aw.color.device))
+            if self.aw.color.device is not None:
+                self.color_deviceEdit.setCurrentIndex(supported_color_meters.index(self.aw.color.device))
         except Exception: # pylint: disable=broad-except
             self.color_deviceEdit.setCurrentIndex(0)
         self.color_deviceEdit.setEditable(False)
@@ -835,11 +848,12 @@ class comportDlg(ArtisanResizeablDialog):
         self.dialogbuttons.accepted.connect(self.accept)
         self.dialogbuttons.rejected.connect(self.reject)
 
-        helpButton = self.dialogbuttons.addButton(QDialogButtonBox.StandardButton.Help)
-        helpButton.setToolTip(QApplication.translate('Tooltip','Show help'))
-        self.setButtonTranslations(helpButton,'Help',QApplication.translate('Button','Help'))
-        helpButton.clicked.connect(self.showModbusbuttonhelp)
-        helpButton.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        helpButton: Optional[QPushButton] = self.dialogbuttons.addButton(QDialogButtonBox.StandardButton.Help)
+        if helpButton is not None:
+            helpButton.setToolTip(QApplication.translate('Tooltip','Show help'))
+            self.setButtonTranslations(helpButton,'Help',QApplication.translate('Button','Help'))
+            helpButton.clicked.connect(self.showModbusbuttonhelp)
+            helpButton.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         #button layout
         buttonLayout = QHBoxLayout()
@@ -894,6 +908,7 @@ class comportDlg(ArtisanResizeablDialog):
 
         modbus_serial_group = QGroupBox(QApplication.translate('GroupBox','Serial'))
         modbus_serial_group.setLayout(modbus_gridV)
+        modbus_serial_group.setSizePolicy(QSizePolicy.Policy.Fixed,QSizePolicy.Policy.Preferred)
 
         modbus_input_grid = QGridLayout()
 
@@ -932,13 +947,19 @@ class comportDlg(ArtisanResizeablDialog):
                     modbus_input_grid.addWidget(inputDecode,6,i+1,Qt.AlignmentFlag.AlignCenter)
 
         modbus_input_grid.setContentsMargins(0,0,0,0)
-        modbus_input_grid.setSpacing(2)
+        modbus_input_grid.setSpacing(5)
+
+        modbus_input_scroll = QScrollArea()
+        modbus_input_scroll.setWidgetResizable(False)
+        modbus_input_scroll_content = QFrame()
+        modbus_input_scroll_content.setSizePolicy(QSizePolicy.Policy.MinimumExpanding,QSizePolicy.Policy.Ignored)
+        modbus_input_scroll_content.setLayout(modbus_input_grid)
+        modbus_input_scroll.setWidget(modbus_input_scroll_content)
+
 
         modbus_gridVLayout = QHBoxLayout()
         modbus_gridVLayout.addWidget(modbus_serial_group)
-        modbus_gridVLayout.addStretch()
-        modbus_gridVLayout.addLayout(modbus_input_grid)
-        modbus_gridVLayout.addStretch()
+        modbus_gridVLayout.addWidget(modbus_input_scroll)
         modbus_setup = QHBoxLayout()
         modbus_setup.addWidget(scanButton)
         modbus_setup.addStretch()
@@ -1629,10 +1650,10 @@ class comportDlg(ArtisanResizeablDialog):
         Mlayout.setContentsMargins(5,15,5,5)
         Mlayout.setSpacing(5)
         self.setLayout(Mlayout)
-        if platform.system() == 'Windows':
-            self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
-        else:
-            self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok).setFocus()
+        if platform.system() != 'Windows':
+            ok_button: Optional[QPushButton] = self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
+            if ok_button is not None:
+                ok_button.setFocus()
         settings = QSettings()
         if settings.contains('PortsGeometry'):
             self.restoreGeometry(settings.value('PortsGeometry'))
@@ -1719,7 +1740,9 @@ class comportDlg(ArtisanResizeablDialog):
                 self.serialtable.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
                 self.serialtable.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
                 self.serialtable.setShowGrid(True)
-                self.serialtable.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+                vheader: Optional[QHeaderView] = self.serialtable.verticalHeader()
+                if vheader is not None:
+                    vheader.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
                 for i in range(nssdevices):
                     if len(self.aw.qmc.extradevices) > i:
                         devid = self.aw.qmc.extradevices[i]
@@ -1819,14 +1842,14 @@ class comportDlg(ArtisanResizeablDialog):
     @pyqtSlot(bool)
     def showModbusbuttonhelp(self,_=False):
         if self.TabWidget.currentIndex() == 2:
-            from help import modbus_help
+            from help import modbus_help # type: ignore [attr-defined] # pylint: disable=no-name-in-module
             self.helpdialog = self.aw.showHelpDialog(
                     self,            # this dialog as parent
                     self.helpdialog, # the existing help dialog
                     QApplication.translate('Form Caption','MODBUS Help'),
                     modbus_help.content())
         elif self.TabWidget.currentIndex() == 3:
-            from help import s7_help
+            from help import s7_help # type: ignore [attr-defined] # pylint: disable=no-name-in-module
             self.helpdialog = self.aw.showHelpDialog(
                     self,            # this dialog as parent
                     self.helpdialog, # the existing help dialog
@@ -1840,7 +1863,8 @@ class comportDlg(ArtisanResizeablDialog):
     def tabSwitched(self,_):
         self.closeHelp()
 
-    def closeEvent(self,_):
+    @pyqtSlot('QCloseEvent')
+    def closeEvent(self,_:Optional['QCloseEvent'] = None) -> None:
         self.closeHelp()
         settings = QSettings()
         #save window geometry

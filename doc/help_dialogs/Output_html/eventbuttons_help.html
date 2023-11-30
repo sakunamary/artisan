@@ -138,7 +138,7 @@
         </tr>
         <tr>
             <td>\2</td>
-            <td>OFF (translated, resepecting button state)</td>
+            <td>OFF (translated, respecting button state)</td>
         </tr>
         <tr>
             <td>\3</td>
@@ -193,6 +193,18 @@
             <td>MANUAL (translated, respecting button state)</td>
         </tr>
         <tr>
+            <td>\i</td>
+            <td>STIRRER</td>
+        </tr>
+        <tr>
+            <td>\f</td>
+            <td>FILL</td>
+        </tr>
+        <tr>
+            <td>\r</td>
+            <td>RELEASE</td>
+        </tr>
+        <tr>
             <td>\h</td>
             <td>HEATING</td>
         </tr>
@@ -228,7 +240,7 @@
         </tr>
         <tr>
             <td>Multiple Event</td>
-            <td>button numbers separated by a comma: 1,2,..</td>
+            <td>button numbers or sleep(&lt;float&gt;) separated by a comma: 1,2,sleep(2.5), 3..</td>
             <td>triggers other buttons</td>
         </tr>
         <tr>
@@ -764,7 +776,7 @@
         <tr>
             <td>&#160;</td>
             <td>button(i,b)</td>
-            <td>sets button i to pressed if value b is yes, true, t, or 1, otherwise to normal</td>
+            <td>sets button i to pressed if value of b is yes, true, t, or 1, otherwise to normal</td>
         </tr>
         <tr>
             <td>&#160;</td>
@@ -775,6 +787,11 @@
             <td>&#160;</td>
             <td>button()</td>
             <td>toggles the state of the button</td>
+        </tr>
+        <tr>
+            <td>&#160;</td>
+            <td>visible(i,b)</td>
+            <td>sets button i to visible if value of b is yes, true, t, or 1, otherwise to hidden</td>
         </tr>
         <tr>
             <td>&#160;</td>

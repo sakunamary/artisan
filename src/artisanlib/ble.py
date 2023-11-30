@@ -18,8 +18,7 @@
 
 from enum import Enum
 import logging
-from typing import Optional, Tuple, List, Callable
-from typing_extensions import Final  # Python <=3.7
+from typing import Final, Optional, Tuple, List, Callable
 
 try:
     from PyQt6 import QtCore # @UnusedImport @Reimport  @UnresolvedImport
@@ -39,7 +38,7 @@ class BLE_CHAR_TYPE(Enum):
     BLE_CHAR_NOTIFY_WRITE = 'BLE_CHAR_NOTIFY_WRITE'
 
 
-class BleInterface(QtCore.QObject): # pyright: ignore # Argument to class must be a base class (reportGeneralTypeIssues)
+class BleInterface(QtCore.QObject): # pyright: ignore [reportGeneralTypeIssues] # Argument to class must be a base class ()
     weightChanged = QtCore.pyqtSignal(float)
     batteryChanged = QtCore.pyqtSignal(int)
     deviceDisconnected = QtCore.pyqtSignal()
@@ -85,8 +84,8 @@ class BleInterface(QtCore.QObject): # pyright: ignore # Argument to class must b
         self.sendStop: Optional[Callable[[Callable[[Optional[bytes]],None]], None]] = sendStop
         self.connected: Optional[Callable[[], None]] = connected
 
-        self.ENABLE_NOTIFICATION_VALUE:QtCore.QByteArray = QtCore.QByteArray.fromHex(b'0100') # type: ignore
-        self.DISABLE_NOTIFICATION_VALUE:QtCore.QByteArray = QtCore.QByteArray.fromHex(b'0000') # type: ignore
+        self.ENABLE_NOTIFICATION_VALUE:QtCore.QByteArray = QtCore.QByteArray.fromHex(b'0100') # OFF type: ignore
+        self.DISABLE_NOTIFICATION_VALUE:QtCore.QByteArray = QtCore.QByteArray.fromHex(b'0000') # OFF type: ignore
 
         self.m_deviceDiscoveryAgent:QtBluetooth.QBluetoothDeviceDiscoveryAgent = QtBluetooth.QBluetoothDeviceDiscoveryAgent()
         self.m_deviceDiscoveryAgent.setLowEnergyDiscoveryTimeout(500)
@@ -109,7 +108,7 @@ class BleInterface(QtCore.QObject): # pyright: ignore # Argument to class must b
 
         self.dataReceived.connect(self.dataReceivedProcessing)
 
-    def disconnectDiscovery(self):
+    def disconnectDiscovery(self) -> None:
         self.m_deviceDiscoveryAgent.deviceDiscovered.disconnect()
         self.m_deviceDiscoveryAgent.errorOccurred.disconnect()
         self.m_deviceDiscoveryAgent.finished.disconnect()
@@ -168,12 +167,12 @@ class BleInterface(QtCore.QObject): # pyright: ignore # Argument to class must b
             if len(data) > self.CHUNK_SIZE:
                 sentBytes = 0
                 while sentBytes < len(data):
-                    self.m_service.writeCharacteristic(self.m_writeCharacteristic,data[sentBytes:sentBytes + self.CHUNK_SIZE],self.m_writemode) # type: ignore # "bytearray" is incompatible with "QByteArray"
+                    self.m_service.writeCharacteristic(self.m_writeCharacteristic,data[sentBytes:sentBytes + self.CHUNK_SIZE],self.m_writemode) # OFF type: ignore # "bytearray" is incompatible with "QByteArray"
                     sentBytes += self.CHUNK_SIZE
 #                    if self.m_writemode == QtBluetooth.QLowEnergyService.WriteMode.WriteWithResponse:
 #                        pass
             else:
-                self.m_service.writeCharacteristic(self.m_writeCharacteristic,data,self.m_writemode) # type: ignore # "bytearray" is incompatible with "QByteArray"
+                self.m_service.writeCharacteristic(self.m_writeCharacteristic,data,self.m_writemode) # OFF type: ignore # "bytearray" is incompatible with "QByteArray"
 
     def update_connected(self,connected:bool) -> None:
         _log.debug('update_connected(%s)', connected)
@@ -296,10 +295,11 @@ class BleInterface(QtCore.QObject): # pyright: ignore # Argument to class must b
                         self.char_uuid.append((uuid_char, ble_write_type))
                         if self.m_control is not None:
                             self.m_service = self.m_control.createServiceObject(uuid)
-                            self.m_service.stateChanged.connect(self.onServiceStateChanged)
-                            self.m_service.characteristicChanged.connect(self.onCharacteristicChanged)
-                            self.m_service.characteristicRead.connect(self.onCharacteristicRead)
-                            self.m_service.errorOccurred.connect(self.serviceError)
+                            if self.m_service is not None:
+                                self.m_service.stateChanged.connect(self.onServiceStateChanged)
+                                self.m_service.characteristicChanged.connect(self.onCharacteristicChanged)
+                                self.m_service.characteristicRead.connect(self.onCharacteristicRead)
+                                self.m_service.errorOccurred.connect(self.serviceError)
         # pylint: disable=maybe-no-member
         if self.m_service is not None and self.m_service.state() == QtBluetooth.QLowEnergyService.ServiceState.DiscoveryRequired:
             self.m_service.discoverDetails() # this is required on PyQt 5.2.2 as onServiceStateChanged() is not called automatically
@@ -325,16 +325,17 @@ class BleInterface(QtCore.QObject): # pyright: ignore # Argument to class must b
         if self.m_device is not None:
             _log.debug('connectCurrentDevice: %s', self.m_device.name())
             self.m_control = QtBluetooth.QLowEnergyController.createCentral(self.m_device)
-            # QueuedConnection required in the following for Windows. See: https://forum.qt.io/topic/109558/bluetooth-low-energy-scanner-discover-service-details/9
-            self.m_control.discoveryFinished.connect(self.onServiceScanDone, type=QtCore.Qt.ConnectionType.QueuedConnection) # type: ignore
-            self.m_control.connected.connect(self.onDeviceConnected)
-            self.m_control.disconnected.connect(self.onDeviceDisconnected)
-            self.m_control.connectToDevice()
+            if self.m_control is not None:
+                # QueuedConnection required in the following for Windows. See: https://forum.qt.io/topic/109558/bluetooth-low-energy-scanner-discover-service-details/9
+                self.m_control.discoveryFinished.connect(self.onServiceScanDone, type=QtCore.Qt.ConnectionType.QueuedConnection) # type: ignore
+                self.m_control.connected.connect(self.onDeviceConnected)
+                self.m_control.disconnected.connect(self.onDeviceDisconnected)
+                self.m_control.connectToDevice()
         else:
             self.deviceDisconnected.emit()
 
     @QtCore.pyqtSlot('QBluetoothDeviceDiscoveryAgent::Error')
-    def scanError(self, error)  -> None: # pylint: disable=no-self-use
+    def scanError(self, error:QtBluetooth.QBluetoothDeviceDiscoveryAgent.Error) -> None: # pylint: disable=no-self-use
         _log.debug('scanError: %s', error)
 
     @QtCore.pyqtSlot()
@@ -348,8 +349,6 @@ class BleInterface(QtCore.QObject): # pyright: ignore # Argument to class must b
     @staticmethod
     def deviceHasService(device:QtBluetooth.QBluetoothDeviceInfo, service_uuid:QtBluetooth.QBluetoothUuid) -> bool:
         try:
-            if device is None:
-                return False
             services = device.serviceUuids()
             has_service:bool = services is not None and len(services)>0 and service_uuid in services
             if has_service:
@@ -412,7 +411,7 @@ class BleInterface(QtCore.QObject): # pyright: ignore # Argument to class must b
                     QBluetoothDeviceDiscoveryAgent_LowEnergyMethod))
 
 
-def main():
+def main() -> None:
     import sys
     app = QtCore.QCoreApplication(sys.argv)
     from artisanlib.acaia import AcaiaBLE

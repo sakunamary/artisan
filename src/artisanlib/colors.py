@@ -19,10 +19,11 @@ import platform
 
 from artisanlib.util import deltaLabelUTF8
 from artisanlib.dialogs import ArtisanDialog
-from typing import TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from artisanlib.main import ApplicationWindow # noqa: F401 # pylint: disable=unused-import
+    from PyQt6.QtGui import QCloseEvent # pylint: disable=unused-import
 
 try:
     from PyQt6.QtCore import Qt, QTimer, pyqtSlot # @UnusedImport @Reimport  @UnresolvedImport
@@ -570,9 +571,10 @@ class graphColorDlg(ArtisanDialog):
         self.dialogbuttons.accepted.connect(self.accept)
         self.dialogbuttons.removeButton(self.dialogbuttons.button(QDialogButtonBox.StandardButton.Cancel))
         resetButton = self.dialogbuttons.addButton(QDialogButtonBox.StandardButton.RestoreDefaults)
-        resetButton.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.dialogbuttons.button(QDialogButtonBox.StandardButton.RestoreDefaults).clicked.connect(self.recolor1)
-        self.setButtonTranslations(self.dialogbuttons.button(QDialogButtonBox.StandardButton.RestoreDefaults),'Restore Defaults',QApplication.translate('Button','Restore Defaults'))
+        if resetButton is not None:
+            resetButton.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            resetButton.clicked.connect(self.recolor1)
+            self.setButtonTranslations(resetButton,'Restore Defaults',QApplication.translate('Button','Restore Defaults'))
 
         greyButton = QPushButton(QApplication.translate('Button','Grey'))
         greyButton.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -597,11 +599,13 @@ class graphColorDlg(ArtisanDialog):
         Mlayout.setSpacing(0)
         self.setLayout(Mlayout)
         self.setColorButtons()
-        if platform.system() == 'Windows':
-            self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
-        else:
-            self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok).setFocus()
-        self.layout().setSizeConstraint(QLayout.SizeConstraint.SetFixedSize) # don't allow resizing
+        if platform.system() != 'Windows':
+            ok_button = self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
+            if ok_button is not None:
+                ok_button.setFocus()
+        layout = self.layout()
+        if layout is not None:
+            layout.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize) # don't allow resizing
 
         # we set the active tab with a QTimer after the tabbar has been rendered once, as otherwise
         # some tabs are not rendered at all on Winwos using Qt v6.5.1 (https://bugreports.qt.io/projects/QTBUG/issues/QTBUG-114204?filter=allissues)
@@ -612,7 +616,7 @@ class graphColorDlg(ArtisanDialog):
         self.TabWidget.setCurrentIndex(self.activeTab)
 
     @pyqtSlot('QCloseEvent')
-    def closeEvent(self,_):
+    def closeEvent(self,_:Optional['QCloseEvent'] = None) -> None:
         self.aw.graphColorDlg_activeTab = self.TabWidget.currentIndex()
 
     @pyqtSlot(bool)
@@ -886,7 +890,7 @@ class graphColorDlg(ArtisanDialog):
             var.setText(colorf.name())
             var.setStyleSheet('QPushButton { background-color: ' + color + '; color: ' + tc + ';' + self.commonstyle + '}')
 #  is this needed?            var.setPalette(QPalette(colorf))
-            self.aw.qmc.fig.canvas.redraw(recomputeAllDeltas=False)
+            self.aw.qmc.redraw(recomputeAllDeltas=False)
             if title == 'ET':
                 self.aw.qmc.backgroundmetcolor = color
             elif title == 'BT':
@@ -905,8 +909,8 @@ class graphColorDlg(ArtisanDialog):
         res = self.aw.colordialog(QColor(palette[select]))
         if QColor.isValid(res):
             nc = str(res.name())
-            if nc == disj_palette[select] or (nc in ['white', '#ffffff'] and disj_palette[select] in ['white', '#ffffff']) or (nc in ['black', '#000000'] and disj_palette[select] in ['black', '#000000']):
-                # this QMessageBox is not rendered native on macOS for unkonwn reason. The same dialog called from a different dialog is rendered nativ.
+            if nc == disj_palette[select] or (nc in {'white', '#ffffff'} and disj_palette[select] in {'white', '#ffffff'}) or (nc in {'black', '#000000'} and disj_palette[select] in {'black', '#000000'}):
+                # this QMessageBox is not rendered native on macOS for unknown reason. The same dialog called from a different dialog is rendered nativ.
                 QMessageBox.warning(self.aw,
                     QApplication.translate('Message', 'Config LCD colors'),
                     QApplication.translate('Message', 'LCD digits color and background color cannot be the same.'),
@@ -998,9 +1002,9 @@ class graphColorDlg(ArtisanDialog):
             tc = self.aw.labelBorW(self.aw.qmc.palette[color])
             var.setStyleSheet('QPushButton { background: ' + self.aw.qmc.palette[color] + '; color: ' + tc + ';' + self.commonstyle + '}')
 #            var.setPalette(QPalette(colorf))
-            self.aw.qmc.fig.canvas.redraw(recomputeAllDeltas=False)
+            self.aw.qmc.redraw(recomputeAllDeltas=False)
             if title == 'ET':
-                self.aw.setLabelColor(self.aw.label2,QColor(self.aw.qmc.palette[color]))
+                self.aw.setLabelColor(self.aw.label2, QColor(self.aw.qmc.palette[color]))
             elif title == 'BT':
                 self.aw.setLabelColor(self.aw.label3,QColor(self.aw.qmc.palette[color]))
             elif title == 'DeltaET':

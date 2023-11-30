@@ -22,16 +22,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Optional, TYPE_CHECKING
-from typing_extensions import Final  # Python <=3.7
+from typing import Final, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from artisanlib.main import ApplicationWindow # pylint: disable=unused-import
 
 # Constants
-app_name: Final = 'artisan.plus'
-profile_ext: Final = 'alog'
-uuid_tag: Final = 'roastUUID'
+app_name: Final[str] = 'artisan.plus'
+profile_ext: Final[str] = 'alog'
+uuid_tag: Final[str] = 'roastUUID'
 
 # Service URLs
 
@@ -77,7 +76,7 @@ stock_cache_expiration: Final[int] = 30  # expiration period in seconds
 
 queue_start_delay: Final[int] = 5  # startup time of queue in seconds
 # delay between tasks in seconds (cycling interval of the queue)
-queue_task_delay: Final[float] = 0.7
+queue_task_delay: Final[float] = 1.0
 queue_retries: Final[int] = 2  # number of retries (should be >=0)
 queue_retry_delay: Final[int] = 30  # time between retries in seconds
 queue_discard_after: Final[int] = 3*24*60*60 # period in seconds after 'modified_at'..

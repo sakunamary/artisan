@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 #
 
-"""
-Check Combo Box
+"""Check Combo Box
 ---------------
 A QComboBox subclass designed for multiple item selection.
 The combo box popup allows the user to check/uncheck multiple items at
@@ -14,40 +13,39 @@ once.
 # updatet to PyQt6, by Marko Luther 2021
 
 import sys
+from typing import Dict, Optional, List
 
 try:
-    from PyQt6.QtCore import Qt, QEvent, QTimer, pyqtSignal # @UnusedImport @Reimport  @UnresolvedImport
+    from PyQt6.QtCore import Qt, QEvent, QTimer, pyqtSignal, QSize # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtGui import ( QStandardItemModel,  # @UnusedImport @Reimport  @UnresolvedImport
         QPalette, QFontMetrics, QBrush, QColor, QPixmap, QIcon # @UnusedImport @Reimport  @UnresolvedImport
     )
     from PyQt6.QtWidgets import (
         QComboBox, QAbstractItemDelegate, QStyledItemDelegate, # @UnusedImport @Reimport  @UnresolvedImport
         QApplication, QStyle, QStyleOptionComboBox, # @UnusedImport @Reimport  @UnresolvedImport
-        QStyleOptionMenuItem, QStyleOptionViewItem, QStylePainter # @UnusedImport @Reimport  @UnresolvedImport
+        QStyleOptionMenuItem, QStyleOptionViewItem, QStylePainter, QWidget # @UnusedImport @Reimport  @UnresolvedImport
     )
 except ImportError:
-    from PyQt5.QtCore import Qt, QEvent, QTimer, pyqtSignal # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
+    from PyQt5.QtCore import Qt, QEvent, QTimer, pyqtSignal, QSize # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtGui import ( QStandardItemModel, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
         QPalette, QFontMetrics, QBrush, QColor, QPixmap, QIcon # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     )
     from PyQt5.QtWidgets import ( # type: ignore
         QComboBox, QAbstractItemDelegate, QStyledItemDelegate, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
         QApplication, QStyle, QStyleOptionComboBox, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
-        QStyleOptionMenuItem, QStyleOptionViewItem, QStylePainter # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
+        QStyleOptionMenuItem, QStyleOptionViewItem, QStylePainter, QWidget # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     )
 
 
-class CheckComboBox(QComboBox): # pyright: ignore # Argument to class must be a base class (reportGeneralTypeIssues)
-    """
-    A QComboBox allowing multiple item selection.
+class CheckComboBox(QComboBox): # pyright: ignore [reportGeneralTypeIssues] # Argument to class must be a base class
+    """A QComboBox allowing multiple item selection.
     """
 
     flagChanged=pyqtSignal(int,bool)
 
 
-    class ComboItemDelegate(QStyledItemDelegate): # pyright: ignore # Argument to class must be a base class (reportGeneralTypeIssues)
-        """
-        Helper styled delegate (mostly based on existing private Qt's
+    class ComboItemDelegate(QStyledItemDelegate): # pyright: ignore [reportGeneralTypeIssues] # Argument to class must be a base class
+        """Helper styled delegate (mostly based on existing private Qt's
         delegate used by the QComboBox). Used to style the popup like a
         list view (e.g windows style).
         """
@@ -75,9 +73,8 @@ class CheckComboBox(QComboBox): # pyright: ignore # Argument to class must be a 
             else:
                 super().paint(painter, option, index)
 
-    class ComboMenuDelegate(QAbstractItemDelegate): # pyright: ignore # Argument to class must be a base class (reportGeneralTypeIssues)
-        """
-        Helper styled delegate (mostly based on existing private Qt's
+    class ComboMenuDelegate(QAbstractItemDelegate): # pyright: ignore [reportGeneralTypeIssues] # Argument to class must be a base class
+        """Helper styled delegate (mostly based on existing private Qt's
         delegate used by the QComboBox). Used to style the popup like a
         menu. (e.g osx aqua style).
         """
@@ -89,23 +86,23 @@ class CheckComboBox(QComboBox): # pyright: ignore # Argument to class must be a 
 
         def paint(self, painter, option, index):
             menuopt = self._getMenuStyleOption(option, index)
+            style:Optional[QStyle] = QApplication.style()
             if option.widget is not None:
                 style = option.widget.style()
-            else:
-                style = QApplication.style()
-            style.drawControl(QStyle.ControlElement.CE_MenuItem, menuopt, painter,
-                              option.widget)
+            if style is not None:
+                style.drawControl(QStyle.ControlElement.CE_MenuItem, menuopt, painter,
+                                  option.widget)
 
         def sizeHint(self, option, index):
             menuopt = self._getMenuStyleOption(option, index)
+            style:Optional[QStyle] = QApplication.style()
             if option.widget is not None:
                 style = option.widget.style()
-            else:
-                style = QApplication.style()
-            return style.sizeFromContents(
-                QStyle.ContentsType.CT_MenuItem, menuopt, menuopt.rect.size(),
-                option.widget
-            )
+            if style is not None:
+                return style.sizeFromContents(
+                    QStyle.ContentsType.CT_MenuItem, menuopt, menuopt.rect.size(),
+                    option.widget)
+            return QSize()
 
         def _getMenuStyleOption(self, option, index):
             menuoption = QStyleOptionMenuItem()
@@ -185,8 +182,8 @@ class CheckComboBox(QComboBox): # pyright: ignore # Argument to class must be a 
             menuoption.state = state
             return menuoption
 
-    def __init__(self, parent=None, placeholderText='', separator=', ',
-                 **kwargs) -> None:
+    def __init__(self, parent:Optional[QWidget] = None, placeholderText:str = '', separator:str = ', ',
+                 **kwargs:Dict) -> None:
         super().__init__(parent, **kwargs)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
@@ -217,68 +214,79 @@ class CheckComboBox(QComboBox): # pyright: ignore # Argument to class must be a 
         """Reimplemented."""
         super().showPopup()
         view = self.view()
-        view.installEventFilter(self)
-        view.viewport().installEventFilter(self)
-        self.__popupIsShown = True
+        if view is not None:
+            view.installEventFilter(self)
+            vp = view.viewport()
+            if vp is not None:
+                vp.installEventFilter(self)
+                self.__popupIsShown = True
 
     def hidePopup(self):
         """Reimplemented."""
-        self.view().removeEventFilter(self)
-        self.view().viewport().removeEventFilter(self)
-        self.__popupIsShown = False
-        self.__initialMousePos = None
-        super().hidePopup()
-        self.view().clearFocus()
+        view = self.view()
+        if view is not None:
+            view.removeEventFilter(self)
+            vp = view.viewport()
+            if vp is not None:
+                vp.removeEventFilter(self)
+            self.__popupIsShown = False
+            self.__initialMousePos = None
+            super().hidePopup()
+            view.clearFocus()
 
     def eventFilter(self, obj, event):
         """Reimplemented."""
-        if self.__popupIsShown and \
-                event.type() == QEvent.Type.MouseMove and \
-                self.view().isVisible() and self.__initialMousePos is not None:
-            diff = obj.mapToGlobal(event.pos()) - self.__initialMousePos # type: ignore # mypy: Statement is unreachable
-            if diff.manhattanLength() > 9 and \
-                    self.__blockMouseReleaseTimer.isActive():
-                self.__blockMouseReleaseTimer.stop()
-            # pass through
+        view = self.view()
+        if view is not None:
+            if self.__popupIsShown and \
+                    event.type() == QEvent.Type.MouseMove and \
+                    view.isVisible() and self.__initialMousePos is not None:
+                diff = obj.mapToGlobal(event.pos()) - self.__initialMousePos # type: ignore # mypy: Statement is unreachable
+                if diff.manhattanLength() > 9 and \
+                        self.__blockMouseReleaseTimer.isActive():
+                    self.__blockMouseReleaseTimer.stop()
+                # pass through
 
-        if self.__popupIsShown and \
-                event.type() == QEvent.Type.MouseButtonRelease and \
-                self.view().isVisible() and \
-                self.view().rect().contains(event.pos()) and \
-                self.view().currentIndex().isValid() and \
-                self.view().currentIndex().flags() & Qt.ItemFlag.ItemIsSelectable and \
-                self.view().currentIndex().flags() & Qt.ItemFlag.ItemIsEnabled and \
-                self.view().currentIndex().flags() & Qt.ItemFlag.ItemIsUserCheckable and \
-                self.view().visualRect(self.view().currentIndex()).contains(event.pos()) and \
-                not self.__blockMouseReleaseTimer.isActive():
-            model = self.model()
-            index = self.view().currentIndex()
-            state = model.data(index, Qt.ItemDataRole.CheckStateRole)
-            model.setData(index,
-                          Qt.CheckState.Checked if state == Qt.CheckState.Unchecked else Qt.CheckState.Unchecked,
-                          Qt.ItemDataRole.CheckStateRole)
-            self.view().update(index)
-            self.update()
-            self.flagChanged.emit(index.row(),state == Qt.CheckState.Unchecked)
-            return True
+            if self.__popupIsShown and \
+                    event.type() == QEvent.Type.MouseButtonRelease and \
+                    view.isVisible() and \
+                    view.rect().contains(event.pos()) and \
+                    view.currentIndex().isValid() and \
+                    view.currentIndex().flags() & Qt.ItemFlag.ItemIsSelectable and \
+                    view.currentIndex().flags() & Qt.ItemFlag.ItemIsEnabled and \
+                    view.currentIndex().flags() & Qt.ItemFlag.ItemIsUserCheckable and \
+                    view.visualRect(view.currentIndex()).contains(event.pos()) and \
+                    not self.__blockMouseReleaseTimer.isActive():
+                index = view.currentIndex()
+                model = self.model()
+                if model is not None:
+                    state = model.data(index, Qt.ItemDataRole.CheckStateRole)
+                    model.setData(index,
+                                  Qt.CheckState.Checked if state == Qt.CheckState.Unchecked else Qt.CheckState.Unchecked,
+                                  Qt.ItemDataRole.CheckStateRole)
+                    view.update(index)
+                    self.update()
+                    self.flagChanged.emit(index.row(),state == Qt.CheckState.Unchecked)
+                    return True
 
-        if self.__popupIsShown and event.type() == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_Space:
-            # toggle the current items check state
-            model = self.model()
-            index = self.view().currentIndex()
-            flags = model.flags(index)
-            state = model.data(index, Qt.ItemDataRole.CheckStateRole)
-            if flags & Qt.ItemFlag.ItemIsUserCheckable and \
-                    flags & Qt.ItemFlag.ItemIsAutoTristate:
-                state = Qt.CheckState((int(state) + 1) % 3)
-            elif flags & Qt.ItemFlag.ItemIsUserCheckable:
-                state = Qt.CheckState.Checked if state != Qt.CheckState.Checked else Qt.CheckState.Unchecked
-            model.setData(index, state, Qt.ItemDataRole.CheckStateRole)
-            self.view().update(index)
-            self.update()
-            self.flagChanged.emit(index.row(),state != Qt.CheckState.Unchecked)
-            return True
-            # TODO: handle Qt.Key.Key_Enter, Key_Return? # pylint: disable=fixme
+            if self.__popupIsShown and event.type() == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_Space:
+                # toggle the current items check state
+                index = view.currentIndex()
+                model = self.model()
+                if model is not None:
+                    flags = model.flags(index)
+                    state = model.data(index, Qt.ItemDataRole.CheckStateRole)
+                    if flags & Qt.ItemFlag.ItemIsUserCheckable and \
+                            flags & Qt.ItemFlag.ItemIsAutoTristate:
+                        state = Qt.CheckState((int(state) + 1) % 3)
+                    elif flags & Qt.ItemFlag.ItemIsUserCheckable:
+                        state = Qt.CheckState.Checked if state != Qt.CheckState.Checked else Qt.CheckState.Unchecked
+                    model.setData(index, state, Qt.ItemDataRole.CheckStateRole)
+                    view.update(index)
+                    self.update()
+                    self.flagChanged.emit(index.row(),state != Qt.CheckState.Unchecked)
+                    return True
+                    # TODO: handle Qt.Key.Key_Enter, Key_Return? # pylint: disable=fixme
 
         return super().eventFilter(obj, event)
 
@@ -300,9 +308,8 @@ class CheckComboBox(QComboBox): # pyright: ignore # Argument to class must be a 
         option.currentIcon = QIcon()
         painter.drawControl(QStyle.ControlElement.CE_ComboBoxLabel, option)
 
-    def itemCheckState(self, index):
-        """
-        Return the check state for item at `index`
+    def itemCheckState(self, index:int) -> Qt.CheckState:
+        """Return the check state for item at `index`
         Parameters
         ----------
         index : int
@@ -315,9 +322,8 @@ class CheckComboBox(QComboBox): # pyright: ignore # Argument to class must be a 
             return Qt.CheckState(state)
         return Qt.CheckState.Unchecked
 
-    def setItemCheckState(self, index, state):
-        """
-        Set the check state for item at `index` to `state`.
+    def setItemCheckState(self, index:int, state:Qt.CheckState) -> None:
+        """Set the check state for item at `index` to `state`.
         Parameters
         ----------
         index : int
@@ -325,9 +331,8 @@ class CheckComboBox(QComboBox): # pyright: ignore # Argument to class must be a 
         """
         self.setItemData(index, state, Qt.ItemDataRole.CheckStateRole)
 
-    def checkedIndices(self):
-        """
-        Return a list of indices of all checked items.
+    def checkedIndices(self) -> List[int]:
+        """Return a list of indices of all checked items.
         Returns
         -------
         indices : List[int]
@@ -335,22 +340,20 @@ class CheckComboBox(QComboBox): # pyright: ignore # Argument to class must be a 
         return [i for i in range(self.count())
                 if self.itemCheckState(i) == Qt.CheckState.Checked]
 
-    def setPlaceholderText(self, text):
-        """
-        Set the placeholder text.
+    def setPlaceholderText(self, text:Optional[str]) -> None:
+        """Set the placeholder text.
         This text is displayed on the checkbox when there are no checked
         items.
         Parameters
         ----------
         text : str
         """
-        if self.__placeholderText != text:
+        if text is not None and self.__placeholderText != text:
             self.__placeholderText = text
             self.update()
 
-    def placeholderText(self):
-        """
-        Return the placeholder text.
+    def placeholderText(self) -> str:
+        """Return the placeholder text.
         Returns
         -------
         text : str
@@ -378,31 +381,41 @@ class CheckComboBox(QComboBox): # pyright: ignore # Argument to class must be a 
 
         super().keyPressEvent(event)
 
-    def __updateItemDelegate(self):
+    def __updateItemDelegate(self) -> None:
         opt = QStyleOptionComboBox()
         opt.initFrom(self)
-        if self.style().styleHint(QStyle.StyleHint.SH_ComboBox_Popup, opt, self):
-            self.setItemDelegate(CheckComboBox.ComboMenuDelegate(self))
-        else:
-            self.setItemDelegate(CheckComboBox.ComboItemDelegate(self))
+        style = self.style()
+        if style is not None:
+            if style.styleHint(QStyle.StyleHint.SH_ComboBox_Popup, opt, self):
+                self.setItemDelegate(CheckComboBox.ComboMenuDelegate(self))
+            else:
+                self.setItemDelegate(CheckComboBox.ComboItemDelegate(self))
 
-
-def example():
+def example() -> int:
     app = QApplication(list(sys.argv))
     cb = CheckComboBox(placeholderText='None')
     model = cb.model()
-    assert isinstance(model, QStandardItemModel)
-    cb.addItem('First')
-    model.item(0).setCheckable(True)
-    cb.addItem('Second')
-    model.item(1).setCheckable(True)
-    cb.addItem('Third')
-    model.item(2).setCheckable(True)
-    cb.insertSeparator(3)
-    cb.addItem('Fourth - Disabled')
-    model.item(4).setEnabled(False)
-    cb.show()
-    cb.raise_()
+    if model is not None:
+        assert isinstance(model, QStandardItemModel)
+        cb.addItem('First')
+        item0 = model.item(0)
+        if item0 is not None:
+            item0.setCheckable(True)
+        cb.addItem('Second')
+        item1 = model.item(1)
+        if item1 is not None:
+            item1.setCheckable(True)
+        cb.addItem('Third')
+        item2 = model.item(2)
+        if item2 is not None:
+            item2.setCheckable(True)
+        cb.insertSeparator(3)
+        cb.addItem('Fourth - Disabled')
+        item4 = model.item(4)
+        if item4 is not None:
+            item4.setEnabled(False)
+        cb.show()
+        cb.raise_()
 
     return app.exec()
 

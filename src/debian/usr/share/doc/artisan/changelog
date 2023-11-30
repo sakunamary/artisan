@@ -1,3 +1,9 @@
+artisan (2.10.0-0) precise; urgency=low
+  * new upstream release
+  * changes since 2.8.4:
+   - bug fixes and performance enhancements
+ --  <marko.luther@gmx.net>  Wed, 28 Nov 2023 19:32:14 +0200
+
 artisan (2.8.4-0) precise; urgency=low
   * new upstream release
   * changes since 2.8.2:
@@ -467,7 +473,7 @@ artisan (0.3.3-1) maverick; urgency=low
     - added roastertype and operator to the application preferences
     - fixed HH506RAGetID
     - upper limit in outOfRange reduced to 500
-    - fixes typo in line 8432: change delay from 1 miliseconds to 1 second.
+    - fixes typo in line 8432: change delay from 1 milliseconds to 1 second.
     - fixes serial NONE. updates serialscan() to set last com port found on editbox.
     - fixed nonedevDlg layout
     - added x-axis limits to application preferences and fixed Axis dialog

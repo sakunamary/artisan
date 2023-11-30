@@ -20,7 +20,7 @@ import numpy as np
 from collections import deque
 from bisect import bisect_left, insort
 
-from typing import List, Optional, Deque, TYPE_CHECKING
+from typing import List, Optional, Deque, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     import numpy.typing as npt # pylint: disable=unused-import
@@ -72,7 +72,7 @@ class LiveLFilter(LiveFilter):
         y = y / self.a[0]
         self._ys.appendleft(y)
 
-        return y
+        return float(y)
 
 
 class LiveSosFilter(LiveFilter):
@@ -82,7 +82,7 @@ class LiveSosFilter(LiveFilter):
     >>> sosfilter = LiveSosFilter(sos)
     >>> [sosfilter(x) for x in xs]
     """
-    def __init__(self, sos_) -> None:
+    def __init__(self, sos_:Any) -> None:
         """Initialize live second-order sections filter.
 
         Args:
@@ -198,7 +198,7 @@ if __name__ == '__main__':
 
     # plot the data
     import matplotlib.pyplot as plt
-    plt.figure(figsize=[6.4, 2.4])
+    plt.figure(figsize=(6.4, 2.4))
     plt.plot(ts, yraw, label='Noisy signal')
 #    plt.plot(ts, y_scipy_lfilter, lw=1, label="SciPy lfilter")
 #    plt.plot(ts, y_live_lfilter, lw=1, ls="dashed", label="LiveLFilter")

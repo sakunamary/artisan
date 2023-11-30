@@ -5,11 +5,12 @@
 import time as libtime
 import xlrd # type: ignore
 import logging
-from typing import Union, List, Optional, TYPE_CHECKING
-from typing_extensions import Final  # Python <=3.7
+from typing import Final, Union, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from artisanlib.main import ApplicationWindow # pylint: disable=unused-import
     from artisanlib.types import ProfileData # pylint: disable=unused-import
+    from PyQt6.QtCore import QUrl # pylint: disable=unused-import
 
 try:
     from PyQt6.QtCore import QDateTime, Qt # @UnusedImport @Reimport  @UnresolvedImport
@@ -24,9 +25,9 @@ from artisanlib.util import encodeLocal
 _log: Final[logging.Logger] = logging.getLogger(__name__)
 
 # returns a dict containing all profile information contained in the given Cropster XLS file
-def extractProfileCropsterXLS(file,_):
+def extractProfileCropsterXLS(file:'QUrl', _:'ApplicationWindow') -> 'ProfileData':
 
-    def takeClosest(num, collection):
+    def takeClosest(num:float, collection:List[float]) -> float:
         return min(collection, key=lambda x:abs(x-num))
 
     res:ProfileData = {} # the interpreted data set

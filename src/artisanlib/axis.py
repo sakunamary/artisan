@@ -16,6 +16,8 @@
 # Marko Luther, 2023
 
 import platform
+from typing import Optional, TYPE_CHECKING
+
 
 from artisanlib.util import deltaLabelUTF8, stringfromseconds, stringtoseconds
 from artisanlib.dialogs import ArtisanDialog
@@ -33,8 +35,13 @@ except ImportError:
         QComboBox, QHBoxLayout, QVBoxLayout, QCheckBox, QGridLayout, QGroupBox, QLineEdit, QLayout, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
         QSpinBox) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
 
+if TYPE_CHECKING:
+    from artisanlib.main import ApplicationWindow # pylint: disable=unused-import
+    from PyQt6.QtWidgets import QPushButton, QWidget # pylint: disable=unused-import
+    from PyQt6.QtGui import QCloseEvent # pylint: disable=unused-import
+
 class WindowsDlg(ArtisanDialog):
-    def __init__(self, parent, aw) -> None:
+    def __init__(self, parent:'QWidget', aw:'ApplicationWindow') -> None:
         super().__init__(parent, aw)
 
         # remember previous original settings
@@ -309,11 +316,12 @@ class WindowsDlg(ArtisanDialog):
         self.dialogbuttons.accepted.connect(self.updatewindow)
         self.dialogbuttons.rejected.connect(self.restoreState)
 
-        resetButton = self.dialogbuttons.addButton(QDialogButtonBox.StandardButton.RestoreDefaults)
-        resetButton.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        resetButton.clicked.connect(self.reset)
-        self.setButtonTranslations(resetButton,'Restore Defaults',QApplication.translate('Button','Restore Defaults'))
-        resetButton.setToolTip(QApplication.translate('Tooltip', 'Reset axis settings to their defaults'))
+        resetButton: Optional['QPushButton'] = self.dialogbuttons.addButton(QDialogButtonBox.StandardButton.RestoreDefaults)
+        if resetButton is not None:
+            resetButton.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            resetButton.clicked.connect(self.reset)
+            self.setButtonTranslations(resetButton,'Restore Defaults',QApplication.translate('Button','Restore Defaults'))
+            resetButton.setToolTip(QApplication.translate('Tooltip', 'Reset axis settings to their defaults'))
 
         self.loadAxisFromProfile = QCheckBox(QApplication.translate('CheckBox', 'Load from profile'))
         self.loadAxisFromProfile.setChecked(self.aw.qmc.loadaxisfromprofile)
@@ -450,10 +458,10 @@ class WindowsDlg(ArtisanDialog):
         mainLayout.addStretch()
         mainLayout.addLayout(buttonLayout)
         self.setLayout(mainLayout)
-        if platform.system() == 'Windows':
-            self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
-        else:
-            self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok).setFocus()
+        if platform.system() != 'Windows':
+            ok_button: Optional[QPushButton] = self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
+            if ok_button is not None:
+                ok_button.setFocus()
 
         if self.aw.qmc.locktimex:
             self.disableXAxisControls()
@@ -570,7 +578,7 @@ class WindowsDlg(ArtisanDialog):
                 self.autodeltaxETFlag.blockSignals(False)
                 self.autodeltaxBTFlag.blockSignals(False)
                 self.aw.qmc.zlimit = new_value
-                if bool(self.aw.comparator):
+                if self.aw.comparator is not None:
                     self.aw.comparator.redraw()
                 else:
                     self.aw.qmc.redraw(recomputeAllDeltas=False)
@@ -598,7 +606,7 @@ class WindowsDlg(ArtisanDialog):
         self.aw.qmc.autodeltaxET = self.autodeltaxETFlag.isChecked()
         self.aw.qmc.autodeltaxBT = self.autodeltaxBTFlag.isChecked()
         if not self.aw.qmc.flagon and (self.autodeltaxETFlag or self.autodeltaxBTFlag):
-            if bool(self.aw.comparator):
+            if self.aw.comparator is not None:
                 self.aw.comparator.redraw()
                 self.zlimitEdit.setText(str(self.aw.qmc.zlimit))
             else:
@@ -611,7 +619,7 @@ class WindowsDlg(ArtisanDialog):
             self.locktimexFlag.setChecked(False)
             self.enableAutoControls()
             self.enableXAxisControls()
-            if bool(self.aw.comparator):
+            if self.aw.comparator is not None:
                 self.aw.comparator.redraw()
             elif not self.aw.qmc.flagon:
                 self.autoAxis()
@@ -745,7 +753,7 @@ class WindowsDlg(ArtisanDialog):
     @pyqtSlot(int)
     def changelegendloc(self,_):
         self.aw.qmc.legendloc = self.legendComboBox.currentIndex()
-        if bool(self.aw.comparator):
+        if self.aw.comparator is not None:
             self.aw.comparator.legend = None
             self.aw.comparator.redraw()
         else:
@@ -755,7 +763,7 @@ class WindowsDlg(ArtisanDialog):
     @pyqtSlot(int)
     def changeAutoTimexMode(self,_):
         self.aw.qmc.autotimexMode = self.autotimexModeCombobox.currentIndex()
-        if bool(self.aw.comparator):
+        if self.aw.comparator is not None:
             self.aw.comparator.modeComboBox.setCurrentIndex(self.aw.qmc.autotimexMode)
         elif not self.aw.qmc.flagon:
             self.autoAxis()
@@ -909,7 +917,7 @@ class WindowsDlg(ArtisanDialog):
         self.close()
 
     @pyqtSlot('QCloseEvent')
-    def closeEvent(self,_):
+    def closeEvent(self, _:Optional['QCloseEvent'] = None) -> None:
         #save window position (only; not size!)
         settings = QSettings()
         settings.setValue('AxisPosition',self.frameGeometry().topLeft())
@@ -957,7 +965,7 @@ class WindowsDlg(ArtisanDialog):
             self.zlimitEdit.setText(str(self.aw.qmc.zlimit_C_default))
             self.zlimitEdit_min.setText(str(self.aw.qmc.zlimit_min_C_default))
             self.zgridSpinBox.setValue(int(self.aw.qmc.zgrid_C_default))
-        if bool(self.aw.comparator):
+        if self.aw.comparator is not None:
             self.aw.comparator.redraw()
         else:
             self.aw.qmc.redraw(recomputeAllDeltas=False)

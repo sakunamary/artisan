@@ -15,6 +15,8 @@
 # AUTHOR
 # Marko Luther, 2023
 
+from typing import Optional, TYPE_CHECKING
+
 from artisanlib.dialogs import ArtisanDialog
 from artisanlib.widgets import MyQDoubleSpinBox
 
@@ -27,8 +29,13 @@ except ImportError:
     from PyQt5.QtWidgets import (QMessageBox, QApplication, QHBoxLayout, QVBoxLayout, QCheckBox, QGridLayout, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
                                  QDialogButtonBox, QLayout) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
 
+if TYPE_CHECKING:
+    from artisanlib.main import ApplicationWindow # noqa: F401 # pylint: disable=unused-import
+    from PyQt6.QtWidgets import QWidget, QPushButton # pylint: disable=unused-import
+    from PyQt6.QtGui import QCloseEvent # pylint: disable=unused-import
+
 class SamplingDlg(ArtisanDialog):
-    def __init__(self, parent, aw) -> None:
+    def __init__(self, parent:'QWidget', aw:'ApplicationWindow') -> None:
         super().__init__(parent, aw)
         self.setWindowTitle(QApplication.translate('Message','Sampling'))
         self.setModal(True)
@@ -77,7 +84,9 @@ class SamplingDlg(ArtisanDialog):
         layout.addStretch()
         layout.addLayout(buttonsLayout)
         self.setLayout(layout)
-        self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok).setFocus()
+        ok_button: Optional['QPushButton'] = self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
+        if ok_button is not None:
+            ok_button.setFocus()
 
         settings = QSettings()
         if settings.contains('SamplingPosition'):
@@ -86,23 +95,25 @@ class SamplingDlg(ArtisanDialog):
         layout.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
 
     #window close box
-    def closeEvent(self,_):
+    @pyqtSlot('QCloseEvent')
+    def closeEvent(self,_:Optional['QCloseEvent'] = None) -> None:
         self.close()
 
     #cancel button
     @pyqtSlot()
-    def close(self):
+    def close(self) -> bool:
         self.storeSettings()
         self.reject()
+        return True
 
-    def storeSettings(self):
+    def storeSettings(self) -> None:
         #save window position (only; not size!)
         settings = QSettings()
         settings.setValue('SamplingPosition',self.frameGeometry().topLeft())
 
     #ok button
     @pyqtSlot()
-    def ok(self):
+    def ok(self) -> None:
         self.aw.qmc.flagKeepON = bool(self.keepOnFlag.isChecked())
         self.aw.qmc.flagOpenCompleted = bool(self.openCompletedFlag.isChecked())
         self.aw.setSamplingRate(int(self.interval.value()*1000.))

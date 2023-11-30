@@ -1,18 +1,17 @@
 #
-
-'''
+"""qtsingleapplication.py
 Source: https://github.com/IARI/alsa_jack_gui
 Author: https://github.com/IARI
 Original Source: http://stackoverflow.com/questions/12712360/qtsingleapplication-for-pyside-or-pyqt
 Original Author: user763305
 Notes: Modified for PyQt5; further modified to remove blocking sockets remaining from died server
 Updated to support QT6
-'''
+"""
 
 import sys
 import multiprocessing as mp
 
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from artisanlib.main import ApplicationWindow # pylint: disable=unused-import
@@ -27,13 +26,13 @@ except ImportError:
     from PyQt5.QtNetwork import QLocalSocket, QLocalServer # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
 
 
-class QtSingleApplication(QApplication): # pyright: ignore # Argument to class must be a base class (reportGeneralTypeIssues)
+class QtSingleApplication(QApplication): # pyright: ignore [reportGeneralTypeIssues] # Argument to class must be a base class
     messageReceived = pyqtSignal(str)
 
     __slots__ = [ '_id', '_viewer_id', '_activationWindow', '_activateOnMessage', '_inSocket', '_outSocket', '_isRunning', '_server',
         '_isRunningViewer', '_outSocketViewer', '_inStream', '_outStream', '_outStreamViewer' ]
 
-    def __init__(self, _id:str, _viewer_id:str, *argv) -> None:
+    def __init__(self, _id:str, _viewer_id:str, *argv: Any) -> None:
 
         if sys.platform.startswith('darwin') and mp.current_process().name == 'WebLCDs':
             import AppKit # type: ignore # pylint: disable=import-error
@@ -120,7 +119,7 @@ class QtSingleApplication(QApplication): # pyright: ignore # Argument to class m
     def activationWindow(self) -> Optional['ApplicationWindow']:
         return self._activationWindow
 
-    def setActivationWindow(self, activationWindow:'ApplicationWindow', activateOnMessage=True) -> None:
+    def setActivationWindow(self, activationWindow:'ApplicationWindow', activateOnMessage:bool = True) -> None:
         self._activationWindow = activationWindow
         self._activateOnMessage = activateOnMessage
 
@@ -137,7 +136,7 @@ class QtSingleApplication(QApplication): # pyright: ignore # Argument to class m
     def sendMessage(self, msg:str) -> bool:
         if self._outStream is None or self._outSocket is None:
             return False
-        self._outStream << msg << '\n' # pylint: disable=pointless-statement # pyright: ignore # warning: Expression value is unused (reportUnusedExpression)
+        self._outStream << msg << '\n' # pylint: disable=pointless-statement # pyright: ignore [reportUnusedExpression] # warning: Expression value is unused
         self._outStream.flush()
         return self._outSocket.waitForBytesWritten()
 
@@ -153,7 +152,8 @@ class QtSingleApplication(QApplication): # pyright: ignore # Argument to class m
             self._inStream.setCodec('UTF-8') # type: ignore # setCodec not available in PyQt6, but UTF-8 the default encoding
         except Exception: # pylint: disable=broad-except
             pass
-        self._inSocket.readyRead.connect(self._onReadyRead)
+        if self._inSocket is not None:
+            self._inSocket.readyRead.connect(self._onReadyRead)
         if self._activateOnMessage and self._isRunning:
             self.activateWindow()
 
