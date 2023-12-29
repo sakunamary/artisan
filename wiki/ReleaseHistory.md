@@ -1,6 +1,30 @@
 Detailed Release History
 ========================
 ----
+v2.10.2 (XX, 2024)
+------------------
+
+* ADDITIONS
+* NEW HARDWARE SUPPORT
+  - adds machine setups for various machines of Mill City Roasters
+* CHANGES
+  - upgrades to Qt/PyQt 6.6.1, pymodbus 3.6.2
+* FIXES
+  - fixes axis limits on starting the designer from a profile with time axis locked ([Discussion #1325](../../../discussions/1325))
+  - fixes regresion that kept log dialogs (serial, message, error) empty
+  - fixes regression which broke loading of certain MODBUS configurations (eg. Loring)
+  - fixes regression which broke the DROP alarm action
+  - fixes regression which broke the PDF export on Linux
+  - fixes regression which broke the transposer calculations
+  - fixes regression which broke the simulator for profiles with extra device curves
+  - fixes regression which broke the CHARGE timer ([Discussion #1358](../../../discussions/1358))
+  - fixes broken computation of the event slider calculators
+  - fixes arabic reshaping and applies it also to Farsi
+  - fixes CSV export ([Discussion #1357](../../../discussions/1357))
+* REMOVALS
+
+
+----
 v2.10.0 (November 28, 2023)
 ------------------
 
@@ -41,7 +65,7 @@ v2.10.0 (November 28, 2023)
   - enable the import of IKAWA profiles from URLs on platforms without Bluetooth BLE support
   - roasting and cupping notes are always deleted on RESET even if `delete Roast Properties on RESET` is not ticked
   - use default spawn instead fork multiprocessing also on macOS and replaced troublesome multiprocessing for Hottop and WebLCDs communication by asyncio
-  - internal improvements leading to faster app start and exit as well as faster start of WebLCDs and more stable communication with Hottop roasters
+  - internal improvements leading to faster app start and exit as well as faster start of WebLCDs and more stable communication with Hottop roasters. As a consequence of this re-implementation, CONTROL can only be started after a connection to the Hottop via the button ON has been initialized.
   - upgrades dependencies (PyQt 6.6, matplotlib 3.8, pymodbus 3.5)
   - adds Idempotency-Key header to [artisan.plus](https://artisan.plus/) POST requests
 
@@ -111,7 +135,7 @@ v2.8.4 (June 21, 2023)
 
 * FIXES
   - fixes regression which broke MODBUS port scan ([Issue #1056](../../../issues/1056))
-  - makes designer respect the auto DeltaET and DeltaBT axis ([Issue #1062]((../../../issues/1062)))
+  - makes designer respect the auto DeltaET and DeltaBT axis ([Issue #1062](../../../issues/1062))
   - don't deactivate auto DeltaET/DeltaBT axis without changing the delta max limit ([Issue #1062](../../../issues/1062))
   - fixes regression which broke channel tare function ([Issue #1063](../../../issues/1063))
   - fixes Aillio R1: unable to detach kernel driver ([Issue #1065](../../../issues/1065))

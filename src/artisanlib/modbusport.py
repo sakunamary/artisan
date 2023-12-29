@@ -18,11 +18,11 @@
 import sys
 import time
 import logging
-from typing import Final, Optional, List, Dict, Tuple, Union, Any, TYPE_CHECKING
+from typing import Final, Optional, List, Dict, Tuple, Union, Any, Awaitable, cast, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from artisanlib.main import ApplicationWindow # pylint: disable=unused-import
-    from pymodbus.client import ModbusBaseClient # pylint: disable=unused-import
+    from pymodbus.client.base import ModbusBaseSyncClient # pylint: disable=unused-import
     from pymodbus.payload import BinaryPayloadBuilder # pylint: disable=unused-import
     from pymodbus.payload import BinaryPayloadDecoder # pylint: disable=unused-import
     from pymodbus.pdu import ModbusResponse # pylint: disable=unused-import
@@ -81,7 +81,7 @@ def getBinaryPayloadBuilder(byteorderLittle:bool = True, wordorderLittle:bool = 
     from pymodbus.payload import BinaryPayloadBuilder
     byteorder = Endian.LITTLE if byteorderLittle else Endian.BIG
     wordorder = Endian.LITTLE if wordorderLittle else Endian.BIG
-    return BinaryPayloadBuilder(byteorder=byteorder, wordorder=wordorder)
+    return BinaryPayloadBuilder(byteorder=byteorder, wordorder=wordorder) # type:ignore[no-untyped-call]
 
 def getBinaryPayloadDecoderFromRegisters(registers:List[int], byteorderLittle:bool = True, wordorderLittle:bool = False) -> 'BinaryPayloadDecoder':
     from pymodbus.constants import Endian
@@ -170,7 +170,7 @@ class modbusport:
         self.PIDmultiplier:int = 0  # 0:no, 1:10x, 2:100x # :Literal[0,1,2]
         self.byteorderLittle:bool = False
         self.wordorderLittle:bool = True
-        self.master:Optional['ModbusBaseClient'] = None
+        self.master:Optional['ModbusBaseSyncClient'] = None
         self.COMsemaphore:QSemaphore = QSemaphore(1)
         self.default_host:Final[str] = '127.0.0.1'
         self.host:str = self.default_host # the TCP/UDP host
@@ -248,9 +248,9 @@ class modbusport:
                 # as in the following the port is None, no port is opened on creation of the (py)serial object
                 if self.type == 1: # Serial ASCII
                     from pymodbus.client import ModbusSerialClient
-                    from pymodbus.transaction import ModbusAsciiFramer
+                    from pymodbus.framer import Framer
                     self.master = ModbusSerialClient(
-                        framer=ModbusAsciiFramer,
+                        framer=Framer.ASCII,
                         #method='ascii', # deprecated in pymodbus 3.x
                         port=self.comport,
                         baudrate=self.baudrate,
@@ -268,9 +268,9 @@ class modbusport:
                     self.readRetries = self.serial_readRetries
                 elif self.type == 2: # Serial Binary
                     from pymodbus.client import ModbusSerialClient # @Reimport
-                    from pymodbus.transaction import ModbusBinaryFramer
+                    from pymodbus.framer import Framer
                     self.master = ModbusSerialClient(
-                        framer=ModbusBinaryFramer,
+                        framer=Framer.BINARY,
                         #method='binary', # deprecated in pymodbus 3.x
                         port=self.comport,
                         baudrate=self.baudrate,
@@ -332,9 +332,9 @@ class modbusport:
                             )
                 else: # Serial RTU
                     from pymodbus.client import ModbusSerialClient # @Reimport
-                    from pymodbus.transaction import ModbusRtuFramer
+                    from pymodbus.framer import Framer
                     self.master = ModbusSerialClient(
-                        framer=ModbusRtuFramer,
+                        framer=Framer.RTU,
                         #method='rtu', # deprecated in pymodbus 3.x
                         port=self.comport,
                         baudrate=self.baudrate,
@@ -352,7 +352,7 @@ class modbusport:
                     self.readRetries = self.serial_readRetries
                 _log.debug('connect(): connecting')
                 time.sleep(.2) # avoid possible hickups on startup
-                self.master.connect()
+                self.master.connect() # type:ignore[no-untyped-call]
                 if self.isConnected():
                     self.updateActiveRegisters()
                     self.clearReadingsCache()
@@ -453,7 +453,7 @@ class modbusport:
                             register:int = seq[0]
                             count:int = seq[1]-seq[0] + 1
                             if 0 < count <= self.maxCount:
-                                res:Optional['ModbusResponse'] = None
+                                res:'Optional[Union[ModbusResponse,Awaitable[ModbusResponse]]]' = None
                                 if just_send:
                                     self.sleepBetween() # we start with a sleep, as it could be that just a send command happened before the semaphore was caught
                                 just_send = True
@@ -463,9 +463,9 @@ class modbusport:
                                     try:
                                         # we cache only MODBUS function 3 and 4 (not 1 and 2!)
                                         if code == 3:
-                                            res = self.master.read_holding_registers(register,count,slave=slave)
+                                            res = cast('ModbusResponse', self.master.read_holding_registers(register,count,slave=slave))
                                         elif code == 4:
-                                            res = self.master.read_input_registers(register,count,slave=slave)
+                                            res = cast('ModbusResponse', self.master.read_input_registers(register,count,slave=slave))
                                     except Exception as e: # pylint: disable=broad-except
                                         _log.info('readActive(%d,%d,%d,%d)', slave, code, register, count)
                                         _log.debug(e)
@@ -771,22 +771,22 @@ class modbusport:
                     # cache hit
                     res_int:List[int] = [self.readingsCache[code][slave][register],self.readingsCache[code][slave][register+1]]
                     decoder = getBinaryPayloadDecoderFromRegisters(res_int, self.byteorderLittle, self.wordorderLittle)
-                    r = decoder.decode_32bit_float()
+                    r = decoder.decode_32bit_float() # type:ignore[no-untyped-call]
                     _log.debug('return cached value => %.3f', r)
                     return r
                 if self.fail_on_cache_miss:
                     _log.debug('optimizer cache miss')
                     return None
             self.connect()
-            res: Optional[ModbusResponse]
+            res: 'Optional[Union[ModbusResponse,Awaitable[ModbusResponse]]]'
             if self.isConnected():
                 assert self.master is not None
                 while True:
                     try:
                         if code==3:
-                            res = self.master.read_holding_registers(int(register),2,slave=int(slave))
+                            res = cast('ModbusResponse', self.master.read_holding_registers(int(register),2,slave=int(slave)))
                         else:
-                            res = self.master.read_input_registers(int(register),2,slave=int(slave))
+                            res = cast('ModbusResponse', self.master.read_input_registers(int(register),2,slave=int(slave)))
                     except Exception as ex: # pylint: disable=broad-except
                         _log.debug(ex)
                         res = None
@@ -803,7 +803,7 @@ class modbusport:
                         break
                 if res is not None and hasattr(res, 'registers'):
                     decoder = getBinaryPayloadDecoderFromRegisters(res.registers, self.byteorderLittle, self.wordorderLittle)
-                    r = decoder.decode_32bit_float()
+                    r = decoder.decode_32bit_float() # type:ignore[no-untyped-call]
                     # we clear the previous error and send a message
                     self.clearCommError()
                     time.sleep(0.020) # we add a small sleep between requests to help out the slow Loring electronic
@@ -853,22 +853,22 @@ class modbusport:
                     # cache hit
                     res_int:List[int] = [self.readingsCache[code][slave][register],self.readingsCache[code][slave][register+1]]
                     decoder = getBinaryPayloadDecoderFromRegisters(res_int, self.byteorderLittle, self.wordorderLittle)
-                    r = convert_from_bcd(decoder.decode_32bit_uint())
+                    r = convert_from_bcd(decoder.decode_32bit_uint()) # type:ignore[no-untyped-call]
                     _log.debug('return cached value => %.3f', r)
                     return r
                 if self.fail_on_cache_miss:
                     _log.debug('optimizer cache miss')
                     return None
             self.connect()
-            res: Optional[ModbusResponse]
+            res: 'Optional[Union[ModbusResponse,Awaitable[ModbusResponse]]]'
             if self.isConnected():
                 assert self.master is not None
                 while True:
                     try:
                         if code==3:
-                            res = self.master.read_holding_registers(int(register),2,slave=int(slave))
+                            res = cast('ModbusResponse', self.master.read_holding_registers(int(register),2,slave=int(slave)))
                         else:
-                            res = self.master.read_input_registers(int(register),2,slave=int(slave))
+                            res = cast('ModbusResponse', self.master.read_input_registers(int(register),2,slave=int(slave)))
                     except Exception as ex: # pylint: disable=broad-except
                         _log.debug(ex)
                         res = None
@@ -885,7 +885,7 @@ class modbusport:
                         break
                 if res is not None and hasattr(res, 'registers'):
                     decoder = getBinaryPayloadDecoderFromRegisters(res.registers, self.byteorderLittle, self.wordorderLittle)
-                    if (r := decoder.decode_32bit_uint()) is not None:
+                    if (r := decoder.decode_32bit_uint()) is not None: # type:ignore[no-untyped-call]
                         self.clearCommError()
                         time.sleep(0.020) # we add a small sleep between requests to help out the slow Loring electronic
                         return convert_from_bcd(r)
@@ -918,19 +918,19 @@ class modbusport:
         _log.debug('peekSingleRegister(%d,%d,%d)', slave, register, code)
         if slave == 0:
             return None
-        res:Optional['ModbusResponse'] = None
+        res:'Optional[Union[ModbusResponse,Awaitable[ModbusResponse]]]' = None
         try:
             self.connect()
             if self.isConnected():
                 assert self.master is not None
                 if code==1:
-                    res = self.master.read_coils(int(register),1,slave=int(slave))
+                    res = cast('ModbusResponse', self.master.read_coils(int(register),1,slave=int(slave)))
                 elif code==2:
-                    res = self.master.read_discrete_inputs(int(register),1,slave=int(slave))
+                    res = cast('ModbusResponse', self.master.read_discrete_inputs(int(register),1,slave=int(slave)))
                 elif code==4:
-                    res = self.master.read_input_registers(int(register),1,slave=int(slave))
+                    res = cast('ModbusResponse', self.master.read_input_registers(int(register),1,slave=int(slave)))
                 else: # code==3
-                    res = self.master.read_holding_registers(int(register),1,slave=int(slave))
+                    res = cast('ModbusResponse', self.master.read_holding_registers(int(register),1,slave=int(slave)))
         except Exception as ex: # pylint: disable=broad-except
             _log.info('peekSingleRegister(%d,%d,%d) failed', slave, register, code)
             _log.debug(ex)
@@ -942,7 +942,7 @@ class modbusport:
                 return 0
             if hasattr(res, 'registers'):
                 decoder = getBinaryPayloadDecoderFromRegisters(res.registers, self.byteorderLittle, self.wordorderLittle)
-                r = int(decoder.decode_16bit_uint())
+                r = int(decoder.decode_16bit_uint()) # type:ignore[no-untyped-call]
 #                _log.debug('  res.registers => %s', res.registers)
                 _log.debug('  decoder.decode_16bit_uint() => %s', r)
                 return r
@@ -973,28 +973,28 @@ class modbusport:
                     res_int:int = self.readingsCache[code][slave][register]
                     decoder = getBinaryPayloadDecoderFromRegisters([res_int], self.byteorderLittle, self.wordorderLittle)
                     if signed:
-                        r = decoder.decode_16bit_int()
+                        r = decoder.decode_16bit_int() # type:ignore[no-untyped-call]
                     else:
-                        r = decoder.decode_16bit_uint()
+                        r = decoder.decode_16bit_uint() # type:ignore[no-untyped-call]
                     _log.debug('return cached value => %d', r)
                     return r
                 if self.fail_on_cache_miss:
                     _log.debug('optimizer cache miss')
                     return None
             self.connect()
-            res: Optional[ModbusResponse]
+            res: 'Optional[Union[ModbusResponse,Awaitable[ModbusResponse]]]'
             if self.isConnected():
                 assert self.master is not None
                 while True:
                     try:
                         if code==1:
-                            res = self.master.read_coils(int(register),1,slave=int(slave))
+                            res = cast('ModbusResponse', self.master.read_coils(int(register),1,slave=int(slave)))
                         elif code==2:
-                            res = self.master.read_discrete_inputs(int(register),1,slave=int(slave))
+                            res = cast('ModbusResponse', self.master.read_discrete_inputs(int(register),1,slave=int(slave)))
                         elif code==4:
-                            res = self.master.read_input_registers(int(register),1,slave=int(slave))
+                            res = cast('ModbusResponse', self.master.read_input_registers(int(register),1,slave=int(slave)))
                         else: # code==3
-                            res = self.master.read_holding_registers(int(register),1,slave=int(slave))
+                            res = cast('ModbusResponse', self.master.read_holding_registers(int(register),1,slave=int(slave)))
                     except Exception as ex: # pylint: disable=broad-except
                         _log.debug(ex)
                         res = None
@@ -1018,9 +1018,9 @@ class modbusport:
                     if hasattr(res, 'registers'):
                         decoder = getBinaryPayloadDecoderFromRegisters(res.registers, self.byteorderLittle, self.wordorderLittle)
                         if signed:
-                            r = decoder.decode_16bit_int()
+                            r = decoder.decode_16bit_int() # type:ignore[no-untyped-call]
                         else:
-                            r = decoder.decode_16bit_uint()
+                            r = decoder.decode_16bit_uint() # type:ignore[no-untyped-call]
                         # we clear the previous error and send a message
                         self.clearCommError()
                         return r
@@ -1069,23 +1069,23 @@ class modbusport:
                     res_int:List[int] = [self.readingsCache[code][slave][register],self.readingsCache[code][slave][register+1]]
                     decoder = getBinaryPayloadDecoderFromRegisters(res_int, self.byteorderLittle, self.wordorderLittle)
                     if signed:
-                        r = decoder.decode_32bit_int()
+                        r = decoder.decode_32bit_int() # type:ignore[no-untyped-call]
                     else:
-                        r = decoder.decode_32bit_uint()
+                        r = decoder.decode_32bit_uint() # type:ignore[no-untyped-call]
                     _log.debug('return cached value => %d', r)
                     return r
                 if self.fail_on_cache_miss:
                     _log.debug('optimizer cache miss')
                     return None
             self.connect()
-            res: Optional[ModbusResponse]
+            res: 'Optional[Union[ModbusResponse,Awaitable[ModbusResponse]]]'
             if self.isConnected():
                 assert self.master is not None
                 while True:
                     if code==3:
-                        res = self.master.read_holding_registers(int(register),2,slave=int(slave))
+                        res = cast('ModbusResponse', self.master.read_holding_registers(int(register),2,slave=int(slave)))
                     else:
-                        res = self.master.read_input_registers(int(register),2,slave=int(slave))
+                        res = cast('ModbusResponse', self.master.read_input_registers(int(register),2,slave=int(slave)))
                     error, disconnect = self.invalidResult(res,2)
                     if error:
                         error_disconnect = error_disconnect or disconnect
@@ -1100,9 +1100,9 @@ class modbusport:
                 if res is not None and hasattr(res, 'registers'):
                     decoder = getBinaryPayloadDecoderFromRegisters(res.registers, self.byteorderLittle, self.wordorderLittle)
                     if signed:
-                        r = decoder.decode_32bit_int()
+                        r = decoder.decode_32bit_int() # type:ignore[no-untyped-call]
                     else:
-                        r = decoder.decode_32bit_uint()
+                        r = decoder.decode_32bit_uint() # type:ignore[no-untyped-call]
                     # we clear the previous error and send a message
                     self.clearCommError()
                     return r
@@ -1151,22 +1151,22 @@ class modbusport:
                     # cache hit
                     res_int:int = self.readingsCache[code][slave][register]
                     decoder = getBinaryPayloadDecoderFromRegisters([res_int], self.byteorderLittle, self.wordorderLittle)
-                    r = convert_from_bcd(decoder.decode_16bit_uint())
+                    r = convert_from_bcd(decoder.decode_16bit_uint()) # type:ignore[no-untyped-call]
                     _log.debug('return cached value => %d', r)
                     return r
                 if self.fail_on_cache_miss:
                     _log.debug('optimizer cache miss')
                     return None
             self.connect()
-            res: Optional[ModbusResponse]
+            res: 'Optional[Union[ModbusResponse,Awaitable[ModbusResponse]]]'
             if self.isConnected():
                 assert self.master is not None
                 while True:
                     try:
                         if code==3:
-                            res = self.master.read_holding_registers(int(register),1,slave=int(slave))
+                            res = cast('ModbusResponse', self.master.read_holding_registers(int(register),1,slave=int(slave)))
                         else:
-                            res = self.master.read_input_registers(int(register),1,slave=int(slave))
+                            res = cast('ModbusResponse', self.master.read_input_registers(int(register),1,slave=int(slave)))
                     except Exception: # pylint: disable=broad-except
                         res = None
                     error, disconnect = self.invalidResult(res,1)
@@ -1182,7 +1182,7 @@ class modbusport:
                         break
                 if res is not None and hasattr(res, 'registers'):
                     decoder = getBinaryPayloadDecoderFromRegisters(res.registers, self.byteorderLittle, self.wordorderLittle)
-                    if (r := decoder.decode_16bit_uint()) is not None:
+                    if (r := decoder.decode_16bit_uint()) is not None: # type:ignore[no-untyped-call]
                         # we clear the previous error and send a message
                         self.clearCommError()
                         time.sleep(0.020) # we add a small sleep between requests to help out the slow Loring electronic

@@ -30,6 +30,7 @@ from typing import Final, Optional, Tuple, List, Sequence, Union, Any, TYPE_CHEC
 from typing_extensions import TypeGuard  # Python <=3.10
 
 if TYPE_CHECKING:
+    from artisanlib.main import Artisan # pylint: disable=unused-import
     import numpy.typing as npt # pylint: disable=unused-import
 
 
@@ -243,7 +244,7 @@ def toInt(x:Optional[Union[int,str,float]]) -> int:
 def toString(x:Any) -> str:
     return str(x)
 
-def toList(x:Any) -> List:
+def toList(x:Any) -> List[Any]:
     if x is None:
         return []
     return list(x)
@@ -269,7 +270,7 @@ def toBool(x:Any) -> bool:
             return False
     return bool(x)
 
-def toStringList(x:List) -> List[str]:
+def toStringList(x:List[Any]) -> List[str]:
     if x:
         return [str(s) for s in x]
     return []
@@ -284,7 +285,7 @@ def removeAll(ll:List[str], s:str) -> None:
 # [-1,-1,2] => [2, 2, 2] # a prefix of -1 of max length 'interpolate_max' will be replaced by the first value in l that is not -1
 # INVARIANT: the resulting list has always the same length as l
 # only gaps of length interpolate_max (should be set to the global aw.qmc.interpolatemax), if not None, are interpolated
-def fill_gaps(ll:Union[Sequence[Union[float, int]], 'npt.NDArray[numpy.floating]'], interpolate_max:int=3) -> List[float]:
+def fill_gaps(ll:Union[Sequence[Union[float, int]], 'npt.NDArray[numpy.floating[Any]]'], interpolate_max:int=3) -> List[float]:
     res:List[float] = []
     last_val:float = -1
     skip:int = -1
@@ -354,13 +355,13 @@ def replace_duplicates(data:List[float]) -> List[float]:
 # otherwise the path is computed on first call and then memorized
 # if the computed path does not exists it is created
 # if creation or access of the path fails None is returned and memorized
-def getDataDirectory():
+def getDataDirectory() -> Optional[str]:
     app = QCoreApplication.instance()
     return _getAppDataDirectory(app)
 
 # internal function to return
 @functools.lru_cache(maxsize=None)  #for Python >= 3.9 can use @functools.cache
-def _getAppDataDirectory(app):
+def _getAppDataDirectory(app:'Artisan') -> Optional[str]:
     # temporarily switch app name to Artisan (as it might be ArtisanViewer)
     appName = app.applicationName()
     app.setApplicationName(application_name)
@@ -376,7 +377,7 @@ def _getAppDataDirectory(app):
         return None
 
 @functools.lru_cache(maxsize=None)  #for Python >= 3.9 can use @functools.cache
-def getAppPath():
+def getAppPath() -> str:
     platf = platform.system()
     if platf in {'Darwin','Linux'}:
         if appFrozen():
@@ -389,7 +390,7 @@ def getAppPath():
     return QCoreApplication.applicationDirPath() + '/'
 
 @functools.lru_cache(maxsize=None)  #for Python >= 3.9 can use @functools.cache
-def getResourcePath():
+def getResourcePath() -> str:
     platf = platform.system()
     if platf == 'Darwin':
         if appFrozen():
@@ -459,18 +460,18 @@ def createRGBGradient(rgb:Union[QColor, str], tint_factor:float = 0.3, shade_fac
     try:
         rgb_tuple: Tuple[float, float, float]
         if isinstance(rgb, QColor):
-            r,g,b,_ = rgb.getRgbF() # type: ignore
+            r,g,b,_ = rgb.getRgbF() # type:ignore[unused-ignore]
             if r is not None and g is not None and b is not None:
                 rgb_tuple = (r,g,b)
             else:
                 rgb_tuple = (0.5,0.5,0.5)
         elif rgb[0:1] == '#':   # hex input like "#ffaa00" # type: ignore
 #            rgb_tuple = tuple(int(rgb[i:i+2], 16)/255 for i in (1, 3 ,5))
-            rgb_tuple = (float(int(rgb[1:3], 16)/255),float(int(rgb[3:5], 16)/255),float(int(rgb[5:7], 16)/255)) # type: ignore
+            rgb_tuple = (float(int(rgb[1:3], 16)/255),float(int(rgb[3:5], 16)/255),float(int(rgb[5:7], 16)/255)) # type:ignore[unused-ignore]
         else:                 # color name
-            rgb_tuple = colors.hex2color(colors.cnames[rgb]) # type: ignore
+            rgb_tuple = colors.hex2color(colors.cnames[rgb]) # type:ignore[unused-ignore]
         #ref: https://stackoverflow.com/questions/6615002/given-an-rgb-value-how-do-i-create-a-tint-or-shade
-        r,g,b = tuple(int(255 * (x * (1 - shade_factor))) for x in rgb_tuple) # type: ignore
+        r,g,b = tuple(int(255 * (x * (1 - shade_factor))) for x in rgb_tuple) # type:ignore[unused-ignore]
         darker_rgb = f'#{r:02x}{g:02x}{b:02x}'
         r,g,b = tuple(int(255 * (x + (1 - x) * tint_factor)) for x in rgb_tuple)
         lighter_rgb = f'#{r:02x}{g:02x}{b:02x}'
@@ -544,11 +545,11 @@ def debugLogLevelToggle() -> bool:
     setDebugLogLevel(newDebugLevel)
     return newDebugLevel
 
-def natsort(s):
+def natsort(s:str) -> List[Union[int,str]]:
     return [int(t) if t.isdigit() else t.lower() for t in re.split(r'(\d+)', s)]
 
 #convert number to string and auto set the number of decimal places 0, 0.999, 9.99, 999.9, 9999
-def scaleFloat2String(num):
+def scaleFloat2String(num:Union[float,str]) -> str:
     n = toFloat(num)
     if n == 0:
         return '0'

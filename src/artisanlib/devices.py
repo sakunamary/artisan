@@ -20,7 +20,7 @@ import time as libtime
 import re
 import platform
 import logging
-from typing import Final, Optional, List, Tuple, TYPE_CHECKING
+from typing import Final, Optional, List, Tuple, cast, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from artisanlib.main import ApplicationWindow # noqa: F401 # pylint: disable=unused-import
@@ -43,9 +43,9 @@ except ImportError:
     from PyQt5.QtCore import (Qt, pyqtSlot, QSettings, QTimer) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtGui import (QStandardItemModel, QStandardItem, QColor) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtWidgets import (QApplication, QWidget, QCheckBox, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
-                                 QPushButton, QSpinBox, QTabWidget, QComboBox, QDialogButtonBox, QGridLayout, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
-                                 QGroupBox, QRadioButton, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
-                                 QTableWidget, QMessageBox, QHeaderView) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
+                                 QPushButton, QSpinBox, QTabWidget, QComboBox, QDialogButtonBox, QGridLayout, # @UnusedImport @Reimport  @UnresolvedImport
+                                 QGroupBox, QRadioButton, # @UnusedImport @Reimport  @UnresolvedImport
+                                 QTableWidget, QMessageBox, QHeaderView) # @UnusedImport @Reimport  @UnresolvedImport
 
 
 class DeviceAssignmentDlg(ArtisanResizeablDialog):
@@ -305,8 +305,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         for i in range(1,5):
             changeTriggersCombo = QComboBox()
             changeTriggersCombo.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-            model = changeTriggersCombo.model()
-            assert isinstance(model, QStandardItemModel)
+            model = cast(QStandardItemModel, changeTriggersCombo.model())
             changeTriggerItems = self.createItems(self.aw.qmc.phidget1048_changeTriggersStrings)
             for item in changeTriggerItems:
                 model.appendRow(item)
@@ -334,8 +333,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             asyncFlag.setChecked(self.aw.qmc.phidget1048_async[i-1])
             probeTypeCombo = QComboBox()
             probeTypeCombo.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-            model = probeTypeCombo.model()
-            assert isinstance(model, QStandardItemModel)
+            model = cast(QStandardItemModel, probeTypeCombo.model())
             probeTypeItems = self.createItems(phidgetProbeTypeItems)
             for item in probeTypeItems:
                 model.appendRow(item)
@@ -358,8 +356,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 
         self.dataRateCombo1048 = QComboBox()
         self.dataRateCombo1048.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        model = self.dataRateCombo1048.model()
-        assert isinstance(model, QStandardItemModel)
+        model = cast(QStandardItemModel, self.dataRateCombo1048.model())
         dataRateItems = self.createItems(self.aw.qmc.phidget_dataRatesStrings)
         for item in dataRateItems:
             model.appendRow(item)
@@ -403,8 +400,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         phidgetBox1045.setSpacing(1)
         self.changeTriggerCombos1045 = QComboBox()
         self.changeTriggerCombos1045.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        model = self.changeTriggerCombos1045.model()
-        assert isinstance(model, QStandardItemModel)
+        model = cast(QStandardItemModel, self.changeTriggerCombos1045.model())
         changeTriggerItems = self.createItems(self.aw.qmc.phidget1045_changeTriggersStrings)
         for item in changeTriggerItems:
             model.appendRow(item)
@@ -433,8 +429,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 
         self.dataRateCombo1045 = QComboBox()
         self.dataRateCombo1045.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        model = self.dataRateCombo1045.model()
-        assert isinstance(model, QStandardItemModel)
+        model = cast(QStandardItemModel, self.dataRateCombo1045.model())
         dataRateItems = self.createItems(self.aw.qmc.phidget_dataRatesStrings)
         for item in dataRateItems:
             model.appendRow(item)
@@ -482,8 +477,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             gainCombo = QComboBox()
             gainCombo.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-            model = gainCombo.model()
-            assert isinstance(model, QStandardItemModel)
+            model = cast(QStandardItemModel, gainCombo.model())
             gainItems = self.createItems(self.aw.qmc.phidget1046_gainValues)
             for item in gainItems:
                 model.appendRow(item)
@@ -504,8 +498,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 
             formulaCombo = QComboBox()
             formulaCombo.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-            model = formulaCombo.model()
-            assert isinstance(model, QStandardItemModel)
+            model = cast(QStandardItemModel, formulaCombo.model())
             formulaItems = self.createItems(self.aw.qmc.phidget1046_formulaValues)
             for item in formulaItems:
                 model.appendRow(item)
@@ -535,8 +528,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 
         self.dataRateCombo1046 = QComboBox()
         self.dataRateCombo1046.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        model = self.dataRateCombo1046.model()
-        assert isinstance(model, QStandardItemModel)
+        model = cast(QStandardItemModel, self.dataRateCombo1046.model())
         dataRateItems = self.createItems(self.aw.qmc.phidget_dataRatesStrings)
         for item in dataRateItems:
             model.appendRow(item)
@@ -583,8 +575,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 
         self.formulaCombo1200 = QComboBox()
         self.formulaCombo1200.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        model = self.formulaCombo1200.model()
-        assert isinstance(model, QStandardItemModel)
+        model = cast(QStandardItemModel, self.formulaCombo1200.model())
         wireItems = self.createItems(self.aw.qmc.phidget1200_formulaValues)
         for item in wireItems:
             model.appendRow(item)
@@ -599,8 +590,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 
         self.wireCombo1200 = QComboBox()
         self.wireCombo1200.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        model = self.wireCombo1200.model()
-        assert isinstance(model, QStandardItemModel)
+        model = cast(QStandardItemModel, self.wireCombo1200.model())
         wireItems = self.createItems(self.aw.qmc.phidget1200_wireValues)
         for item in wireItems:
             model.appendRow(item)
@@ -620,8 +610,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 
         self.changeTriggerCombo1200 = QComboBox()
         self.changeTriggerCombo1200.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        model = self.changeTriggerCombo1200.model()
-        assert isinstance(model, QStandardItemModel)
+        model = cast(QStandardItemModel, self.changeTriggerCombo1200.model())
         changeTriggerItems = self.createItems(self.aw.qmc.phidget1200_changeTriggersStrings)
         for item in changeTriggerItems:
             model.appendRow(item)
@@ -637,8 +626,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 
         self.rateCombo1200 = QComboBox()
         self.rateCombo1200.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        model = self.rateCombo1200.model()
-        assert isinstance(model, QStandardItemModel)
+        model = cast(QStandardItemModel, self.rateCombo1200.model())
         dataRateItems = self.createItems(self.aw.qmc.phidget1200_dataRatesStrings)
         for item in dataRateItems:
             model.appendRow(item)
@@ -654,8 +642,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 #---
         self.formulaCombo1200_2 = QComboBox()
         self.formulaCombo1200_2.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        model = self.formulaCombo1200_2.model()
-        assert isinstance(model, QStandardItemModel)
+        model = cast(QStandardItemModel, self.formulaCombo1200_2.model())
         wireItems = self.createItems(self.aw.qmc.phidget1200_formulaValues)
         for item in wireItems:
             model.appendRow(item)
@@ -669,8 +656,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 
         self.wireCombo1200_2 = QComboBox()
         self.wireCombo1200_2.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        model = self.wireCombo1200_2.model()
-        assert isinstance(model, QStandardItemModel)
+        model = cast(QStandardItemModel, self.wireCombo1200_2.model())
         wireItems = self.createItems(self.aw.qmc.phidget1200_wireValues)
         for item in wireItems:
             model.appendRow(item)
@@ -690,8 +676,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 
         self.changeTriggerCombo1200_2 = QComboBox()
         self.changeTriggerCombo1200_2.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        model = self.changeTriggerCombo1200_2.model()
-        assert isinstance(model, QStandardItemModel)
+        model = cast(QStandardItemModel, self.changeTriggerCombo1200_2.model())
         changeTriggerItems = self.createItems(self.aw.qmc.phidget1200_changeTriggersStrings)
         for item in changeTriggerItems:
             model.appendRow(item)
@@ -707,8 +692,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 
         self.rateCombo1200_2 = QComboBox()
         self.rateCombo1200_2.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        model = self.rateCombo1200_2.model()
-        assert isinstance(model, QStandardItemModel)
+        model = cast(QStandardItemModel, self.rateCombo1200_2.model())
         dataRateItems = self.createItems(self.aw.qmc.phidget1200_dataRatesStrings)
         for item in dataRateItems:
             model.appendRow(item)
@@ -859,8 +843,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         for i in range(1,9):
             dataRatesCombo = QComboBox()
             dataRatesCombo.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-            model = dataRatesCombo.model()
-            assert isinstance(model, QStandardItemModel)
+            model = cast(QStandardItemModel, dataRatesCombo.model())
             dataRateItems = self.createItems(self.aw.qmc.phidget_dataRatesStrings)
             for item in dataRateItems:
                 model.appendRow(item)
@@ -880,8 +863,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             changeTriggersCombo = QComboBox()
             changeTriggersCombo.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             changeTriggersCombo.setEnabled(bool(self.aw.qmc.phidget1018_async[i-1]))
-            model = changeTriggersCombo.model()
-            assert isinstance(model, QStandardItemModel)
+            model = cast(QStandardItemModel, changeTriggersCombo.model())
             changeTriggerItems = self.createItems(self.aw.qmc.phidget1018_changeTriggersStrings)
             for item in changeTriggerItems:
                 model.appendRow(item)
@@ -900,8 +882,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 
             voltageRangeCombo = QComboBox()
             voltageRangeCombo.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-            model = voltageRangeCombo.model()
-            assert isinstance(model, QStandardItemModel)
+            model = cast(QStandardItemModel, voltageRangeCombo.model())
             voltageRangeItems = self.createItems(self.aw.qmc.phidgetVCP100x_voltageRangeStrings)
             for item in voltageRangeItems:
                 model.appendRow(item)
@@ -949,7 +930,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         phidgetBox1018.addWidget(ratioLabel,6,0,Qt.AlignmentFlag.AlignRight)
         phidget1018HBox = QVBoxLayout()
         phidget1018HBox.addLayout(phidgetBox1018)
-        phidget1018GroupBox = QGroupBox('1010/1011/1013/1018/1019/HUB0000/SBC/DAQ1000/DAQ1400/VCP100x IO')
+        phidget1018GroupBox = QGroupBox('1010/1011/1013/1018/1019/HUB0000/SBC/DAQxxxx/VCP100x IO')
         phidget1018GroupBox.setLayout(phidget1018HBox)
         phidget1018HBox.setContentsMargins(0,0,0,0)
         self.phidgetBoxRemoteFlag = QCheckBox()
@@ -1049,8 +1030,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         yoctoIRHorizontalLayout.addStretch()
         self.yoctoDataRateCombo = QComboBox()
         self.yoctoDataRateCombo.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        model = self.yoctoDataRateCombo.model()
-        assert isinstance(model, QStandardItemModel)
+        model = cast(QStandardItemModel, self.yoctoDataRateCombo.model())
         dataRateItems = self.createItems(self.aw.qmc.YOCTO_dataRatesStrings)
         for item in dataRateItems:
             model.appendRow(item)
@@ -1442,8 +1422,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
     @pyqtSlot(int)
     def asyncFlagStateChanged1048(self, x:int) -> None:
         try:
-            sender = self.sender()
-            assert isinstance(sender, QCheckBox)
+            sender = cast(QCheckBox, self.sender())
             i = self.asyncCheckBoxes1048.index(sender)
             if x == 0:
                 # disable ChangeTrigger selection
@@ -1484,8 +1463,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
     @pyqtSlot(int)
     def asyncFlagStateChanged(self, x:int) -> None:
         try:
-            sender = self.sender()
-            assert isinstance(sender, QCheckBox)
+            sender = cast(QCheckBox, self.sender())
             i = self.asyncCheckBoxes.index(sender)
             if x == 0:
                 # disable DataRate selection
@@ -1497,15 +1475,15 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             _log.exception(e)
 
     @staticmethod
-    def createItems(strs):
-        items = []
+    def createItems(strs:List[str]) -> List[QStandardItem]:
+        items:List[QStandardItem] = []
         for st in strs:
             item = QStandardItem(st)
             items.append(item)
         return items
 
     @pyqtSlot(int)
-    def PIDfirmwareToggle(self,i):
+    def PIDfirmwareToggle(self, i:int) -> None:
         if i:
             self.aw.qmc.PIDbuttonflag = True
         else:
@@ -1513,14 +1491,14 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         self.aw.showControlButton()
 
     @pyqtSlot(int)
-    def showControlbuttonToggle(self,i):
+    def showControlbuttonToggle(self, i:int) -> None:
         if i:
             self.aw.qmc.Controlbuttonflag = True
         else:
             self.aw.qmc.Controlbuttonflag = False
         self.aw.showControlButton()
 
-    def createDeviceTable(self):
+    def createDeviceTable(self) -> None:
         try:
             columns = 15
             if self.devicetable is not None and self.devicetable.columnCount() == columns:
@@ -1695,11 +1673,11 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                         except Exception: # pylint: disable=broad-except
                             pass
         except Exception as e: # pylint: disable=broad-except
-            _, _, exc_tb = sys.exc_info()
+            _t, _e, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message', 'Exception:') + ' createDeviceTable(): {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
 
     @pyqtSlot(bool)
-    def copyDeviceTabletoClipboard(self,_=False):
+    def copyDeviceTabletoClipboard(self, _:bool = False) -> None:
         import prettytable
         nrows = self.devicetable.rowCount()
         ncols = self.devicetable.columnCount()
@@ -1717,64 +1695,49 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             for r in range(nrows):
                 rows = []
                 # device type
-                typeComboBox = self.devicetable.cellWidget(r,0)
-                assert isinstance(typeComboBox, MyQComboBox)
+                typeComboBox = cast(MyQComboBox, self.devicetable.cellWidget(r,0))
                 rows.append(typeComboBox.currentText())
                 # color 1
-                color1Button = self.devicetable.cellWidget(r,1)
-                assert isinstance(color1Button, QPushButton)
+                color1Button = cast(QPushButton, self.devicetable.cellWidget(r,1))
                 rows.append(color1Button.palette().button().color().name())
                 # color 2
-                color2Button = self.devicetable.cellWidget(r,2)
-                assert isinstance(color2Button, QPushButton)
+                color2Button = cast(QPushButton, self.devicetable.cellWidget(r,2))
                 rows.append(color2Button.palette().button().color().name())
                 # name 1
-                name1edit = self.devicetable.cellWidget(r,3)
-                assert isinstance(name1edit, QLineEdit)
+                name1edit = cast(QLineEdit, self.devicetable.cellWidget(r,3))
                 rows.append(name1edit.text())
                 # name 2
-                name2edit = self.devicetable.cellWidget(r,4)
-                assert isinstance(name2edit, QLineEdit)
+                name2edit = cast(QLineEdit, self.devicetable.cellWidget(r,4))
                 rows.append(name2edit.text())
                 # math 1
-                mexpr1edit = self.devicetable.cellWidget(r,5)
-                assert isinstance(mexpr1edit, QLineEdit)
+                mexpr1edit = cast(QLineEdit, self.devicetable.cellWidget(r,5))
                 rows.append(mexpr1edit.text())
                 # math 2
-                mexpr2edit = self.devicetable.cellWidget(r,6)
-                assert isinstance(mexpr2edit, QLineEdit)
+                mexpr2edit = cast(QLineEdit, self.devicetable.cellWidget(r,6))
                 rows.append(mexpr2edit.text())
                 # lcd 1
-                LCD1visibilityQCheckBox = self.devicetable.cellWidget(r,7)
-                assert isinstance(LCD1visibilityQCheckBox, QCheckBox)
+                LCD1visibilityQCheckBox = cast(QCheckBox, self.devicetable.cellWidget(r,7))
                 rows.append(str(LCD1visibilityQCheckBox.isChecked()))
                 # lcd 2
-                LCD2visibilityQCheckBox = self.devicetable.cellWidget(r,8)
-                assert isinstance(LCD2visibilityQCheckBox, QCheckBox)
+                LCD2visibilityQCheckBox = cast(QCheckBox, self.devicetable.cellWidget(r,8))
                 rows.append(str(LCD2visibilityQCheckBox.isChecked()))
                 # curve 1
-                Curve1visibilityQCheckBox = self.devicetable.cellWidget(r,9)
-                assert isinstance(Curve1visibilityQCheckBox, QCheckBox)
+                Curve1visibilityQCheckBox = cast(QCheckBox, self.devicetable.cellWidget(r,9))
                 rows.append(str(Curve1visibilityQCheckBox.isChecked()))
                 # curve 2
-                Curve2visibilityQCheckBox = self.devicetable.cellWidget(r,10)
-                assert isinstance(Curve2visibilityQCheckBox, QCheckBox)
+                Curve2visibilityQCheckBox = cast(QCheckBox, self.devicetable.cellWidget(r,10))
                 rows.append(str(Curve2visibilityQCheckBox.isChecked()))
                 # delta 1
-                Delta1QCheckBox = self.devicetable.cellWidget(r,11)
-                assert isinstance(Delta1QCheckBox, QCheckBox)
+                Delta1QCheckBox = cast(QCheckBox, self.devicetable.cellWidget(r,11))
                 rows.append(str(Delta1QCheckBox.isChecked()))
                 # delta 2
-                Delta2QCheckBox = self.devicetable.cellWidget(r,12)
-                assert isinstance(Delta2QCheckBox, QCheckBox)
+                Delta2QCheckBox = cast(QCheckBox, self.devicetable.cellWidget(r,12))
                 rows.append(str(Delta2QCheckBox.isChecked()))
                 # fill 1
-                Fill1SpinBox = self.devicetable.cellWidget(r,13)
-                assert isinstance(Fill1SpinBox, QSpinBox)
+                Fill1SpinBox = cast(QSpinBox, self.devicetable.cellWidget(r,13))
                 rows.append(str(Fill1SpinBox.value()))
             # fill 2
-                Fill2SpinBox = self.devicetable.cellWidget(r,14)
-                assert isinstance(Fill2SpinBox, QSpinBox)
+                Fill2SpinBox = cast(QSpinBox, self.devicetable.cellWidget(r,14))
                 rows.append(str(Fill2SpinBox.value()))
                 tbl.add_row(rows)
             clipboard = tbl.get_string()
@@ -1788,64 +1751,49 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             clipboard += '\n'
             for r in range(nrows):
                 # device type
-                typeComboBox = self.devicetable.cellWidget(r,0)
-                assert isinstance(typeComboBox, MyQComboBox)
+                typeComboBox = cast(MyQComboBox, self.devicetable.cellWidget(r,0))
                 clipboard += typeComboBox.currentText() + '\t'
                 # color 1
-                color1Button = self.devicetable.cellWidget(r,1)
-                assert isinstance(color1Button, QPushButton)
+                color1Button = cast(QPushButton, self.devicetable.cellWidget(r,1))
                 clipboard += color1Button.palette().button().color().name() + '\t'
                 # color 2
-                color2Button = self.devicetable.cellWidget(r,2)
-                assert isinstance(color2Button, QPushButton)
+                color2Button = cast(QPushButton, self.devicetable.cellWidget(r,2))
                 clipboard += color2Button.palette().button().color().name() + '\t'
                 # name 1
-                name1edit = self.devicetable.cellWidget(r,3)
-                assert isinstance(name1edit, QLineEdit)
+                name1edit = cast(QLineEdit, self.devicetable.cellWidget(r,3))
                 clipboard += name1edit.text() + '\t'
                 # name 2
-                name2edit = self.devicetable.cellWidget(r,4)
-                assert isinstance(name2edit, QLineEdit)
+                name2edit = cast(QLineEdit, self.devicetable.cellWidget(r,4))
                 clipboard += name2edit.text() + '\t'
                 # math 1
-                mexpr1edit = self.devicetable.cellWidget(r,5)
-                assert isinstance(mexpr1edit, QLineEdit)
+                mexpr1edit = cast(QLineEdit, self.devicetable.cellWidget(r,5))
                 clipboard += mexpr1edit.text() + '\t'
                 # math 2
-                mexpr2edit = self.devicetable.cellWidget(r,6)
-                assert isinstance(mexpr2edit, QLineEdit)
+                mexpr2edit = cast(QLineEdit, self.devicetable.cellWidget(r,6))
                 clipboard += mexpr2edit.text() + '\t'
                 # lcd 1
-                LCD1visibilityQCheckBox = self.devicetable.cellWidget(r,7)
-                assert isinstance(LCD1visibilityQCheckBox, QCheckBox)
+                LCD1visibilityQCheckBox = cast(QCheckBox, self.devicetable.cellWidget(r,7))
                 clipboard += str(LCD1visibilityQCheckBox.isChecked()) + '\t'
                 # lcde 2
-                LCD2visibilityQCheckBox = self.devicetable.cellWidget(r,8)
-                assert isinstance(LCD2visibilityQCheckBox, QCheckBox)
+                LCD2visibilityQCheckBox = cast(QCheckBox, self.devicetable.cellWidget(r,8))
                 clipboard += str(LCD2visibilityQCheckBox.isChecked()) + '\t'
                 # curve 1
-                Curve1visibilityQCheckBox = self.devicetable.cellWidget(r,9)
-                assert isinstance(Curve1visibilityQCheckBox, QCheckBox)
+                Curve1visibilityQCheckBox = cast(QCheckBox, self.devicetable.cellWidget(r,9))
                 clipboard += str(Curve1visibilityQCheckBox.isChecked()) + '\t'
                 # curve 2
-                Curve2visibilityQCheckBox = self.devicetable.cellWidget(r,10)
-                assert isinstance(Curve2visibilityQCheckBox, QCheckBox)
+                Curve2visibilityQCheckBox = cast(QCheckBox, self.devicetable.cellWidget(r,10))
                 clipboard += str(Curve2visibilityQCheckBox.isChecked()) + '\t'
                 # delta 1
-                Delta1QCheckBox = self.devicetable.cellWidget(r,11)
-                assert isinstance(Delta1QCheckBox, QCheckBox)
+                Delta1QCheckBox = cast(QCheckBox, self.devicetable.cellWidget(r,11))
                 clipboard += str(Delta1QCheckBox.isChecked()) + '\t'
                 # delta 2
-                Delta2QCheckBox = self.devicetable.cellWidget(r,12)
-                assert isinstance(Delta2QCheckBox, QCheckBox)
+                Delta2QCheckBox = cast(QCheckBox, self.devicetable.cellWidget(r,12))
                 clipboard += str(Delta2QCheckBox.isChecked()) + '\t'
                 # fill 1
-                Fill1SpinBox = self.devicetable.cellWidget(r,13)
-                assert isinstance(Fill1SpinBox, QSpinBox)
+                Fill1SpinBox = cast(QSpinBox, self.devicetable.cellWidget(r,13))
                 clipboard += str(Fill1SpinBox.value()) + '\t'
                 # fill 2
-                Fill2SpinBox = self.devicetable.cellWidget(r,14)
-                assert isinstance(Fill2SpinBox, QSpinBox)
+                Fill2SpinBox = cast(QSpinBox, self.devicetable.cellWidget(r,14))
                 clipboard += str(Fill2SpinBox.value()) + '\n'
         # copy to the system clipboard
         sys_clip = QApplication.clipboard()
@@ -1854,7 +1802,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         self.aw.sendmessage(QApplication.translate('Message','Device table copied to clipboard'))
 
     @pyqtSlot(bool)
-    def loadprogramname(self,_):
+    def loadprogramname(self, _:bool) -> None:
         fileName = self.aw.ArtisanOpenFileDialog()
         if fileName:
             if ' ' in fileName:
@@ -1863,13 +1811,13 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                 self.programedit.setText(fileName)
 
     @pyqtSlot(bool)
-    def loadoutprogramname(self,_):
+    def loadoutprogramname(self, _:bool) -> None:
         fileName = self.aw.ArtisanOpenFileDialog()
         if fileName:
             self.outprogramedit.setText(fileName)
             self.aw.ser.externaloutprogram = self.outprogramedit.text()
 
-    def enableDisableAddDeleteButtons(self):
+    def enableDisableAddDeleteButtons(self) -> None:
         if len(self.aw.qmc.extradevices) >= self.aw.nLCDS:
             self.addButton.setEnabled(False)
         else:
@@ -1885,7 +1833,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 
     #adds extra device
     @pyqtSlot(bool)
-    def adddevice(self,_):
+    def adddevice(self, _:bool) -> None:
         try:
             self.savedevicetable()
             #addDevice() is located in aw so that the same function can be used in init after dynamically loading settings
@@ -1898,11 +1846,11 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             self.aw.qmc.resetlinecountcaches()
             self.aw.qmc.redraw(recomputeAllDeltas=False)
         except Exception as e: # pylint: disable=broad-except
-            _, _, exc_tb = sys.exc_info()
+            _t, _e, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message', 'Exception:') + ' adddevice(): {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
 
     @pyqtSlot(bool)
-    def deldevice(self,_):
+    def deldevice(self, _:bool) -> None:
         try:
             self.savedevicetable()
             bindex = len(self.aw.qmc.extradevices)-1
@@ -1915,11 +1863,11 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             self.aw.qmc.resetlinecountcaches()
             self.enableDisableAddDeleteButtons()
         except Exception as e: # pylint: disable=broad-except
-            _, _, exc_tb = sys.exc_info()
+            _t, _e, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message', 'Exception:') + ' deldevice(): {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
 
     @pyqtSlot(bool)
-    def resetextradevices(self,_):
+    def resetextradevices(self, _:bool) -> None:
         try:
             self.aw.resetExtraDevices()
             #update table
@@ -1929,10 +1877,10 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             #redraw
             self.aw.qmc.redraw(recomputeAllDeltas=False)
         except Exception as e: # pylint: disable=broad-except
-            _, _, exc_tb = sys.exc_info()
+            _t, _e, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message', 'Exception:') + ' resetextradevices(): {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
 
-    def delextradevice(self,x):
+    def delextradevice(self, x:int) -> None:
         try:
             self.aw.qmc.extradevices.pop(x)
             self.aw.qmc.extradevicecolor1.pop(x)
@@ -2013,23 +1961,18 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             self.aw.qmc.resetlinecountcaches()
             self.aw.qmc.redraw(recomputeAllDeltas=False)
         except Exception as ex: # pylint: disable=broad-except
-            _, _, exc_tb = sys.exc_info()
+            _t, _e, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message', 'Exception:') + 'delextradevice(): {0}').format(str(ex)),getattr(exc_tb, 'tb_lineno', '?'))
 
-    def savedevicetable(self,redraw=True):
+    def savedevicetable(self, redraw:bool = True) -> None:
         try:
             for i, _ in enumerate(self.aw.qmc.extradevices):
-                typecombobox = self.devicetable.cellWidget(i,0)
-                assert isinstance(typecombobox, MyQComboBox)
+                typecombobox = cast(MyQComboBox, self.devicetable.cellWidget(i,0))
                 #cellWidget(i,1) and cellWidget(i,2) are saved automatically when there is a change. No need to save here.
-                name1edit = self.devicetable.cellWidget(i,3)
-                assert isinstance(name1edit, QLineEdit)
-                name2edit = self.devicetable.cellWidget(i,4)
-                assert isinstance(name2edit, QLineEdit)
-                mexpr1edit = self.devicetable.cellWidget(i,5)
-                assert isinstance(mexpr1edit, QLineEdit)
-                mexpr2edit = self.devicetable.cellWidget(i,6)
-                assert isinstance(mexpr2edit, QLineEdit)
+                name1edit = cast(QLineEdit, self.devicetable.cellWidget(i,3))
+                name2edit = cast(QLineEdit, self.devicetable.cellWidget(i,4))
+                mexpr1edit = cast(QLineEdit, self.devicetable.cellWidget(i,5))
+                mexpr2edit = cast(QLineEdit, self.devicetable.cellWidget(i,6))
                 try:
                     self.aw.qmc.extradevices[i] = self.aw.qmc.devices.index(str(typecombobox.currentText())) + 1
                 except Exception: # pylint: disable=broad-except
@@ -2068,24 +2011,24 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             if redraw:
                 self.aw.qmc.redraw(recomputeAllDeltas=False)
         except Exception as ex: # pylint: disable=broad-except
-            _, _, exc_tb = sys.exc_info()
+            _t, _e, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message', 'Exception:') + 'savedevicetable(): {0}').format(str(ex)),getattr(exc_tb, 'tb_lineno', '?'))
 
     @pyqtSlot(bool)
-    def updateVirtualdevicesinprofile_clicked(self,_):
+    def updateVirtualdevicesinprofile_clicked(self, _:bool) -> None:
         self.updateVirtualdevicesinprofile(redraw=True)
 
-    def updateVirtualdevicesinprofile(self,redraw=True):
+    def updateVirtualdevicesinprofile(self, redraw:bool = True) -> None:
         try:
             self.savedevicetable(redraw=False)
             if self.aw.calcVirtualdevices(update=True) and redraw:
                 self.aw.qmc.redraw(recomputeAllDeltas=False)
         except Exception as ex: # pylint: disable=broad-except
-            _, _, exc_tb = sys.exc_info()
+            _t, _e, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message', 'Exception:') + 'updateVirtualdevicesinprofile(): {0}').format(str(ex)),getattr(exc_tb, 'tb_lineno', '?'))
 
     @pyqtSlot(bool)
-    def updateETBTinprofile(self,_):
+    def updateETBTinprofile(self, _:bool) -> None:
         try:
             # be sure there is an equation to process
             nonempty_ETfunction = bool(self.ETfunctionedit.text() is not None and len(self.ETfunctionedit.text().strip()))
@@ -2126,78 +2069,76 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             else:
                 self.aw.sendmessage(QApplication.translate('Message', 'Nothing here to process.'))
         except Exception as ex: # pylint: disable=broad-except
-            _, _, exc_tb = sys.exc_info()
+            _t, _e, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message', 'Exception:') + 'updateETBTinprofile(): {0}').format(str(ex)),getattr(exc_tb, 'tb_lineno', '?'))
 
     @pyqtSlot(int)
-    def updateLCDvisibility1(self,x):
+    def updateLCDvisibility1(self, x:int) -> None:
         r = self.aw.findWidgetsRow(self.devicetable,self.sender(),7)
         if r is not None:
             self.aw.extraLCDvisibility1[r] = bool(x)
             self.aw.extraLCDframe1[r].setVisible(bool(x))
 
     @pyqtSlot(int)
-    def updateLCDvisibility2(self,x):
+    def updateLCDvisibility2(self, x:int) -> None:
         r = self.aw.findWidgetsRow(self.devicetable,self.sender(),8)
         if r is not None:
             self.aw.extraLCDvisibility2[r] = bool(x)
             self.aw.extraLCDframe2[r].setVisible(bool(x))
 
     @pyqtSlot(int)
-    def updateCurveVisibility1(self,x):
+    def updateCurveVisibility1(self, x:int) -> None:
         r = self.aw.findWidgetsRow(self.devicetable,self.sender(),9)
         if r is not None:
             self.aw.extraCurveVisibility1[r] = bool(x)
             self.aw.qmc.resetlinecountcaches()
 
     @pyqtSlot(int)
-    def updateCurveVisibility2(self,x):
+    def updateCurveVisibility2(self, x:int) -> None:
         r = self.aw.findWidgetsRow(self.devicetable,self.sender(),10)
         if r is not None:
             self.aw.extraCurveVisibility2[r] = bool(x)
             self.aw.qmc.resetlinecountcaches()
 
     @pyqtSlot(int)
-    def updateDelta1(self,x):
+    def updateDelta1(self, x:int) -> None:
         r = self.aw.findWidgetsRow(self.devicetable,self.sender(),11)
         if r is not None:
             self.aw.extraDelta1[r] = bool(x)
 
     @pyqtSlot(int)
-    def updateDelta2(self,x):
+    def updateDelta2(self, x:int) -> None:
         r = self.aw.findWidgetsRow(self.devicetable,self.sender(),12)
         if r is not None:
             self.aw.extraDelta2[r] = bool(x)
 
     @pyqtSlot()
-    def updateFill1(self):
+    def updateFill1(self) -> None:
         r = self.aw.findWidgetsRow(self.devicetable,self.sender(),13)
         if r is not None:
-            sender = self.sender()
-            assert isinstance(sender, QSpinBox)
+            sender = cast(QSpinBox, self.sender())
             self.aw.extraFill1[r] = sender.value()
 
     @pyqtSlot()
-    def updateFill2(self):
+    def updateFill2(self) -> None:
         r = self.aw.findWidgetsRow(self.devicetable,self.sender(),14)
         if r is not None:
-            sender = self.sender()
-            assert isinstance(sender, QSpinBox)
+            sender = cast(QSpinBox, self.sender())
             self.aw.extraFill2[r] = sender.value()
 
     @pyqtSlot(bool)
-    def setextracolor1(self,_):
-        r = self.aw.findWidgetsRow(self.devicetable,self.sender(),1)
+    def setextracolor1(self, _:bool) -> None:
+        r = self.aw.findWidgetsRow(self.devicetable,self.sender(), 1)
         if r is not None:
-            self.setextracolor(1,r)
+            self.setextracolor(1, r)
 
     @pyqtSlot(bool)
-    def setextracolor2(self,_):
-        r = self.aw.findWidgetsRow(self.devicetable,self.sender(),2)
+    def setextracolor2(self, _:bool) -> None:
+        r = self.aw.findWidgetsRow(self.devicetable,self.sender(), 2)
         if r is not None:
-            self.setextracolor(2,r)
+            self.setextracolor(2, r)
 
-    def setextracolor(self,ll,i):
+    def setextracolor(self, ll:int, i:int) -> None:
         try:
             #line 1
             if ll == 1:
@@ -2208,8 +2149,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                     self.aw.qmc.extradevicecolor1[i] = colorname
                     # set LCD label color
                     self.aw.setLabelColor(self.aw.extraLCDlabel1[i],QColor(colorname))
-                    color1Button = self.devicetable.cellWidget(i,1)
-                    assert isinstance(color1Button, QPushButton)
+                    color1Button = cast(QPushButton, self.devicetable.cellWidget(i,1))
                     color1Button.setStyleSheet(f'background-color: {self.aw.qmc.extradevicecolor1[i]}; color: { self.aw.labelBorW(self.aw.qmc.extradevicecolor1[i])}')
                     color1Button.setText(colorname)
                     self.aw.checkColors([(self.aw.qmc.extraname1[i], self.aw.qmc.extradevicecolor1[i], QApplication.translate('Label','Background'), self.aw.qmc.palette['background'])])
@@ -2223,26 +2163,26 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                     self.aw.qmc.extradevicecolor2[i] = colorname
                     # set LCD label color
                     self.aw.setLabelColor(self.aw.extraLCDlabel2[i],QColor(colorname))
-                    color2Button = self.devicetable.cellWidget(i,2)
-                    assert isinstance(color2Button, QPushButton)
+                    color2Button = cast(QPushButton, self.devicetable.cellWidget(i,2))
                     color2Button.setStyleSheet(f'background-color: {self.aw.qmc.extradevicecolor2[i]}; color: {self.aw.labelBorW(self.aw.qmc.extradevicecolor2[i])}')
                     color2Button.setText(colorname)
                     self.aw.checkColors([(self.aw.qmc.extraname2[i], self.aw.qmc.extradevicecolor2[i], QApplication.translate('Label','Background'), self.aw.qmc.palette['background'])])
                     self.aw.checkColors([(self.aw.qmc.extraname2[i], self.aw.qmc.extradevicecolor2[i], QApplication.translate('Label','Legend bkgnd'),self.aw.qmc.palette['background'])])
         except Exception as e: # pylint: disable=broad-except
-            _, _, exc_tb = sys.exc_info()
+            _t, _e, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message', 'Exception:') + ' setextracolor(): {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
 
-    def close(self):
+    def close(self) -> bool:
         self.closeHelp()
         settings = QSettings()
         #save window geometry
         settings.setValue('DeviceAssignmentGeometry',self.saveGeometry())
         self.aw.DeviceAssignmentDlg_activeTab = self.TabWidget.currentIndex()
 #        self.aw.closeEventSettings() # save all app settings
+        return True
 
     @pyqtSlot()
-    def cancelEvent(self):
+    def cancelEvent(self) -> None:
         self.aw.DeviceAssignmentDlg_activeTab = self.TabWidget.currentIndex()
         self.close()
         self.aw.qmc.phidgetRemoteFlag = self.org_phidgetRemoteFlag
@@ -2252,7 +2192,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         self.reject()
 
     @pyqtSlot()
-    def okEvent(self): # pyright: ignore [reportGeneralTypeIssues] # Code is too complex to analyze; reduce complexity by refactoring into subroutines or reducing conditional code paths
+    def okEvent(self) -> None: # pyright: ignore [reportGeneralTypeIssues] # Code is too complex to analyze; reduce complexity by refactoring into subroutines or reducing conditional code paths
 
         try:
             self.aw.qmc.device_logging = self.deviceLoggingFlag.isChecked()
@@ -3461,12 +3401,12 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             self.accept()
         except Exception as e: # pylint: disable=broad-except
             _log.exception(e)
-            _, _, exc_tb = sys.exc_info()
+            _t, _e, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message', 'Exception:') + ' device accept(): {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
 
     @pyqtSlot(bool)
-    def showExtradevHelp(self):
-        from help import symbolic_help # type: ignore [attr-defined] # pylint: disable=no-name-in-module
+    def showExtradevHelp(self, _checked:bool = False) -> None:
+        from help import symbolic_help # type: ignore [attr-defined,unused-ignore] # pylint: disable=no-name-in-module
         self.helpdialog = self.aw.showHelpDialog(
                 self,            # this dialog as parent
                 self.helpdialog, # the existing help dialog
@@ -3474,8 +3414,8 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                 symbolic_help.content())
 
     @pyqtSlot(bool)
-    def showSymbolicHelp(self):
-        from help import symbolic_help # type: ignore [attr-defined] # pylint: disable=no-name-in-module
+    def showSymbolicHelp(self, _checked:bool = False) -> None:
+        from help import symbolic_help # type: ignore [attr-defined,unused-ignore] # pylint: disable=no-name-in-module
         self.helpdialog = self.aw.showHelpDialog(
                 self,            # this dialog as parent
                 self.helpdialog, # the existing help dialog
@@ -3483,17 +3423,17 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                 symbolic_help.content())
 
     @pyqtSlot(bool)
-    def showhelpprogram(self,_=False):
-        from help import programs_help # type: ignore [attr-defined] # pylint: disable=no-name-in-module
+    def showhelpprogram(self, _checked:bool = False) -> None:
+        from help import programs_help # type: ignore [attr-defined,unused-ignore] # pylint: disable=no-name-in-module
         self.helpdialog = self.aw.showHelpDialog(
                 self,            # this dialog as parent
                 self.helpdialog, # the existing help dialog
                 QApplication.translate('Form Caption','External Programs Help'),
                 programs_help.content())
 
-    def closeHelp(self):
+    def closeHelp(self) -> None:
         self.aw.closeHelpDialog(self.helpdialog)
 
     @pyqtSlot(int)
-    def tabSwitched(self,_):
+    def tabSwitched(self, _:int) -> None:
         self.closeHelp()

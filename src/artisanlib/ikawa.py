@@ -9,7 +9,7 @@ import base64
 import csv
 import re
 import logging
-from typing import Final, Optional, List, Tuple, Callable, ClassVar, Generator, TYPE_CHECKING
+from typing import Final, Optional, List, Tuple, Callable, ClassVar, Any, Generator, TYPE_CHECKING
 
 
 if TYPE_CHECKING:
@@ -27,7 +27,7 @@ try:
 except ImportError:
     # BLE not available on older Windows/PyQt5 platforms
     pass
-from proto import IkawaCmd_pb2 # type: ignore
+from proto import IkawaCmd_pb2 # type:ignore[unused-ignore]
 
 
 _log: Final[logging.Logger] = logging.getLogger(__name__)
@@ -60,7 +60,7 @@ def extractProfileIkawaURL(url:QUrl, aw:'ApplicationWindow') -> 'ProfileData':
     extra6:List[float] = []
     timeindex:List[int] = [-1,0,0,0,0,0,0,0] #CHARGE index init set to -1 as 0 could be an actual index used
 
-    fan_points:List = list(ikawa_profile.fan_points)
+    fan_points:List[Any] = list(ikawa_profile.fan_points)
     for idx, p in enumerate(ikawa_profile.temp_points):
         if idx != 0:
             # add additional fan_point before this temp point
@@ -396,7 +396,7 @@ try: # BLE not available on some platforms
 
             self.seq:Generator[int, None, None] = self.seqNum() # message sequence number generator
 
-            self.ble:BleInterface = BleInterface(
+            self.ble:BleInterface = BleInterface(  # type:ignore[unused-ignore]
                 [(IKAWA_BLE.IKAWA_SERVICE_UUID, [IKAWA_BLE.IKAWA_SEND_CHAR_UUID, IKAWA_BLE.IKAWA_RECEIVE_CHAR_UUID])],
                 self.processData,
                 sendStop = self.sendStop,

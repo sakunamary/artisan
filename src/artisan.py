@@ -9,6 +9,7 @@ warnings.simplefilter('ignore', DeprecationWarning)
 import sys
 import os
 from platform import system
+from typing import Any
 
 # limit the number of numpy threads to 1 to limit the total number of threads taking into account a potential performance reduction on array operations using blas,
 # which should not be significant
@@ -16,8 +17,9 @@ os.environ['OMP_NUM_THREADS'] = '1'
 
 # highDPI support must be set before creating the Application instance
 try:
-    if system() == 'Darwin':
-        os.environ['QT_MAC_WANTS_LAYER'] = '1' # some widgets under PyQt  on macOS seem not to update properly without this (see the discussion on the pyqt mailing list from 15.6.2020 "Widgets are not updated - is this a bug?")
+# the following two lines seem not to be needed any longer with Qt6.1
+#    if system() == 'Darwin':
+#        os.environ['QT_MAC_WANTS_LAYER'] = '1' # some widgets under PyQt  on macOS seem not to update properly without this (see the discussion on the pyqt mailing list from 15.6.2020 "Widgets are not updated - is this a bug?")
     try:
         #pylint: disable = E, W, R, C
         from PyQt6.QtWidgets import QApplication  # @UnusedImport @Reimport  @UnresolvedImport
@@ -86,16 +88,16 @@ class NullWriter:
     encoding:str = 'UTF-8'
 
     @staticmethod
-    def write(*args):
+    def write(*args:Any) -> None:
         pass
 
     @staticmethod
-    def flush(*args):
+    def flush(*args:Any) -> None:
         pass
 
     # Some packages are checking if stdout/stderr is available (e.g., youtube-dl). For details, see #1883.
     @staticmethod
-    def isatty():
+    def isatty() -> bool:
         return False
 
 if system() == 'Windows' and hasattr(sys, 'frozen'): # tools/freeze
