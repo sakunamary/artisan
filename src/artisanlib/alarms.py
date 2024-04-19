@@ -17,6 +17,7 @@
 
 import os
 import sys
+import platform
 import logging
 from typing import Final, Dict, Union, List, Optional, cast, TYPE_CHECKING
 
@@ -27,7 +28,7 @@ if TYPE_CHECKING:
     from PyQt6.QtWidgets import QStyleOptionViewItem  # pylint: disable=unused-import
     from PyQt6.QtCore import QModelIndex # pylint: disable=unused-import
 
-from artisanlib.util import deltaLabelUTF8, comma2dot
+from artisanlib.util import deltaLabelUTF8, comma2dot, float2float
 from artisanlib.dialogs import ArtisanResizeablDialog
 from artisanlib.widgets import (MyQComboBox, MyTableWidgetItemNumber, MyTableWidgetItemQCheckBox,
                                 MyTableWidgetItemQComboBox, MyTableWidgetItemQLineEdit, MyTableWidgetItemQTime)
@@ -72,7 +73,6 @@ class AlarmDlg(ArtisanResizeablDialog):
 
         #table for alarms
         self.alarmtable = QTableWidget()
-        self.createalarmtable()
         self.alarmtable.itemSelectionChanged.connect(self.selectionChanged)
         allonButton = QPushButton(QApplication.translate('Button','All On'))
         allonButton.clicked.connect(self.alarmsAllOn)
@@ -249,9 +249,12 @@ class AlarmDlg(ArtisanResizeablDialog):
         mainlayout.addWidget(self.TabWidget)
         mainlayout.addLayout(okbuttonlayout)
         self.setLayout(mainlayout)
-        ok_button = self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
-        if ok_button is not None:
-            ok_button.setFocus()
+        if platform.system() != 'Windows':
+            ok_button: Optional[QPushButton] = self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
+            if ok_button is not None:
+                ok_button.setFocus()
+        else:
+            self.TabWidget.setFocus()
 
         # we set the active tab with a QTimer after the tabbar has been rendered once, as otherwise
         # some tabs are not rendered at all on Winwos using Qt v6.5.1 (https://bugreports.qt.io/projects/QTBUG/issues/QTBUG-114204?filter=allissues)
@@ -259,6 +262,8 @@ class AlarmDlg(ArtisanResizeablDialog):
 
     @pyqtSlot()
     def setActiveTab(self) -> None:
+        if self.activeTab == 0:
+            self.createalarmtable()
         self.TabWidget.setCurrentIndex(self.activeTab)
 
     def setAlarmSetLabels(self) -> None:
@@ -779,9 +784,9 @@ class AlarmDlg(ArtisanResizeablDialog):
                 beepWidget = cast(QWidget, self.alarmtable.cellWidget(i,10))
                 beepLayout = beepWidget.layout()
                 if beepLayout is not None:
-                    item1 = beepLayout.itemAt(1)
-                    if item1 is not None:
-                        beep = cast(QCheckBox, item1.widget())
+                    item0 = beepLayout.itemAt(0)
+                    if item0 is not None:
+                        beep = cast(QCheckBox, item0.widget())
                         if beep and beep is not None:
                             self.aw.qmc.alarmbeep[i] = int(beep.isChecked())
                 description = cast(QLineEdit, self.alarmtable.cellWidget(i,11))
@@ -873,7 +878,7 @@ class AlarmDlg(ArtisanResizeablDialog):
         condComboBox.addItems(['<','>','=', '\u2260'])
         condComboBox.setCurrentIndex(self.aw.qmc.alarmcond[i])
         #8: temperature
-        tempedit = QLineEdit(str(self.aw.float2float(self.aw.qmc.alarmtemperature[i])))
+        tempedit = QLineEdit(str(float2float(self.aw.qmc.alarmtemperature[i])))
         tempedit.setAlignment(Qt.AlignmentFlag.AlignRight)
         tempedit.setMaximumWidth(130)
 #        tempedit.setValidator(QIntValidator(0, 999,tempedit))
@@ -913,14 +918,10 @@ class AlarmDlg(ArtisanResizeablDialog):
         beepWidget = QWidget()
         beepCheckBox = QCheckBox()
         beepCheckBox.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        beepLayout = QHBoxLayout()
-        beepLayout.addStretch()
+        beepLayout = QHBoxLayout(beepWidget)
         beepLayout.addWidget(beepCheckBox)
-        beepLayout.addSpacing(6)
-        beepLayout.addStretch()
+        beepLayout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         beepLayout.setContentsMargins(0,0,0,0)
-        beepLayout.setSpacing(0)
-        beepWidget.setLayout(beepLayout)
         if len(self.aw.qmc.alarmbeep) > i and self.aw.qmc.alarmbeep[i]:
             beepCheckBox.setCheckState(Qt.CheckState.Checked)
         else:
@@ -929,7 +930,10 @@ class AlarmDlg(ArtisanResizeablDialog):
         descriptionedit = QLineEdit(self.aw.qmc.alarmstrings[i])
         descriptionedit.setCursorPosition(0)
         descriptionedit.setPlaceholderText(QApplication.translate('Label','Enter description'))
-        self.alarmtable.setItem(i, 0, MyTableWidgetItemNumber(str(i+1),i))
+        #
+        numberWidget = MyTableWidgetItemNumber(str(i+1),i)
+        numberWidget.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+        self.alarmtable.setItem(i, 0, numberWidget)
         self.alarmtable.setCellWidget(i,1,flagComboBox)
         self.alarmtable.setItem(i, 1, MyTableWidgetItemQCheckBox(flagComboBox))
         self.alarmtable.setCellWidget(i,2,guardedit)
@@ -950,13 +954,14 @@ class AlarmDlg(ArtisanResizeablDialog):
         self.alarmtable.setCellWidget(i,9,actionComboBox)
         self.alarmtable.setItem(i, 9, MyTableWidgetItemQComboBox(actionComboBox))
         self.alarmtable.setCellWidget(i,10,beepWidget)
+        # ensure proper sorting
         beepL = beepWidget.layout()
         if beepL is not None:
-            item1 = beepL.itemAt(1)
-            if item1 is not None:
-                item1widget = cast(QCheckBox, item1.widget())
-#                if isinstance(item1widget,QCheckBox):
-                self.alarmtable.setItem(i, 10, MyTableWidgetItemQCheckBox(item1widget))
+            item0 = beepL.itemAt(0)
+            if item0 is not None:
+                item0widget = cast(QCheckBox, item0.widget())
+#                if isinstance(item0widget,QCheckBox):
+                self.alarmtable.setItem(i, 10, MyTableWidgetItemQCheckBox(item0widget))
         self.alarmtable.setCellWidget(i,11,descriptionedit)
         self.alarmtable.setItem(i, 11, MyTableWidgetItemQLineEdit(descriptionedit))
 
@@ -1005,10 +1010,14 @@ class AlarmDlg(ArtisanResizeablDialog):
             #populate table
             for i in range(nalarms):
                 self.setalarmtablerow(i)
+            fixed_columns:Final[List[int]] = [0,1,5,7,10]
             header = self.alarmtable.horizontalHeader()
             if header is not None:
                 header.setStretchLastSection(True)
-            self.alarmtable.resizeColumnsToContents()
+                self.alarmtable.resizeColumnsToContents()
+                for i in fixed_columns:
+                    header.setSectionResizeMode(i, QHeaderView.ResizeMode.Fixed)
+                    header.resizeSection(i, header.sectionSize(i) + (10 if i in {0,5} else 5))
             if not self.aw.qmc.alarmtablecolumnwidths:
                 self.alarmtable.setColumnWidth(2, 50)
                 self.alarmtable.setColumnWidth(3, 50)
@@ -1020,13 +1029,14 @@ class AlarmDlg(ArtisanResizeablDialog):
             else:
                 # remember the columnwidth
                 for i, _ in enumerate(self.aw.qmc.alarmtablecolumnwidths):
-                    try:
-                        w = self.aw.qmc.alarmtablecolumnwidths[i]
-                        if i == 6:
-                            w = max(100,w)
-                        self.alarmtable.setColumnWidth(i,w)
-                    except Exception: # pylint: disable=broad-except
-                        pass
+                    if i not in fixed_columns:
+                        try:
+                            w = self.aw.qmc.alarmtablecolumnwidths[i]
+                            if i == 6:
+                                w = max(100,w)
+                            self.alarmtable.setColumnWidth(i,w)
+                        except Exception: # pylint: disable=broad-except
+                            pass
             self.markNotEnabledAlarmRows()
             self.alarmtable.setSortingEnabled(True)
             self.alarmtable.sortItems(0)
@@ -1076,10 +1086,11 @@ class AlarmDlg(ArtisanResizeablDialog):
                 beepWidget = cast(QWidget, self.alarmtable.cellWidget(r,10))
                 beepLayout = beepWidget.layout()
                 if beepLayout is not None:
-                    item1 = beepLayout.itemAt(1)
+                    item1 = beepLayout.itemAt(0)
                     if item1 is not None:
                         beepCheckBox = cast(QCheckBox, item1.widget())
-                        rows.append(str(beepCheckBox.isChecked()))
+                        if beepCheckBox and beepCheckBox is not None:
+                            rows.append(str(beepCheckBox.isChecked()))
                 descriptionedit = cast(QLineEdit, self.alarmtable.cellWidget(r,11))
                 rows.append(descriptionedit.text())
                 tbl.add_row(rows)
@@ -1117,10 +1128,13 @@ class AlarmDlg(ArtisanResizeablDialog):
                 beepWidget = cast(QWidget, self.alarmtable.cellWidget(r,10))
                 beepLayout = beepWidget.layout()
                 if beepLayout is not None:
-                    item1 = beepLayout.itemAt(1)
+                    item1 = beepLayout.itemAt(0)
                     if item1 is not None:
                         beepCheckBox = cast(QCheckBox, item1.widget())
-                        clipboard += str(beepCheckBox.isChecked()) + '\t'
+                        if beepCheckBox and beepCheckBox is not None:
+                            clipboard += str(beepCheckBox.isChecked()) + '\t'
+                        else:
+                            clipboard += ' ' + '\t'
                 descriptionedit = cast(QLineEdit, self.alarmtable.cellWidget(r,11))
                 clipboard += descriptionedit.text() + '\n'
         # copy to the system clipboard

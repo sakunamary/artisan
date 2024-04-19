@@ -1,27 +1,84 @@
 Detailed Release History
 ========================
+
 ----
-v2.10.2 (XX, 2024)
+v2.10.6 (XX, 2024)
 ------------------
 
 * ADDITIONS
+  - adds flag to toggle compression, detailed device logging, and origin header for WebSocket communication
 * NEW HARDWARE SUPPORT
-  - adds machine setups for various machines of Mill City Roasters
+  - adds Bühler RM20 Simatic Legacy setup suporting older firmware versions not returning the machine state
 * CHANGES
-  - upgrades to Qt/PyQt 6.6.1, pymodbus 3.6.2
+  - only reset roasting notes on reset if profile is loaded ([Issue #1521](../../../issues/1521))
+* FIXES
+  - fixes regression preventing Artisan v2.10.2 and v2.10.4 to connect successfully to Probat Series III machines via WebSockets incl. the Probat Sample Roaster
+  - fixes regression in Roast Properties, unable to change/add ground color value ([Issue #1520](../../../issues/1520))
+  - fixes regressions in table copy functions
+  - avoids rendering timestamps as "xx:60" in mouse pointer time/temp/RoR widget
+  - ensures that time-axis ticks extend over the full range of readings w.r.t. the loaded background and foreground profiles
+* REMOVALS
+
+----
+v2.10.4 (March 21, 2024)
+------------------
+
+* ADDITIONS
+  - adds metadata to PDF, SVG and PNG exports
+
+* FIXES
+  - fixes regression which broke the PID dialog for MODBUS, S7, TC4 and Kaleido ([Issue #1480](../../../issues/1480) and [Issue #1515](../../../issues/1515))
+  - fixes regression which broke devices Omega HH309 34 and the just introduced Digi-Sense 20250-07 and Extech 42570 ([PR #1481](../../../pull/1481))
+  - fixes regression introduced in v2.8.4 which broke persisting volume changes made in Roast Properties dialog ([Discussion #1511](../../../discussions/1511))
+  - fixes regression which broke persistence of custom column width of alarm and extra device and table
+  - fixes regression which broke the formating of extra curve data in background event table
+  - fixes regression which broke the automatic opening of completed profiles in ArtisanViewer ([Issue #1516](../../../issues/1516))
+  - improves formating of profile and background data tables, custom event button table, alarm table and extra device table
+  - fixes Linux builds that failed to start Artisan v2.10.2 on some configurations
+  - fixes phases bar rendering in case CHARGE is not set
+
+----
+v2.10.2 (February 29, 2024)
+------------------
+
+* ADDITIONS
+  - adds sensitive variants to autoCHARGE and autoDROP detection algorithms ([Issue #1358](../../../issues/1358))
+  - adds PID output limits and derivative filter
+
+* NEW HARDWARE SUPPORT
+  - adds setups for machines from [Mill City Roasters](https://millcityroasters.com/)
+  - adds [IKAWA](https://www.ikawacoffee.com/) PRO X machine support (records ambient pressure, humidity and inlet temperature)
+  - adds support for the [Digi-Sense 20250-07](https://www.coleparmer.com/i/digi-sense-ir-thermometer-thermocouple-probe-input-and-nist-traceable-calibration-30-1/2025007) and [Extech 42570](https://www.extech-online.com/index.php?main_page=product_info&cPath=78_21_35&products_id=99) IR and k-type dual-channel meters
+  - adds glowing lines style
+
+* CHANGES
+  - replaces USB lib for [Aillio](https://aillio.com/) connectivity on Windows from libusb-win32 to WinUSB ([PR #1358](../../../pull/1411))
+  - adds C/F conversion for the drop duplicates limit and the RoR limits ([Issue #1406](../../../issues/1406))
+  - updates Caromaq machine setups ([PR #1419](../../../pull/1419))
+  - prevents LCD curve visibility toggling if no data is displayed and thus no visible feedback is given
+  - replaces the threading WebSocket implementation by an asyncio-based one
+  - upgrades to Python 3.12, Qt/PyQt 6.6.2, pymodbus 3.6.4 and matplotlib 3.8.3
+
 * FIXES
   - fixes axis limits on starting the designer from a profile with time axis locked ([Discussion #1325](../../../discussions/1325))
-  - fixes regresion that kept log dialogs (serial, message, error) empty
-  - fixes regression which broke loading of certain MODBUS configurations (eg. Loring)
+  - fixes long standing issue where the Designer looses one sample on each round-trip (thanks [Terracotta-6](https://github.com/Terracotta-6) for reporting)
+  - fixes regression that kept log dialogs (serial, message, error) empty ([Issue #1393](../../../issues/1393))
+  - fixes regression which broke loading of certain MODBUS configurations correctly (eg. Loring)
+  - fixes issue with MODBUS UDP communication that caused unnecessary retries and could break control on some Probat machines
   - fixes regression which broke the DROP alarm action
   - fixes regression which broke the PDF export on Linux
+  - fixes regression which broke PDF/PS export on macOS running on Apple Silicon (M1, M2, ..) ([Issue #1430](../../../issues/1430))
   - fixes regression which broke the transposer calculations
   - fixes regression which broke the simulator for profiles with extra device curves
   - fixes regression which broke the CHARGE timer ([Discussion #1358](../../../discussions/1358))
+  - fixes regression which failed to time align profiles on load ([Discussion #1366](../../../discussions/1366))
+  - fixes regression that caused IO Phidgets with channels in async mode to detach on ON ([Discussion #1394](../../../discussions/1394))
+  - fixes regression which could lead to user customized event type names not being properly persisted in the application settings ([Issue #572](../../../issues/572))
+  - fixes regression which broke Aillio R1 communication under Windows
   - fixes broken computation of the event slider calculators
-  - fixes arabic reshaping and applies it also to Farsi
+  - fixes Arabic reshaping and applies it also to Farsi
   - fixes CSV export ([Discussion #1357](../../../discussions/1357))
-* REMOVALS
+  - fixes WebSocket connection handling ([Issue #1463](../../../issues/1463))
 
 
 ----

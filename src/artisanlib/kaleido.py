@@ -20,8 +20,7 @@ import asyncio
 import websockets.client
 from contextlib import suppress
 from threading import Thread
-#from pymodbus.client.serial_asyncio import open_serial_connection # patched pyserial-asyncio
-from pymodbus.transport.transport_serial import create_serial_connection # patched pyserial-asyncio
+from pymodbus.transport.serialtransport import create_serial_connection # patched pyserial-asyncio
 
 import logging
 from typing import Final, Optional, TypedDict, Union, Callable, Dict, Tuple  #for Python >= 3.9: can remove 'List' since type hints can now use the generic 'list'
@@ -225,7 +224,7 @@ class KaleidoPort:
     async def ws_handle_reads(self, websocket:websockets.client.WebSocketClientProtocol) -> None:
         while True:
             res:Union[str,bytes] = await asyncio.wait_for(websocket.recv(), timeout=self._read_timeout)
-            message:str = (str(res, 'utf-8') if isinstance(res, bytes) else res) # pyright: ignore[reportGeneralTypeIssues]
+            message:str = (str(res, 'utf-8') if isinstance(res, bytes) else res) # pyright: ignore[reportAssignmentType]
             if self._logging:
                 _log.info('received: %s',message.strip())
             await self.process_message(message)
@@ -247,7 +246,7 @@ class KaleidoPort:
             _log.info('ws_write_process(%s)',message)
         await asyncio.wait_for(self.ws_write(websocket, message), self._send_timeout)
         res:Union[str,bytes] = await asyncio.wait_for(websocket.recv(), self._ping_timeout)
-        response:str = (str(res, 'utf-8') if isinstance(res, bytes) else res) # pyright: ignore[reportGeneralTypeIssues]
+        response:str = (str(res, 'utf-8') if isinstance(res, bytes) else res) # pyright: ignore[reportAssignmentType]
         # register response
         await self.process_message(response.strip())
 
@@ -392,8 +391,8 @@ class KaleidoPort:
         if self._logging:
             _log.info('serial_write_process(%s)',message)
         await asyncio.wait_for(self.serial_write(writer, message), self._send_timeout)
-        res:Union[str,bytes] = await asyncio.wait_for(reader.readline(), self._ping_timeout)
-        response:str = (str(res, 'utf-8') if isinstance(res, bytes) else res) # pyright: ignore[reportGeneralTypeIssues]
+        res:bytes = await asyncio.wait_for(reader.readline(), self._ping_timeout)
+        response:str = str(res, 'utf-8')
         # register response
         await self.process_message(response.strip())
 

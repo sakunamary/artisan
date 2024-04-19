@@ -21,10 +21,13 @@ from struct import unpack
 from multiprocessing import Pipe
 import threading
 from platform import system
-import usb.core # type: ignore
-import usb.util # type: ignore
+import usb.core # type: ignore[import-untyped]
+import usb.util # type: ignore[import-untyped]
 
 import array
+
+if system().startswith('Windows'):
+    import libusb_package # pyright:ignore[reportMissingImports] # pylint: disable=import-error
 
 #import requests
 #from requests_file import FileAdapter # type: ignore # @UnresolvedImport
@@ -36,9 +39,9 @@ from typing import Final, Optional, List, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     try:
-        from multiprocessing.connection import PipeConnection as Connection # type: ignore # pylint: disable=unused-import
+        from multiprocessing.connection import PipeConnection as Connection # type: ignore[unused-ignore,attr-defined,assignment] # pylint: disable=unused-import
     except ImportError:
-        from multiprocessing.connection import Connection # pylint: disable=unused-import
+        from multiprocessing.connection import Connection # type: ignore[unused-ignore,attr-defined,assignment] # pylint: disable=unused-import
 #    from artisanlib.types import ProfileData # pylint: disable=unused-import
 #    from artisanlib.main import ApplicationWindow # pylint: disable=unused-import
 
@@ -47,11 +50,18 @@ if TYPE_CHECKING:
 #except ImportError:
 #    from PyQt5.QtCore import QDateTime, Qt # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
 
-#from artisanlib.util import encodeLocal
+#from artisanlib.util import weight_units
 
 
 _log: Final[logging.Logger] = logging.getLogger(__name__)
 
+
+def _load_library(find_library:Any = None) -> Any:
+    import usb.libloader # type: ignore[import-untyped, unused-ignore] # pylint: disable=redefined-outer-name
+    return usb.libloader.load_locate_library(
+                ('usb-1.0', 'libusb-1.0', 'usb'),
+                'cygusb-1.0.dll', 'Libusb 1',
+                find_library=find_library, check_symbols=('libusb_init',))
 
 class AillioR1:
     AILLIO_VID = 0x0483
@@ -82,7 +92,7 @@ class AillioR1:
         self.simulated = False
         self.AILLIO_DEBUG = debug
         self.__dbg('init')
-        self.usbhandle:Optional[usb.core.Device] = None
+        self.usbhandle:Optional[usb.core.Device] = None # type:ignore[no-any-unimported,unused-ignore]
         self.bt:float = 0
         self.dt:float = 0
         self.heater:float = 0
@@ -98,8 +108,8 @@ class AillioR1:
         self.roast_number:int = -1
         self.fan_rpm:float = 0
 
-        self.parent_pipe:Optional['Connection'] = None
-        self.child_pipe:Optional['Connection'] = None
+        self.parent_pipe:Optional['Connection'] = None # type:ignore[no-any-unimported,unused-ignore]
+        self.child_pipe:Optional['Connection'] = None # type:ignore[no-any-unimported,unused-ignore]
         self.irt:float = 0
         self.pcbt:float = 0
         self.coil_fan:int = 0
@@ -124,11 +134,38 @@ class AillioR1:
             return
         if self.usbhandle is not None:
             return
-        self.usbhandle = usb.core.find(idVendor=self.AILLIO_VID,
-                                       idProduct=self.AILLIO_PID)
-        if self.usbhandle is None:
+        if not system().startswith('Windows'):
+            backend = None
+
+            if system().startswith('Linux'):
+                # we prefer a system installed libusb-1.0 shared lib if available on Linux (incl. RPi),
+                # especially since libusb-1.0.so is from removed from the AppImage installer
+                # if we could not find one, backend remains None and pyusb is searching for a backend
+                # within the app bundle
+                # on macOS libusb is never pre-installed thus we always take the bundled one
+                import os
+                for shared_libusb_path in [
+                        '/usr/lib/x86_64-linux-gnu/libusb-1.0.so',
+                        '/usr/lib/x86_64-linux-gnu/libusb-1.0.so.0',
+                        '/usr/lib/aarch64-linux-gnu/libusb-1.0.so'
+                        '/usr/lib/aarch64-linux-gnu/libusb-1.0.so.0']:
+                    if os.path.isfile(shared_libusb_path):
+                        import usb.backend.libusb1 as libusb10 # type: ignore[import-untyped, unused-ignore]
+                        libusb10._load_library = _load_library # pylint: disable=protected-access # overwrite the overwrite of the pyinstaller runtime hook pyi_rth_usb.py
+                        from usb.backend.libusb1 import get_backend  # type: ignore[import-untyped, unused-ignore]
+                        backend = get_backend(find_library=lambda _,shared_libusb_path=shared_libusb_path: shared_libusb_path)
+                        break
             self.usbhandle = usb.core.find(idVendor=self.AILLIO_VID,
-                                           idProduct=self.AILLIO_PID_REV3)
+                                           idProduct=self.AILLIO_PID, backend=backend)
+            if self.usbhandle is None:
+                self.usbhandle = usb.core.find(idVendor=self.AILLIO_VID,
+                                               idProduct=self.AILLIO_PID_REV3, backend=backend)
+        else:
+            self.usbhandle = libusb_package.find(idVendor=self.AILLIO_VID, # pyright:ignore[reportPossiblyUnboundVariable]
+                                                 idProduct=self.AILLIO_PID)
+            if self.usbhandle is None:
+                self.usbhandle = libusb_package.find(idVendor=self.AILLIO_VID, # pyright:ignore[reportPossiblyUnboundVariable]
+                                                     idProduct=self.AILLIO_PID_REV3)
         if self.usbhandle is None:
             raise OSError('not found or no permission')
         self.__dbg('device found!')
@@ -299,7 +336,7 @@ class AillioR1:
         if self.parent_pipe is not None:
             self.parent_pipe.send(self.AILLIO_CMD_PRS)
 
-    def __updatestate(self, p:'Connection') -> None:
+    def __updatestate(self, p:'Connection') -> None: # type:ignore[no-any-unimported,unused-ignore]
         while self.worker_thread_run:
             state1:'array.array[int]' = array.array('B', bytes(0))
             state2:'array.array[int]' = array.array('B', bytes(0))
@@ -453,7 +490,7 @@ class AillioR1:
 #            res['beans'] = data['bean']['beanName']
 #        try:
 #            if 'weightGreen' in data or 'weightRoasted' in data:
-#                wunit = aw.qmc.weight_units.index(aw.qmc.weight[2])
+#                wunit = weight_units.index(aw.qmc.weight[2])
 #                if wunit in {1,3}: # turn Kg into g, and lb into oz
 #                    wunit = wunit -1
 #                wgreen:float = 0
@@ -462,7 +499,7 @@ class AillioR1:
 #                wroasted:float = 0
 #                if 'weightRoasted' in data:
 #                    wroasted = float(data['weightRoasted'])
-#                res['weight'] = [wgreen,wroasted,aw.qmc.weight_units[wunit]]
+#                res['weight'] = [wgreen,wroasted,weight_units[wunit]]
 #        except Exception: # pylint: disable=broad-except
 #            pass
 #        try:

@@ -99,7 +99,6 @@ PYQT_QT_BIN = PYQT_QT + r'\bin'
 PYQT_QT_TRANSLATIONS = QT_TRANSL
 YOCTO_BIN = PYTHON_PACKAGES + r'\yoctopuce\cdll'
 SNAP7_BIN = r'C:\Windows'
-LIBUSB_BIN = r'C:\Windows\SysWOW64'
 
 from PyInstaller.utils.hooks import is_module_satisfies
 if is_module_satisfies('scipy >= 1.3.2'):
@@ -225,17 +224,13 @@ if not ARTISAN_LEGACY=='True':
 #remove_dir(TARGET + 'mpl-data\sample_data',False)
 
 # YOCTO HACK BEGIN: manually copy over the dlls
-make_dir(TARGET + '_internal\yoctopuce\cdll')
-copy_file(YOCTO_BIN + r'\yapi.dll', TARGET + '_internal\yoctopuce\cdll')
-copy_file(YOCTO_BIN + r'\yapi64.dll', TARGET + '_internal\yoctopuce\cdll')
+make_dir(TARGET + r'_internal\yoctopuce\cdll')
+copy_file(YOCTO_BIN + r'\yapi.dll', TARGET + r'_internal\yoctopuce\cdll')
+copy_file(YOCTO_BIN + r'\yapi64.dll', TARGET + r'_internal\yoctopuce\cdll')
 # YOCTO HACK END
 
 # copy Snap7 lib
 copy_file(SNAP7_BIN + r'\snap7.dll', TARGET)
-
-# copy libusb0.1 lib
-
-copy_file(LIBUSB_BIN + r'\libusb0.dll', TARGET)
 
 for fn in [
     'artisan.png',
@@ -282,10 +277,10 @@ for fn in [
   copy_file(fn, TARGET)
 
 make_dir(TARGET + 'Machines')
-xcopy_files('includes\Machines', TARGET + 'Machines')
+xcopy_files(r'includes\Machines', TARGET + 'Machines')
 
 make_dir(TARGET + 'Themes')
-xcopy_files('includes\Themes', TARGET + 'Themes')
+xcopy_files(r'includes\Themes', TARGET + 'Themes')
 
 make_dir(TARGET + 'Icons')
-xcopy_files('includes\Icons', TARGET + 'Icons')
+xcopy_files(r'includes\Icons', TARGET + 'Icons')

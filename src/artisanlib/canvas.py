@@ -33,6 +33,7 @@ import warnings
 import numpy
 import logging
 import re
+import functools
 from bisect import bisect_right
 import psutil
 from psutil._common import bytes2human
@@ -56,8 +57,9 @@ if TYPE_CHECKING:
     from PyQt6.QtGui import QResizeEvent # pylint: disable=unused-import
 
 from artisanlib.util import (uchr, fill_gaps, deltaLabelPrefix, deltaLabelUTF8, deltaLabelMathPrefix, stringfromseconds,
-        fromFtoC, fromFtoCstrict, fromCtoF, fromCtoFstrict, RoRfromFtoC, RoRfromFtoCstrict, RoRfromCtoF, toInt, toString, toFloat, application_name, getResourcePath, getDirectory,
-        abbrevString, scaleFloat2String, is_proper_temp)
+        fromFtoC, fromFtoCstrict, fromCtoF, fromCtoFstrict, RoRfromFtoC, RoRfromFtoCstrict, RoRfromCtoF, toInt, toString,
+        toFloat, application_name, getResourcePath, getDirectory, convertWeight,
+        abbrevString, scaleFloat2String, is_proper_temp, weight_units, volume_units, float2float)
 from artisanlib import pid
 from artisanlib.time import ArtisanTime
 from artisanlib.filters import LiveMedian
@@ -110,6 +112,7 @@ from matplotlib.projections.polar import PolarAxes
 from matplotlib.text import Annotation, Text
 from matplotlib.lines import Line2D
 from matplotlib.offsetbox import DraggableAnnotation
+from matplotlib.colors import to_hex, to_rgba
 
 from artisanlib.phidgets import PhidgetManager
 from Phidget22.VoltageRange import VoltageRange # type: ignore
@@ -180,6 +183,7 @@ class tgraphcanvas(FigureCanvas):
     showExtraCurveSignal = pyqtSignal(int, str, bool)
     showEventsSignal = pyqtSignal(int, bool)
     showBackgroundEventsSignal = pyqtSignal(bool)
+    redrawSignal = pyqtSignal(bool,bool,bool,bool,bool)
 
     umlaute_dict : Final[Dict[str, str]] = {
        uchr(228): 'ae',  # U+00E4   \xc3\xa4
@@ -246,9 +250,9 @@ class tgraphcanvas(FigureCanvas):
         'swapdeltalcds', 'PIDbuttonflag', 'Controlbuttonflag', 'deltaETfilter', 'deltaBTfilter', 'curvefilter', 'deltaETspan', 'deltaBTspan',
         'deltaETsamples', 'deltaBTsamples', 'profile_sampling_interval', 'background_profile_sampling_interval', 'profile_meter', 'optimalSmoothing', 'polyfitRoRcalc',
         'patheffects', 'graphstyle', 'graphfont', 'buttonvisibility', 'buttonactions', 'buttonactionstrings', 'extrabuttonactions', 'extrabuttonactionstrings',
-        'xextrabuttonactions', 'xextrabuttonactionstrings', 'chargeTimerFlag', 'autoChargeFlag', 'autoDropFlag', 'autoChargeIdx', 'autoDropIdx', 'markTPflag',
+        'xextrabuttonactions', 'xextrabuttonactionstrings', 'chargeTimerFlag', 'autoChargeFlag', 'autoDropFlag', 'autoChargeMode', 'autoDropMode', 'autoChargeIdx', 'autoDropIdx', 'markTPflag',
         'autoDRYflag', 'autoFCsFlag', 'autoCHARGEenabled', 'autoDRYenabled', 'autoFCsenabled', 'autoDROPenabled', 'autoDryIdx', 'projectionconstant',
-        'projectionmode', 'transMappingMode', 'weight', 'volume_units', 'volume', 'density', 'density_roasted', 'volumeCalcUnit', 'volumeCalcWeightInStr',
+        'projectionmode', 'transMappingMode', 'weight', 'volume', 'density', 'density_roasted', 'volumeCalcUnit', 'volumeCalcWeightInStr',
         'volumeCalcWeightOutStr', 'container_names', 'container_weights', 'container_idx', 'specialevents', 'etypes', 'etypesdefault', 'specialeventstype',
         'specialeventsStrings', 'specialeventsvalue', 'eventsGraphflag', 'clampEvents', 'renderEventsDescr', 'eventslabelschars', 'eventsshowflag',
         'annotationsflag', 'showeventsonbt', 'showEtypes', 'E1timex', 'E2timex', 'E3timex', 'E4timex', 'E1values', 'E2values', 'E3values', 'E4values',
@@ -308,7 +312,7 @@ class tgraphcanvas(FigureCanvas):
         'segmentpickflag', 'segmentdeltathreshold', 'segmentsamplesthreshold', 'stats_summary_rect', 'title_text', 'title_artist', 'title_width',
         'background_title_width', 'xlabel_text', 'xlabel_artist', 'xlabel_width', 'lazyredraw_on_resize_timer', 'mathdictionary_base',
         'ambient_pressure_sampled', 'ambient_humidity_sampled', 'ambientTemp_sampled', 'backgroundmovespeed', 'chargeTimerPeriod', 'flavors_default_value',
-        'fmt_data_ON', 'l_subtitle', 'projectDeltaFlag', 'weight_units', 'btbreak_params']
+        'fmt_data_ON', 'l_subtitle', 'projectDeltaFlag', 'btbreak_params']
 
 
     def __init__(self, parent:QWidget, dpi:int, locale:str, aw:'ApplicationWindow') -> None:
@@ -461,16 +465,23 @@ class tgraphcanvas(FigureCanvas):
 
         # used by BTbreak
         self.btbreak_params:BTBreakParams = {
-            'd_drop': -0.34,
-            'd_charge': -0.67,
+            'delay': [[40000,1000,500],               #autoChargeMode="Standard"
+                      [40000,1000,500]],              #autoChargeMode="Sensitive"
+            'd_charge': [[-0.67, -0.34, -0.20],       #autoChargeMode="Standard"  [delay>=1000, 500<=delay<1000, delay<500]
+                         [ 0.00,  0.00,  0.00]],      #autoChargeMode="Sensitive" [delay>=1000, 500<=delay<1000, delay<500]
+            'd_drop':   [[-0.34, -0.20,  0.00],       #autoDropMode="Standard"    [delay>=1000, 500<=delay<1000, delay<500]
+                         [ 0.00,  0.00,  0.00]],      #autoDropMode="Sensitive"   [delay>=1000, 500<=delay<1000, delay<500]
+            'offset_charge': [[0.5, 0.2, 0.0],        #autoChargeMode="Standard"  [delay>=1000, 500<=delay<1000, delay<500]
+                              [0.5, 0.1, 0.0]],       #autoChargeMode="Sensitive" [delay>=1000, 500<=delay<1000, delay<500]
+            'offset_drop':   [[0.2, 0.1, 0.0],        #autoDropMode="Standard"    [delay>=1000, 500<=delay<1000, delay<500]
+                              [0.2, 0.05, 0.0]],      #autoDropMode="Sensitive"   [delay>=1000, 500<=delay<1000, delay<500]
+            'dpre_dpost_diff': [[0.78, 0.78, 20.0],   #autoChargeMode="Standard"  [delay>=1000, 500<=delay<1000, delay<500]
+                                [20.0, 20.0, 20.0]],  #autoChargeMode="Sensitive" [delay>=1000, 500<=delay<1000, delay<500]
             'tight': 3,
             'loose': 5,
             'f': 2.5,
             'maxdpre': 6.4,
             'f_dtwice': 1.5,
-            'dpre_dpost_diff': 0.78,
-            'offset_charge': 0.5,
-            'offset_drop': 0.2
         }
 
         self.flavorlabels = list(self.artisanflavordefaultlabels)
@@ -841,7 +852,7 @@ class tgraphcanvas(FigureCanvas):
                        'IKAWA',                     #142
                        '+IKAWA SET/RPM',            #143
                        '+IKAWA Heater/Fan',         #144
-                       '+IKAWA State',              #145
+                       '+IKAWA State/Humidity',     #145
                        'Phidget DAQ1000 01',        #146
                        '+Phidget DAQ1000 23',       #147
                        '+Phidget DAQ1000 45',       #148
@@ -855,7 +866,11 @@ class tgraphcanvas(FigureCanvas):
                        'Phidget DAQ1301 01',        #156
                        '+Phidget DAQ1301 23',       #157
                        '+Phidget DAQ1301 45',       #158
-                       '+Phidget DAQ1301 67'        #159
+                       '+Phidget DAQ1301 67',       #159
+                       f'+IKAWA {deltaLabelUTF8}Humidity/{deltaLabelUTF8}Humidity Dir.',    #160
+                       '+Omega HH309 34',           #161
+                       'Digi-Sense 20250-07',       #162
+                       'Extech 42570'               #163
                        ]
 
         # ADD DEVICE:
@@ -969,7 +984,7 @@ class tgraphcanvas(FigureCanvas):
             141, # Kaleido Heater/Fan
             143, # IKAWA Set/RPM
             144, # IKAWA Heater/Fan
-            145, # IKAWA State
+            145, # IKAWA State/Humidity
             146, # Phidget DAQ1000 01
             147, # +Phidget DAQ1000 23
             148, # +Phidget DAQ1000 45
@@ -981,7 +996,8 @@ class tgraphcanvas(FigureCanvas):
             156, # Phidget DAQ1301 01
             157, # +Phidget DAQ1301 23
             158, # +Phidget DAQ1301 45
-            159  # +Phidget DAQ1301 67
+            159, # +Phidget DAQ1301 67
+            160  # IKAWA \Delta Humidity / \Delat Humidity direction
         ]
 
         #extra devices
@@ -1443,9 +1459,10 @@ class tgraphcanvas(FigureCanvas):
         self.optimalSmoothing:bool = False
         self.polyfitRoRcalc:bool = False
 
-        self.patheffects = 1
-        self.graphstyle = 0
-        self.graphfont = 0
+        self.patheffects:int = 1
+        self.glow:int = 0
+        self.graphstyle:int = 0
+        self.graphfont:int = 0
 
         #variables to configure the 8 default buttons
         # button = 0:CHARGE, 1:DRY_END, 2:FC_START, 3:FC_END, 4:SC_START, 5:SC_END, 6:DROP, 7:COOL_END;
@@ -1464,6 +1481,9 @@ class tgraphcanvas(FigureCanvas):
         self.chargeTimerPeriod: int = 0 # period until CHARGE since START if CHARGE timer is active
         self.autoChargeFlag: bool = True
         self.autoDropFlag: bool = True
+        # auto mark modes for autoCHARGE and autoDROP (0: Standard, 1: Sensitive)
+        self.autoChargeMode: int = 0
+        self.autoDropMode: int = 0
         #autodetected CHARGE and DROP index
         self.autoChargeIdx = 0 # if positive it holds the autoCHARGE index, if negative, autoCHARGE is disabled
         self.autoDropIdx = 0 # if positive it holds the autoDROP index, if negative, autoDROP is disabled
@@ -1487,13 +1507,11 @@ class tgraphcanvas(FigureCanvas):
         # profile transformator mapping mode
         self.transMappingMode = 0 # 0: discrete, 1: linear, 2: quadratic
 
-        self.weight_units:List[str] = ['g','Kg','lb','oz']
         #[0]weight in, [1]weight out, [2]units (string)
-        self.weight:Tuple[float,float,str] = (0,0,self.weight_units[1])
+        self.weight:Tuple[float,float,str] = (0, 0, weight_units[1])
 
-        self.volume_units:List[str] = ['l','gal','qt','pt','cup','ml']
         #[0]volume in, [1]volume out, [2]units (string)
-        self.volume:Tuple[float,float,str] = (0,0,self.volume_units[0])
+        self.volume:Tuple[float,float,str] = (0, 0, volume_units[0])
 
         #[0]probe weight, [1]weight unit, [2]probe volume, [3]volume unit
         self.density:Tuple[float,str,float,str] = (0,'g',1.,'l')
@@ -1507,8 +1525,8 @@ class tgraphcanvas(FigureCanvas):
             # try to "guess" the users preferred temperature unit
             try:
                 if not QSettings().value('AppleMetricUnits'):
-                    self.weight = (0,0,self.weight_units[2])
-                    self.volume = (0,0,self.volume_units[1])
+                    self.weight = (0, 0, weight_units[2])
+                    self.volume = (0, 0, volume_units[1])
             except Exception: # pylint: disable=broad-except
                 pass
 
@@ -1939,7 +1957,7 @@ class tgraphcanvas(FigureCanvas):
         self.minmaxLimits:bool = False
         self.dropSpikes:bool = False
         self.dropDuplicates:bool = False
-        self.dropDuplicatesLimit:float = 0.3
+        self.dropDuplicatesLimit:float = 0.54
 
         # self.median_filter_factor: factor used for MedianFilter on both, temperature and RoR curves
         self.median_filter_factor:Final[int] = 5 # k=3 is conservative seems not to catch all spikes in all cases; k=5 and k=7 seems to be ok; 13 might be the maximum; k must be odd!
@@ -2243,6 +2261,7 @@ class tgraphcanvas(FigureCanvas):
         self.showExtraCurveSignal.connect(self.showExtraCurve)
         self.showEventsSignal.connect(self.showEvents)
         self.showBackgroundEventsSignal.connect(self.showBackgroundEvents)
+        self.redrawSignal.connect(self.redraw, type=Qt.ConnectionType.QueuedConnection) # type: ignore
 
     #NOTE: empty Figure is initially drawn at the end of self.awsettingsload()
     #################################    FUNCTIONS    ###################################
@@ -2457,7 +2476,7 @@ class tgraphcanvas(FigureCanvas):
             if self.ax is not None:
                 axfig = self.ax.get_figure()
                 if axfig is not None and hasattr(self.fig.canvas,'copy_from_bbox'):
-                    self.ax_background = self.fig.canvas.copy_from_bbox(axfig.bbox) # pyright: ignore[reportGeneralTypeIssues]
+                    self.ax_background = self.fig.canvas.copy_from_bbox(axfig.bbox) # pyright: ignore[reportAttributeAccessIssue]
                     # we redraw the additional artists like the projection lines, the timeline and the AUC guide line
                     self.update_additional_artists()
                     self.fig.canvas.blit(axfig.bbox)
@@ -2506,7 +2525,7 @@ class tgraphcanvas(FigureCanvas):
             except Exception as ex: # pylint: disable=broad-except # the array to average over might get empty and mean thus invoking an exception
                 _log.exception(ex)
         if res is not None:
-            res = self.aw.float2float(res)
+            res = float2float(res)
         return res
 
     def updateAmbientTempFromPhidgetModulesOrCurve(self) -> None:
@@ -2527,8 +2546,8 @@ class tgraphcanvas(FigureCanvas):
                     if ser.PhidgetTemperatureSensor is not None:
                         at = ser.PhidgetTemperatureSensor[0].getTemperature()
                         if self.mode == 'F':
-                            at = self.aw.float2float(fromCtoFstrict(at))
-                        self.ambientTemp = self.aw.float2float(at)
+                            at = float2float(fromCtoFstrict(at))
+                        self.ambientTemp = float2float(at)
                 except Exception as e: # pylint: disable=broad-except
                     _log.exception(e)
             # in case the AT channel of the 1048 or the TMP1101 is not used as extra device, we try to attach to it anyhow and read the temp off
@@ -2548,16 +2567,16 @@ class tgraphcanvas(FigureCanvas):
                             libtime.sleep(.5)
                         t = ambient.getTemperature()
                         if self.mode == 'F':
-                            self.ambientTemp = self.aw.float2float(fromCtoFstrict(t))
+                            self.ambientTemp = float2float(fromCtoFstrict(t))
                         else:
-                            self.ambientTemp = self.aw.float2float(t)
+                            self.ambientTemp = float2float(t)
                         if ambient.getAttached():
                             ambient.close()
                 except Exception as e: # pylint: disable=broad-except
                     _log.exception(e)
         res = self.ambientTempSourceAvg()
         if res is not None and (isinstance(res, (float,int))) and not math.isnan(res):
-            self.ambientTemp = self.aw.float2float(float(res))
+            self.ambientTemp = float2float(float(res))
 
     def updateAmbientTemp(self) -> None:
         self.updateAmbientTempFromPhidgetModulesOrCurve()
@@ -2734,7 +2753,7 @@ class tgraphcanvas(FigureCanvas):
                     met_time_str = str(-1*self.met_timex_temp1_delta[2])
                     met_time_msg = QApplication.translate('Message','seconds after FCs')
 
-                self.aw.sendmessage(f'MET {self.aw.float2float(self.met_timex_temp1_delta[1],1)}{self.mode} @ {stringfromseconds(self.met_timex_temp1_delta[0])}, {met_time_str} {met_time_msg}')
+                self.aw.sendmessage(f'MET {float2float(self.met_timex_temp1_delta[1],1)}{self.mode} @ {stringfromseconds(self.met_timex_temp1_delta[0])}, {met_time_str} {met_time_msg}')
 
             # the analysis results were clicked
             elif self.aw.analysisresultsanno is not None and isinstance(event.artist, Annotation) and event.artist in [self.aw.analysisresultsanno]:
@@ -2835,7 +2854,7 @@ class tgraphcanvas(FigureCanvas):
                             self.backgroundeventmessage = f'{self.backgroundeventmessage}{self.Betypesf(self.backgroundEtypes[i])} = {self.eventsvalues(self.backgroundEvalues[i])}'
                             if self.renderEventsDescr and self.backgroundEStrings[i] and self.backgroundEStrings[i]!='':
                                 self.backgroundeventmessage = f'{self.backgroundeventmessage} ({self.backgroundEStrings[i].strip()[:self.eventslabelschars]})'
-                            self.backgroundeventmessage = f'{self.backgroundeventmessage} @ {(stringfromseconds(self.timeB[bge] - start))} {self.aw.float2float(self.temp2B[bge],digits)}{self.mode}'
+                            self.backgroundeventmessage = f'{self.backgroundeventmessage} @ {(stringfromseconds(self.timeB[bge] - start))} {float2float(self.temp2B[bge],digits)}{self.mode}'
                             self.starteventmessagetimer()
                             break
                 elif event.artist in [self.l_eventtype1dots,self.l_eventtype2dots,self.l_eventtype3dots,self.l_eventtype4dots]:
@@ -2854,7 +2873,7 @@ class tgraphcanvas(FigureCanvas):
                             self.eventmessage = f'{self.eventmessage}{self.etypesf(self.specialeventstype[i])} = {self.eventsvalues(self.specialeventsvalue[i])}'
                             if self.renderEventsDescr and self.specialeventsStrings[i] and self.specialeventsStrings[i]!='':
                                 self.eventmessage = f'{self.eventmessage} ({self.specialeventsStrings[i].strip()[:self.eventslabelschars]})'
-                            self.eventmessage = f'{self.eventmessage} @ {stringfromseconds(self.timex[spe] - start)} {self.aw.float2float(self.temp2[spe],digits)}{self.mode}'
+                            self.eventmessage = f'{self.eventmessage} @ {stringfromseconds(self.timex[spe] - start)} {float2float(self.temp2[spe],digits)}{self.mode}'
                             self.starteventmessagetimer()
                             break
         except Exception as e: # pylint: disable=broad-except
@@ -2925,6 +2944,7 @@ class tgraphcanvas(FigureCanvas):
             pass
 
     def onclick(self, event:'MouseEvent') -> None:
+        self.aw.setFocus() # we set the focus to the ApplicationWindow on clicking the MPL canvas to (re-)gain focus while the event minieditor is open
         try:
             if self.ax is None:
                 return
@@ -3060,6 +3080,9 @@ class tgraphcanvas(FigureCanvas):
                         self.aw.buttonCHARGE.setFlat(True)
                         self.aw.buttonCHARGE.stopAnimation()
                         self.aw.onMarkMoveToNext(self.aw.buttonCHARGE)
+
+                    self.xaxistosm(redraw=False) # need to fix uneven x-axis labels like -0:13
+                    self.updateProjection() # we update the data here to have the projections drawn by the redraw() triggered by belows timealign
                 else:
                     # we keep xaxis limit the same but adjust to updated timeindex[0] mark
                     if timeindex_before > -1:
@@ -3067,7 +3090,7 @@ class tgraphcanvas(FigureCanvas):
                     else:
                         self.startofx += self.timex[self.timeindex[0]]
                     self.aw.autoAdjustAxis(deltas=False)
-                self.timealign(redraw=True,recompute=False) # redraws at least the canvas if redraw=True, so no need here for doing another canvas.draw()
+                self.timealign(redraw=True,recompute=False,force=True) # redraws at least the canvas if redraw=True, so no need here for doing another canvas.draw()
             elif action.key[0] == 6: # type: ignore[attr-defined] # "QAction" has no attribute "key" # DROP
                 try:
                     # clear the TP mark position cache (TP depends on DROP!)
@@ -3239,6 +3262,7 @@ class tgraphcanvas(FigureCanvas):
 
     # returns True if the extra device n, channel c, is of type MODBUS or S7, has no factor defined, nor any math formula, and is of type int
     # channel c is either 0 or 1
+    @functools.lru_cache(maxsize=None) # noqa: B019 # pylint: disable=W1518 #for Python >= 3.9 can use @functools.cache; Not relevant here, as qmc is only created once: [B019] Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
     def intChannel(self, n:int, c:int) -> bool:
         if self.aw is not None and len(self.extradevices) > n:
             no_math_formula_defined:bool = False
@@ -3302,7 +3326,7 @@ class tgraphcanvas(FigureCanvas):
                 return True
             if self.extradevices[n] in {140, 141}: # Kaleido drum/AH, heater/fan
                 return True
-            if self.extradevices[n] in {144, 145}: # IKAWA heater/fan, state
+            if self.extradevices[n] == 144: # IKAWA heater/fan, state/humidity
                 return True
             return False
         return False
@@ -3402,7 +3426,7 @@ class tgraphcanvas(FigureCanvas):
             return -1
         l = min(len(decay_weights),len(temp_in))
         # take trail of length l and remove items where temp[i]=None to fulfil precond. of numpy.interp
-        tx_org = []
+        tx_org:List[float] = []
         temp_trail:List[float] = []
         for x, tp in zip(tx_in[-l:],temp_in[-l:]): # we only iterate over l-elements
             if tp is not None and tp != -1:
@@ -3579,7 +3603,7 @@ class tgraphcanvas(FigureCanvas):
                                 sample_extratemp1[i].append(float(extrat1))
                                 sample_extratemp2[i].append(float(extrat2))
 
-                                # gaps larger than 3 readings are not connected in the graph (as util.py:fill_gaps() is not interpolating them)
+                                # gaps larger than self.interpolatemax readings are not connected in the graph (as util.py:fill_gaps() is not interpolating them)
                                 if extrat1 != -1:
                                     sample_extractimex1[i].append(float(extratx))
                                     sample_extractemp1[i].append(float(extrat1))
@@ -3754,63 +3778,71 @@ class tgraphcanvas(FigureCanvas):
                     #we need a minimum of two readings to calculate rate of change
                     if length_of_qmc_timex > 1:
                         # compute T1 RoR
-                        if t1_final == -1 or len(sample_ctimex1)<2:  # we repeat the last RoR if underlying temperature dropped
-                            if sample_unfiltereddelta1:
-                                self.rateofchange1 = sample_unfiltereddelta1[-1]
-                            else:
-                                self.rateofchange1 = 0.
-                        else: # normal data received
-                            #   Delta T = (changeTemp/ChangeTime)*60. =  degrees per minute;
-                            left_index = min(len(sample_ctimex1),len(sample_tstemp1),max(2, self.deltaETsamples + 1))
-                            # ****** Instead of basing the estimate on the window extremal points,
-                            #        grab the full set of points and do a formal LS solution to a straight line and use the slope estimate for RoR
-                            if self.polyfitRoRcalc:
-                                try:
-                                    time_vec = sample_ctimex1[-left_index:]
-                                    temp_samples = sample_tstemp1[-left_index:]
-                                    with warnings.catch_warnings():
-                                        warnings.simplefilter('ignore')
-                                        # using stable polyfit from numpy polyfit module
-                                        LS_fit = numpy.polynomial.polynomial.polyfit(time_vec, temp_samples, 1) # type:ignore[no-untyped-call]
-                                        self.rateofchange1 = LS_fit[1]*60.
-                                except Exception: # pylint: disable=broad-except
-                                    # a numpy/OpenBLAS polyfit bug can cause polyfit to throw an exception "SVD did not converge in Linear Least Squares" on Windows Windows 10 update 2004
-                                    # https://github.com/numpy/numpy/issues/16744
-                                    # we fall back to the two point algo
+                        try:
+                            if t1_final == -1 or len(sample_ctimex1)<2:  # we repeat the last RoR if underlying temperature dropped
+                                if sample_unfiltereddelta1:
+                                    self.rateofchange1 = sample_unfiltereddelta1[-1]
+                                else:
+                                    self.rateofchange1 = 0.
+                            else: # normal data received
+                                #   Delta T = (changeTemp/ChangeTime)*60. =  degrees per minute;
+                                left_index = min(len(sample_ctimex1),len(sample_tstemp1),max(2, self.deltaETsamples + 1))
+                                # ****** Instead of basing the estimate on the window extremal points,
+                                #        grab the full set of points and do a formal LS solution to a straight line and use the slope estimate for RoR
+                                if self.polyfitRoRcalc:
+                                    try:
+                                        time_vec = sample_ctimex1[-left_index:]
+                                        temp_samples = sample_tstemp1[-left_index:]
+                                        with warnings.catch_warnings():
+                                            warnings.simplefilter('ignore')
+                                            # using stable polyfit from numpy polyfit module
+                                            LS_fit = numpy.polynomial.polynomial.polyfit(time_vec, temp_samples, 1) # type:ignore[no-untyped-call]
+                                            self.rateofchange1 = LS_fit[1]*60.
+                                    except Exception: # pylint: disable=broad-except
+                                        # a numpy/OpenBLAS polyfit bug can cause polyfit to throw an exception "SVD did not converge in Linear Least Squares" on Windows Windows 10 update 2004
+                                        # https://github.com/numpy/numpy/issues/16744
+                                        # we fall back to the two point algo
+                                        timed = sample_ctimex1[-1] - sample_ctimex1[-left_index]   #time difference between last self.deltaETsamples readings
+                                        self.rateofchange1 = ((sample_tstemp1[-1] - sample_tstemp1[-left_index])/timed)*60.  #delta ET (degrees/minute)
+                                else:
                                     timed = sample_ctimex1[-1] - sample_ctimex1[-left_index]   #time difference between last self.deltaETsamples readings
                                     self.rateofchange1 = ((sample_tstemp1[-1] - sample_tstemp1[-left_index])/timed)*60.  #delta ET (degrees/minute)
-                            else:
-                                timed = sample_ctimex1[-1] - sample_ctimex1[-left_index]   #time difference between last self.deltaETsamples readings
-                                self.rateofchange1 = ((sample_tstemp1[-1] - sample_tstemp1[-left_index])/timed)*60.  #delta ET (degrees/minute)
+                        except Exception as e: # pylint: disable=broad-except
+                            _log.error(e)
+                            self.rateofchange1 = 0.
 
                         # compute T2 RoR
-                        if t2_final == -1 or len(sample_ctimex2)<2:  # we repeat the last RoR if underlying temperature dropped
-                            if sample_unfiltereddelta2:
-                                self.rateofchange2 = sample_unfiltereddelta2[-1]
-                            else:
-                                self.rateofchange2 = 0.
-                        else: # normal data received
-                            #   Delta T = (changeTemp/ChangeTime)*60. =  degrees per minute;
-                            left_index = min(len(sample_ctimex2),len(sample_tstemp2),max(2, self.deltaBTsamples + 1))
-                            # ****** Instead of basing the estimate on the window extremal points,
-                            #        grab the full set of points and do a formal LS solution to a straight line and use the slope estimate for RoR
-                            if self.polyfitRoRcalc:
-                                try:
-                                    time_vec = sample_ctimex2[-left_index:]
-                                    temp_samples = sample_tstemp2[-left_index:]
-                                    with warnings.catch_warnings():
-                                        warnings.simplefilter('ignore')
-                                        LS_fit = numpy.polynomial.polynomial.polyfit(time_vec, temp_samples, 1) # type:ignore[no-untyped-call]
-                                        self.rateofchange2 = LS_fit[1]*60.
-                                except Exception: # pylint: disable=broad-except
-                                    # a numpy/OpenBLAS polyfit bug can cause polyfit to throw an exception "SVD did not converge in Linear Least Squares" on Windows Windows 10 update 2004
-                                    # https://github.com/numpy/numpy/issues/16744
-                                    # we fall back to the two point algo
+                        try:
+                            if t2_final == -1 or len(sample_ctimex2)<2:  # we repeat the last RoR if underlying temperature dropped
+                                if sample_unfiltereddelta2:
+                                    self.rateofchange2 = sample_unfiltereddelta2[-1]
+                                else:
+                                    self.rateofchange2 = 0.
+                            else: # normal data received
+                                #   Delta T = (changeTemp/ChangeTime)*60. =  degrees per minute;
+                                left_index = min(len(sample_ctimex2),len(sample_tstemp2),max(2, self.deltaBTsamples + 1))
+                                # ****** Instead of basing the estimate on the window extremal points,
+                                #        grab the full set of points and do a formal LS solution to a straight line and use the slope estimate for RoR
+                                if self.polyfitRoRcalc:
+                                    try:
+                                        time_vec = sample_ctimex2[-left_index:]
+                                        temp_samples = sample_tstemp2[-left_index:]
+                                        with warnings.catch_warnings():
+                                            warnings.simplefilter('ignore')
+                                            LS_fit = numpy.polynomial.polynomial.polyfit(time_vec, temp_samples, 1) # type:ignore[no-untyped-call]
+                                            self.rateofchange2 = LS_fit[1]*60.
+                                    except Exception: # pylint: disable=broad-except
+                                        # a numpy/OpenBLAS polyfit bug can cause polyfit to throw an exception "SVD did not converge in Linear Least Squares" on Windows Windows 10 update 2004
+                                        # https://github.com/numpy/numpy/issues/16744
+                                        # we fall back to the two point algo
+                                        timed = sample_ctimex2[-1] - sample_ctimex2[-left_index]   #time difference between last self.deltaBTsamples readings
+                                        self.rateofchange2 = ((sample_tstemp2[-1] - sample_tstemp2[-left_index])/timed)*60.  #delta BT (degrees/minute)
+                                else:
                                     timed = sample_ctimex2[-1] - sample_ctimex2[-left_index]   #time difference between last self.deltaBTsamples readings
                                     self.rateofchange2 = ((sample_tstemp2[-1] - sample_tstemp2[-left_index])/timed)*60.  #delta BT (degrees/minute)
-                            else:
-                                timed = sample_ctimex2[-1] - sample_ctimex2[-left_index]   #time difference between last self.deltaBTsamples readings
-                                self.rateofchange2 = ((sample_tstemp2[-1] - sample_tstemp2[-left_index])/timed)*60.  #delta BT (degrees/minute)
+                        except Exception as e: # pylint: disable=broad-except
+                            _log.error(e)
+                            self.rateofchange1 = 0.
 
 
                         # self.unfiltereddelta{1,2}_pure contain the RoR values respecting the delta_span, but without any delta smoothing NOR delta mathformulas applied
@@ -4189,7 +4221,7 @@ class tgraphcanvas(FigureCanvas):
                     except Exception: # pylint: disable=broad-except
                         pass
                 self.aw.lcd1.display(timestr)
-                if self.aw.largeLCDs_dialog:
+                if self.aw.largeLCDs_dialog is not None:
                     self.updateLargeLCDsTimeSignal.emit(timestr)
 
             ## ET LCD:
@@ -4431,11 +4463,6 @@ class tgraphcanvas(FigureCanvas):
                                             self.delta_ax.set_ylim(zlim_new)
                                             self.ax_background = None
 
-                        if self.patheffects:
-                            rcParams['path.effects'] = [PathEffects.withStroke(linewidth=self.patheffects, foreground=self.palette['background'])]
-                        else:
-                            rcParams['path.effects'] = []
-
                         ##### updated canvas
                         try:
                             if not self.block_update:
@@ -4547,8 +4574,6 @@ class tgraphcanvas(FigureCanvas):
                             self.adderror((QApplication.translate('Error Message','Exception:') + ' updategraphics() {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
 
                         #####
-                        if self.patheffects:
-                            rcParams['path.effects'] = []
 
                         #update phase lcds
                         self.aw.updatePhasesLCDs()
@@ -4568,9 +4593,9 @@ class tgraphcanvas(FigureCanvas):
     def setLCDtimestr(self, timestr:str) -> None:
         self.aw.lcd1.display(timestr)
         # update connected WebLCDs
-        if self.aw.WebLCDs:
+        if self.aw.WebLCDs is not None:
             self.updateWebLCDs(time=timestr)
-        if self.aw.largeLCDs_dialog:
+        if self.aw.largeLCDs_dialog is not None:
             self.updateLargeLCDsTimeSignal.emit(timestr)
 
     def setLCDtime(self, ts:float) -> None:
@@ -4915,7 +4940,7 @@ class tgraphcanvas(FigureCanvas):
                             # we set the last value to be used for relative +- button action as base
                             self.aw.extraeventsactionslastvalue[slidernr] = int(round(slidervalue))
                             if self.flagstart:
-                                value = self.aw.float2float((slidervalue + 10.0) / 10.0)
+                                value = float2float((slidervalue + 10.0) / 10.0)
                                 self.EventRecordAction(extraevent = 1,eventtype=slidernr,eventvalue=value,eventdescription=f'A{number:d} (S{slidernr:d})')
                             self.aw.fireslideraction(slidernr)
                     except Exception as e: # pylint: disable=broad-except
@@ -5538,7 +5563,7 @@ class tgraphcanvas(FigureCanvas):
             # add Roast Properties
             try:
                 # weight-in in g
-                mathdictionary['WEIGHTin'] = int(round(self.aw.convertWeight(self.weight[0],self.weight_units.index(self.weight[2]),0)))
+                mathdictionary['WEIGHTin'] = int(round(convertWeight(self.weight[0], weight_units.index(self.weight[2]),0)))
                 mathdictionary['MOISTUREin'] = self.moisture_greens
                 mathdictionary['TEMPunit'] = (0 if self.mode == 'C' else 1) # 0:C and 1:F
             except Exception as e: # pylint: disable=broad-except
@@ -6151,7 +6176,7 @@ class tgraphcanvas(FigureCanvas):
 
             if bool(self.aw.comparator):
                 starttime = 0
-            elif self.timeindex[0] != -1 and self.timeindex[0] < len(self.timex):
+            elif -1 < self.timeindex[0] < len(self.timex):
                 starttime = self.timex[self.timeindex[0]]
             else:
                 starttime = 0
@@ -6162,8 +6187,19 @@ class tgraphcanvas(FigureCanvas):
 
             if self.xgrid != 0:
 
-                mfactor1 =  round(float(2. + abs(int(round(startofx-starttime))/int(round(self.xgrid)))))
-                mfactor2 =  round(float(2. + abs(int(round(endofx))/int(round(self.xgrid)))))
+                first_reading_time = startofx-starttime
+                last_reading_time = endofx
+                if not self.flagon and min_time is None and max_time is None:
+                    if len(self.timex)>0:
+                        first_reading_time = min(first_reading_time, self.timex[0]-starttime)
+                        last_reading_time = max(last_reading_time, self.timex[-1]-starttime)
+                    if self.background and len(self.timeB)>0:
+                        first_reading_time = min(first_reading_time, self.timeB[0]-starttime)
+                        last_reading_time = max(last_reading_time, self.timeB[-1]-starttime)
+                # mfactor1: number of ticks before CHARGE
+                mfactor1 =  round(float(2. + abs( int(round(first_reading_time)) / int(round(self.xgrid)) )))
+                # mfactor2: number of ticks after CHARGE
+                mfactor2 =  round(float(2. + abs( int(round(last_reading_time)) / int(round(self.xgrid)) )))
 
                 majorloc = numpy.arange(starttime-(self.xgrid*mfactor1),starttime+(self.xgrid*mfactor2), self.xgrid)
                 if self.xgrid == 60:
@@ -6221,7 +6257,7 @@ class tgraphcanvas(FigureCanvas):
         sign = '' if x >= starttime else '-'
         m,s = divmod(abs(x - starttime), 60.)
 #        return '%s%d:%02d'%(sign,m,s)
-        return f'{sign}{m:.0f}:{s:02.0f}'
+        return f'{sign}{m:.0f}:{int(s):02.0f}'
 
     def fmt_data(self, x:float) -> str:
         res = x
@@ -6233,7 +6269,7 @@ class tgraphcanvas(FigureCanvas):
             except Exception: # pylint: disable=broad-except
                 pass
         if self.LCDdecimalplaces:
-            return str(self.aw.float2float(res))
+            return str(float2float(res))
         return str(int(round(res)))
 
     #used by xaxistosm(). Provides also negative time
@@ -6355,7 +6391,7 @@ class tgraphcanvas(FigureCanvas):
             self.aw.lcd1.display('00:00')
             if self.aw.WebLCDs:
                 self.updateWebLCDs(time='00:00')
-            if self.aw.largeLCDs_dialog:
+            if self.aw.largeLCDs_dialog is not None:
                 self.updateLargeLCDsTimeSignal.emit('00:00')
             if andLCDs:
                 self.clearLCDs()
@@ -6387,7 +6423,8 @@ class tgraphcanvas(FigureCanvas):
     #Resets graph. Called from reset button. Deletes all data. Calls redraw() at the end
     # returns False if action was canceled, True otherwise
     # if keepProperties=True (a call from OnMonitor()), we keep all the pre-set roast properties
-    def reset(self,redraw:bool = True, soundOn:bool = True, keepProperties:bool = False, fireResetAction:bool = True) -> bool:
+    # onMonitor is set if called from onMonitor
+    def reset(self,redraw:bool = True, soundOn:bool = True, keepProperties:bool = False, fireResetAction:bool = True, onMonitor:bool = False) -> bool:
         try:
             focused_widget = QApplication.focusWidget()
             if focused_widget and focused_widget != self.aw.centralWidget():
@@ -6401,13 +6438,13 @@ class tgraphcanvas(FigureCanvas):
         # restore and clear extra device settings which might have been created on loading a profile with different extra devices settings configuration
         self.aw.restoreExtraDeviceSettingsBackup()
 
-        if self.flagon and self.flagOpenCompleted and self.aw.curFile is not None:
+        if onMonitor and self.flagOpenCompleted and self.aw.curFile is not None:
             # always if ON is pressed while a profile is loaded, the profile is send to the Viewer
             # the file URL of the saved profile (if any) is send to the ArtisanViewer app to be opened if already running
             try:
                 fileURL = QUrl.fromLocalFile(self.aw.curFile)
                 fileURL.setQuery('background') # open the file URL without raising the app to the foreground
-                QTimer.singleShot(10,lambda : self.aw.app.sendMessage2ArtisanInstance(fileURL.toString(),self.aw.app._viewer_id)) # pylint: disable=protected-access
+                self.aw.app.sendmessage2ArtisanViewerSignal.emit(fileURL.toString())
             except Exception as e: # pylint: disable=broad-except
                 _log.exception(e)
 
@@ -6512,7 +6549,9 @@ class tgraphcanvas(FigureCanvas):
             else:
                 self.weight = (self.weight[0],0,self.weight[2])
                 self.volume = (self.volume[0],0,self.volume[2])
-            self.roastingnotes = ''
+            if len(self.timex) > 20:
+                # roast notes of an existing roast are reset
+                self.roastingnotes = ''
             self.cuppingnotes = ''
             self.whole_color = 0
             self.ground_color = 0
@@ -6811,7 +6850,6 @@ class tgraphcanvas(FigureCanvas):
         window_len:int = 7, window:str = 'hanning', decay_weights:Optional[List[int]] = None, decay_smoothing:bool = False,
         re_sample:bool = True, back_sample:bool = True, a_lin:Optional['npt.NDArray[numpy.double]'] = None,
         delta:bool=False) -> 'npt.NDArray[numpy.double]':
-
         # 1. re-sample
         if re_sample:
             if a_lin is None or len(a_lin) != len(a):
@@ -6860,7 +6898,7 @@ class tgraphcanvas(FigureCanvas):
                             result.append(v)
                         else:
                             result.append(numpy.average(seq,axis=0,weights=w)) # works only if len(seq) = len(w)
-                    res = numpy.array(res)
+                    res = numpy.array(result)
                     # postCond: len(res) = len(b)
             else:
                 # optimal smoothing (the default)
@@ -6996,10 +7034,7 @@ class tgraphcanvas(FigureCanvas):
         fontprop_small = self.aw.mpl_fontproperties.copy()
         fontsize = 'x-small'
         fontprop_small.set_size(fontsize)
-        if self.patheffects:
-            rcParams['path.effects'] = [PathEffects.withStroke(linewidth=self.patheffects, foreground=self.palette['background'])]
-        else:
-            rcParams['path.effects'] = []
+        path_effects = self.line_path_effects(False, self.patheffects, self.aw.light_background_p, self.patheffects) # don't glow annotations!
         #annotate temp
         fmtstr = '%.1f' if self.LCDdecimalplaces else '%.0f'
         xytext: Optional[Tuple[float, float]]
@@ -7018,7 +7053,8 @@ class tgraphcanvas(FigureCanvas):
                             arrowprops={'arrowstyle':'-','color':self.palette['text'],'alpha':a},
                             fontsize=fontsize,
                             alpha=a,
-                            fontproperties=fontprop_small)
+                            fontproperties=fontprop_small,
+                            path_effects=path_effects)
         try:
             temp_anno.set_in_layout(False)  # remove text annotations from tight_layout calculation
             if draggable:
@@ -7034,9 +7070,14 @@ class tgraphcanvas(FigureCanvas):
             xytext = self.l_annotations_dict[draggable_anno_key][1].xyann
         else:
             xytext = (x+e,y - ydown)
-        time_anno = self.ax.annotate(time_str,xy=(x,y),xytext=xytext,
-                             color=self.palette['text'],arrowprops={'arrowstyle':'-','color':self.palette['text'],'alpha':a},
-                             fontsize=fontsize,alpha=a,fontproperties=fontprop_small)
+        time_anno = self.ax.annotate(time_str,
+                        xy=(x,y),
+                        xytext=xytext,
+                        color=self.palette['text'],
+                        arrowprops={'arrowstyle':'-','color':self.palette['text'],'alpha':a},
+                        fontsize=fontsize,alpha=a,
+                        fontproperties=fontprop_small,
+                        path_effects=path_effects)
         try:
             time_anno.set_in_layout(False)  # remove text annotations from tight_layout calculation
             if draggable:
@@ -7044,8 +7085,6 @@ class tgraphcanvas(FigureCanvas):
                 time_anno.set_picker(self.aw.draggable_text_box_picker)
         except Exception: # pylint: disable=broad-except # mpl before v3.0 do not have this set_in_layout() function
             pass
-        if self.patheffects:
-            rcParams['path.effects'] = []
         if draggable and draggable_anno_key is not None:
             self.l_annotations_dict[draggable_anno_key] = [temp_anno, time_anno]
         return [temp_anno, time_anno]
@@ -7080,8 +7119,6 @@ class tgraphcanvas(FigureCanvas):
                         else:
                             st1 = self.aw.arabicReshape(QApplication.translate('Scope Annotation', 'CHARGE'))
                             st1 = self.__dijstra_to_ascii(st1)
-                            if self.graphfont == 1:
-                                st1 = self.__to_ascii(st1)
                             e = 0
                             a = 1.
                         time_temp_annos = self.annotate(temp[t0idx],st1,t0,y,ystep_up,ystep_down,e,a,draggable,0+anno_key_offset)
@@ -7155,7 +7192,12 @@ class tgraphcanvas(FigureCanvas):
                             anno_artists += time_temp_annos
                         #add a water mark if FCs
                         if timeindex[2] and not timeindex2 and self.watermarksflag:
-                            self.ax.axvspan(timex[timeindex[2]],timex[tidx], facecolor=self.palette['watermarks'], alpha=0.2)
+                            self.ax.axvspan(
+                                    timex[timeindex[2]],
+                                    timex[tidx],
+                                    facecolor=self.palette['watermarks'],
+                                    alpha=0.2,
+                                    path_effects=[])
                 #Add 2Cs markers
                 if timeindex[4]:
                     tidx = timeindex[4]
@@ -7186,7 +7228,12 @@ class tgraphcanvas(FigureCanvas):
                             anno_artists += time_temp_annos
                         #do water mark if SCs
                         if timeindex[4] and not timeindex2 and self.watermarksflag:
-                            self.ax.axvspan(timex[timeindex[4]],timex[tidx], facecolor=self.palette['watermarks'], alpha=0.2)
+                            self.ax.axvspan(
+                                timex[timeindex[4]],
+                                timex[tidx],
+                                facecolor=self.palette['watermarks'],
+                                alpha=0.2,
+                                path_effects=[])
                 #Add DROP markers
                 if timeindex[6]:
                     tidx = timeindex[6]
@@ -7222,14 +7269,24 @@ class tgraphcanvas(FigureCanvas):
                             anno_artists += fake_anno
                     #do water mark if FCs, but no FCe nor SCs nor SCe
                     if timeindex[2] and not timeindex[3] and not timeindex[4] and not timeindex[5] and not timeindex2 and self.watermarksflag:
-                        fc_artist = self.ax.axvspan(timex[timeindex[2]],timex[tidx], facecolor=self.palette['watermarks'], alpha=0.2)
+                        fc_artist = self.ax.axvspan(
+                            timex[timeindex[2]],
+                            timex[tidx],
+                            facecolor=self.palette['watermarks'],
+                            alpha=0.2,
+                            path_effects=[])
                         try:
                             fc_artist.set_in_layout(False) # remove title from tight_layout calculation
                         except Exception: # pylint: disable=broad-except # set_in_layout not available in mpl<3.x
                             pass
                     #do water mark if SCs, but no SCe
                     if timeindex[4] and not timeindex[5] and not timeindex2 and self.watermarksflag:
-                        sc_artist = self.ax.axvspan(timex[timeindex[4]],timex[tidx], facecolor=self.palette['watermarks'], alpha=0.2)
+                        sc_artist = self.ax.axvspan(
+                            timex[timeindex[4]],
+                            timex[tidx],
+                            facecolor=self.palette['watermarks'],
+                            alpha=0.2,
+                            path_effects=[])
                         try:
                             sc_artist.set_in_layout(False) # remove title from tight_layout calculation
                         except Exception: # pylint: disable=broad-except # set_in_layout not available in mpl<3.x
@@ -7247,7 +7304,14 @@ class tgraphcanvas(FigureCanvas):
                     # we simply set it to twice as wide and trust that the clipping will cut of the part not within the axis system
                     endidx = 2*max(self.timex[-1],self.endofx,self.ax.get_xlim()[0],self.ax.get_xlim()[1])
                     if timex[tidx] < endidx and self.watermarksflag:
-                        cool_mark = self.ax.axvspan(timex[tidx],endidx, facecolor=self.palette['rect4'], ec='none', alpha=0.3, clip_on=True, lw=None)
+                        cool_mark = self.ax.axvspan(
+                            timex[tidx],endidx,
+                            facecolor=self.palette['rect4'],
+                            ec='none',
+                            alpha=0.3,
+                            clip_on=True,
+                            lw=None,
+                            path_effects=[])
                         try:
                             cool_mark.set_in_layout(False) # remove title from tight_layout calculation
                         except Exception: # pylint: disable=broad-except # set_in_layout not available in mpl<3.x
@@ -7521,8 +7585,7 @@ class tgraphcanvas(FigureCanvas):
         self.background_title_width = 0
         backgroundtitle = backgroundtitle.strip()
         if backgroundtitle != '':
-            if self.graphfont in {1, 9}: # if selected font is Humor we translate the unicode title into pure ascii
-                backgroundtitle = self.__to_ascii(backgroundtitle)
+            backgroundtitle = self.__dijstra_to_ascii(backgroundtitle)
             backgroundtitle = f'\n{abbrevString(backgroundtitle, 32)}'
 
         self.l_subtitle = self.fig.suptitle(backgroundtitle,
@@ -7556,8 +7619,7 @@ class tgraphcanvas(FigureCanvas):
         elif bnr == 0 and title != '' and title != self.title != QApplication.translate('Scope Title', 'Roaster Scope') and bprefix != '':
             title = f'{bprefix} {title}'
 
-        if self.graphfont in {1,9}: # if selected font is Humor or Dijkstra we translate the unicode title into pure ascii
-            title = self.__to_ascii(title)
+        title = self.__dijstra_to_ascii(title)
 
         self.title_text = self.aw.arabicReshape(title.strip())
         if self.ax is not None and self.title_text is not None:
@@ -7594,6 +7656,35 @@ class tgraphcanvas(FigureCanvas):
     def resizeListStrict(lst:List[Any], ln:int) -> List[Any]:
         return (lst + [-1]*(ln-len(lst)))[:ln]
 
+    @functools.lru_cache(maxsize=50) # noqa: B019 # pylint: disable=W1518 #for Python >= 3.9 can use @functools.cache; Not relevant here, as qmc is only created once: [B019] Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+    def line_path_effects(self, glow:int, patheffects:int, light_background:bool, linewidth:float, color:Optional[str]=None, alpha:Optional[float]=None) -> List[PathEffects.AbstractPathEffect]:
+        path_effects:List[PathEffects.AbstractPathEffect] = []
+        foreground:str = self.palette['background']
+        if patheffects:
+            if alpha is not None:
+                hex_alpha:str = f'{int(alpha*255):02x}'
+                if len(foreground) == 9:
+                    foreground = foreground[:7] + hex_alpha
+                elif len(foreground) == 7:
+                    foreground = foreground + hex_alpha
+            elif color is not None and len(color) == 9 and color[0] == '#':
+                if len(foreground) == 9:
+                    foreground = foreground[:7] + color[7:9]
+                elif len(foreground) == 7:
+                    foreground = foreground + color[7:9]
+            path_effects.append(PathEffects.Stroke(linewidth=linewidth+self.patheffects,foreground=foreground))
+        if glow:
+            glow_alpha = (0.03 if light_background else 0.13)
+            path_effects.extend(
+                [
+                    PathEffects.Stroke(linewidth=linewidth+6,alpha=glow_alpha/1.5),
+                    PathEffects.Stroke(linewidth=linewidth+3,alpha=glow_alpha),
+                    PathEffects.Stroke(linewidth=linewidth+2,alpha=glow_alpha),
+                    PathEffects.Stroke(linewidth=linewidth+1,alpha=glow_alpha)
+                ])
+        path_effects.append(PathEffects.Normal())
+        return path_effects
+
     def drawET(self, temp:'npt.NDArray[numpy.double]') -> None:
         if self.ETcurve and self.ax is not None:
             try:
@@ -7602,7 +7693,6 @@ class tgraphcanvas(FigureCanvas):
             except Exception: # pylint: disable=broad-except
                 pass
             # don't draw -1:
-#            temp = [r if r !=-1 else None for r in temp]
             temp = numpy.ma.masked_where(temp == -1, temp) # type:ignore[no-untyped-call]
             self.l_temp1, = self.ax.plot(
                 self.timex,
@@ -7610,7 +7700,7 @@ class tgraphcanvas(FigureCanvas):
                 markersize=self.ETmarkersize,
                 marker=self.ETmarker,
                 sketch_params=None,
-                path_effects=[PathEffects.withStroke(linewidth=self.ETlinewidth+self.patheffects,foreground=self.palette['background'])],
+                path_effects = self.line_path_effects(self.glow, self.patheffects, self.aw.light_background_p, self.ETlinewidth, self.palette['et']),
                 linewidth=self.ETlinewidth,
                 linestyle=self.ETlinestyle,
                 drawstyle=self.ETdrawstyle,
@@ -7625,7 +7715,6 @@ class tgraphcanvas(FigureCanvas):
             except Exception: # pylint: disable=broad-except
                 pass
             # don't draw -1:
-#            temp = [r if r !=-1 else None for r in temp]
             temp = numpy.ma.masked_where(temp == -1, temp) # type:ignore[no-untyped-call]
             self.l_temp2, = self.ax.plot(
                 self.timex,
@@ -7633,12 +7722,12 @@ class tgraphcanvas(FigureCanvas):
                 markersize=self.BTmarkersize,
                 marker=self.BTmarker,
                 sketch_params=None,
-                path_effects=[PathEffects.withStroke(linewidth=self.BTlinewidth+self.patheffects,foreground=self.palette['background'])],
-                linewidth=self.BTlinewidth,
-                linestyle=self.BTlinestyle,
-                drawstyle=self.BTdrawstyle,
-                color=self.palette['bt'],
-                label=self.aw.arabicReshape(QApplication.translate('Label', 'BT')))
+                path_effects = self.line_path_effects(self.glow, self.patheffects, self.aw.light_background_p, self.BTlinewidth, self.palette['bt']),
+                linewidth = self.BTlinewidth,
+                linestyle = self.BTlinestyle,
+                drawstyle = self.BTdrawstyle,
+                color = self.palette['bt'],
+                label = self.aw.arabicReshape(QApplication.translate('Label', 'BT')))
 
     def drawDeltaET(self, trans:Transform, start:int, end:int) -> None:
         if self.DeltaETflag and self.ax is not None:
@@ -7662,7 +7751,7 @@ class tgraphcanvas(FigureCanvas):
                     markersize=self.ETdeltamarkersize,
                     marker=self.ETdeltamarker,
                     sketch_params=None,
-                    path_effects=[PathEffects.withStroke(linewidth=self.ETdeltalinewidth+self.patheffects,foreground=self.palette['background'])],
+                    path_effects = self.line_path_effects(self.glow, self.patheffects, self.aw.light_background_p, self.ETdeltalinewidth, self.palette['deltaet']),
                     linewidth=self.ETdeltalinewidth,
                     linestyle=self.ETdeltalinestyle,
                     drawstyle=self.ETdeltadrawstyle,
@@ -7689,7 +7778,7 @@ class tgraphcanvas(FigureCanvas):
                     markersize=self.BTdeltamarkersize,
                     marker=self.BTdeltamarker,
                     sketch_params=None,
-                    path_effects=[PathEffects.withStroke(linewidth=self.BTdeltalinewidth+self.patheffects,foreground=self.palette['background'])],
+                    path_effects = self.line_path_effects(self.glow, self.patheffects, self.aw.light_background_p, self.BTdeltalinewidth, self.palette['deltabt']),
                     linewidth=self.BTdeltalinewidth,
                     linestyle=self.BTdeltalinestyle,
                     drawstyle=self.BTdeltadrawstyle,
@@ -7837,10 +7926,11 @@ class tgraphcanvas(FigureCanvas):
     #Redraws data
     # if recomputeAllDeltas, the delta arrays and if smooth the smoothed line arrays are recomputed (incl. those of the background curves)
     # re_smooth_foreground: the foreground curves (incl. extras) will be re-smoothed if called while not recording. During recording foreground will never be smoothed here.
-    # re_smooth_background: the background curves (incl. extras) will be re-smoothed if True (default False), also during recording
+# re_smooth_background: the background curves (incl. extras) will be re-smoothed if True (default False), also during recording
     # NOTE: points for error values represented by None or masked arrays (where values are -1) are not drawn and lines are broken there
     #   see https://matplotlib.org/stable/gallery/lines_bars_and_markers/masked_demo.html
     #   to keep points and lines drawn without those breaks data should be interpolated via util:fill_gaps (controlled by the "Interpolate Drops" filter)
+    @pyqtSlot(bool,bool,bool,bool,bool)
     def redraw(self, recomputeAllDeltas:bool = True, re_smooth_foreground:bool = True, takelock:bool = True, forceRenewAxis:bool = False, re_smooth_background:bool = False) -> None: # pyright: ignore [reportGeneralTypeIssues] # Code is too complex to analyze; reduce complexity by refactoring into subroutines or reducing conditional code paths
 #        _log.info("PRINT redraw(recomputeAllDeltas: %s, re_smooth_foreground: %s, takelock: %s, forceRenewAxis: %s, re_smooth_background: %s)",recomputeAllDeltas, re_smooth_foreground, takelock, forceRenewAxis, re_smooth_background)
         if self.designerflag:
@@ -7863,27 +7953,29 @@ class tgraphcanvas(FigureCanvas):
 
                     decay_smoothing_p = (not self.optimalSmoothing) or self.flagon
 
-                    rcParams['path.effects'] = []
                     scale = 1 if self.graphstyle == 1 else 0
                     length = 700 # 100 (128 the default)
                     randomness = 12 # 2 (16 default)
                     rcParams['path.sketch'] = (scale, length, randomness)
 
+                    rcParams['axes.linewidth'] = 0.8
+                    rcParams['xtick.major.size'] = 6
+                    rcParams['xtick.major.width'] = 1
+                    rcParams['xtick.minor.width'] = 0.8
+
+                    rcParams['ytick.major.size'] = 4
+                    rcParams['ytick.major.width'] = 1
+                    rcParams['ytick.minor.width'] = 1
+
+                    xlabel_alpha_color = to_hex(to_rgba(self.palette['xlabel'], 0.47), keep_alpha=True)
+                    ylabel_alpha_color = to_hex(to_rgba(self.palette['ylabel'], 0.47), keep_alpha=True)
+
+                    rcParams['xtick.color'] = xlabel_alpha_color
+                    rcParams['ytick.color'] = ylabel_alpha_color
+
+                    #rcParams['text.antialiased'] = True
+
                     if forceRenewAxis:
-                        rcParams['axes.linewidth'] = 0.8
-                        rcParams['xtick.major.size'] = 6
-                        rcParams['xtick.major.width'] = 1
-                        rcParams['xtick.minor.width'] = 0.8
-
-                        rcParams['ytick.major.size'] = 4
-                        rcParams['ytick.major.width'] = 1
-                        rcParams['ytick.minor.width'] = 1
-
-                        rcParams['xtick.color'] = self.palette['xlabel']
-                        rcParams['ytick.color'] = self.palette['ylabel']
-
-                        #rcParams['text.antialiased'] = True
-
                         self.fig.clf()
 
                     if self.ax is None or forceRenewAxis:
@@ -7969,7 +8061,7 @@ class tgraphcanvas(FigureCanvas):
                     if self.flagstart or self.xgrid == 0:
                         self.set_xlabel('')
                     else:
-                        self.set_xlabel(f'{self.roastertype_setup} {self.roastersize_setup}kg')
+                        self.set_xlabel(f'{self.__dijstra_to_ascii(self.roastertype_setup)} {self.roastersize_setup}kg')
 
                     try:
                         y_label.set_in_layout(False) # remove y-axis labels from tight_layout calculation
@@ -8002,7 +8094,27 @@ class tgraphcanvas(FigureCanvas):
 
                     if self.delta_ax is not None:
                         self.ax.set_zorder(self.delta_ax.get_zorder()+1) # put ax in front of delta_ax (which remains empty!)
-                    if two_ax_mode and self.delta_ax is not None:
+
+                    self.ax.patch.set_visible(True)
+
+                    self.delta_ax.set_ylim(self.zlimit_min,self.zlimit)
+                    if self.zgrid > 0:
+                        self.delta_ax.yaxis.set_major_locator(ticker.MultipleLocator(self.zgrid))
+                        self.delta_ax.yaxis.set_minor_locator(ticker.AutoMinorLocator())
+                        for ii in self.delta_ax.get_yticklines():
+                            ii.set_markersize(10)
+                        for iiii in self.delta_ax.yaxis.get_minorticklines():
+                            iiii.set_markersize(5)
+                        for label in self.delta_ax.get_yticklabels() :
+                            label.set_fontsize('small')
+                        if not self.LCDdecimalplaces:
+                            self.delta_ax.minorticks_off()
+                    # translate y-coordinate from delta into temp range to ensure the cursor position display (x,y) coordinate in the temp axis
+                    self.delta_ax.fmt_ydata = self.fmt_data
+                    self.delta_ax.fmt_xdata = self.fmt_timedata
+                    self.delta_ax.yaxis.set_label_position('right')
+
+                    if two_ax_mode:
                         #create a second set of axes in the same position as self.ax
                         self.delta_ax.tick_params(\
                             axis='y',           # changes apply to the y-axis
@@ -8014,7 +8126,6 @@ class tgraphcanvas(FigureCanvas):
                             labelright=True,
                             labelleft=False,
                             labelbottom=False)   # labels along the bottom edge are off
-                        self.ax.patch.set_visible(True)
 
                         if self.flagstart or self.zgrid == 0:
                             y_label = self.delta_ax.set_ylabel('')
@@ -8024,38 +8135,22 @@ class tgraphcanvas(FigureCanvas):
                                 fontsize='medium',
                                 fontfamily=prop.get_family()
                                 )
-                        self.delta_ax.yaxis.set_label_position('right')
                         try:
                             y_label.set_in_layout(False) # remove y-axis labels from tight_layout calculation
                         except Exception: # pylint: disable=broad-except # set_in_layout not available in mpl<3.x
                             pass
-                        self.delta_ax.set_ylim(self.zlimit_min,self.zlimit)
-                        if self.zgrid > 0:
-                            self.delta_ax.yaxis.set_major_locator(ticker.MultipleLocator(self.zgrid))
-                            self.delta_ax.yaxis.set_minor_locator(ticker.AutoMinorLocator())
-                            for ii in self.delta_ax.get_yticklines():
-                                ii.set_markersize(10)
-                            for iiii in self.delta_ax.yaxis.get_minorticklines():
-                                iiii.set_markersize(5)
-                            for label in self.delta_ax.get_yticklabels() :
-                                label.set_fontsize('small')
-                            if not self.LCDdecimalplaces:
-                                self.delta_ax.minorticks_off()
-
-                        # translate y-coordinate from delta into temp range to ensure the cursor position display (x,y) coordinate in the temp axis
-                        self.delta_ax.fmt_ydata = self.fmt_data
-                        self.delta_ax.fmt_xdata = self.fmt_timedata
                     else:
+                        self.delta_ax.patch.set_visible(False)
                         self.delta_ax.tick_params(\
                             axis='y',
                             which='both',
                             right=False,
                             labelright=False)
 
-                    self.ax.spines['top'].set_color('0.40')
-                    self.ax.spines['bottom'].set_color('0.40')
-                    self.ax.spines['left'].set_color('0.40')
-                    self.ax.spines['right'].set_color('0.40')
+                    self.ax.spines['top'].set_color(xlabel_alpha_color)
+                    self.ax.spines['bottom'].set_color(xlabel_alpha_color)
+                    self.ax.spines['left'].set_color(ylabel_alpha_color)
+                    self.ax.spines['right'].set_color(ylabel_alpha_color)
 
                     self.ax.spines.top.set_visible(self.xgrid != 0 and self.ygrid != 0 and self.zgrid != 0)
                     self.ax.spines.bottom.set_visible(self.xgrid != 0)
@@ -8121,12 +8216,8 @@ class tgraphcanvas(FigureCanvas):
 
                     if forceRenewAxis:
                         for label in self.ax.get_xticklabels() :
-        # labels not rendered in PDF exports on MPL 3.4 if fontproperties are set:
-        #                    label.set_fontproperties(prop)
                             label.set_fontsize('small')
                         for label in self.ax.get_yticklabels() :
-        # labels not rendered in PDF exports on MPL 3.4 if fontproperties are set:
-        #                    label.set_fontproperties(prop)
                             label.set_fontsize('small')
 
                     rcParams['path.sketch'] = (0,0,0)
@@ -8135,11 +8226,14 @@ class tgraphcanvas(FigureCanvas):
                     #draw water marks for dry phase region, mid phase region, and finish phase region
                     if self.watermarksflag:
                         rect1 = patches.Rectangle((0,self.phases[0]), width=1, height=(self.phases[1]-self.phases[0]),
-                                                  transform=trans, color=self.palette['rect1'],alpha=0.15)
+                                                  transform=trans, color=self.palette['rect1'],alpha=0.15,
+                                                  path_effects=[])
                         rect2 = patches.Rectangle((0,self.phases[1]), width=1, height=(self.phases[2]-self.phases[1]),
-                                                  transform=trans, color=self.palette['rect2'],alpha=0.15)
+                                                  transform=trans, color=self.palette['rect2'],alpha=0.15,
+                                                  path_effects=[])
                         rect3 = patches.Rectangle((0,self.phases[2]), width=1, height=(self.phases[3] - self.phases[2]),
-                                                  transform=trans, color=self.palette['rect3'],alpha=0.15)
+                                                  transform=trans, color=self.palette['rect3'],alpha=0.15,
+                                                  path_effects=[])
                         self.ax.add_patch(rect1)
                         self.ax.add_patch(rect2)
                         self.ax.add_patch(rect3)
@@ -8158,7 +8252,14 @@ class tgraphcanvas(FigureCanvas):
                         jump = 20.
                         for i in range(4):
                             if self.showEtypes[3-i]:
-                                rectEvent = patches.Rectangle((0,self.phases[0]-start-jump), width=1, height = step, transform=trans, color=self.palette['rect5'],alpha=.15)
+                                rectEvent = patches.Rectangle(
+                                    (0,self.phases[0]-start-jump),
+                                    width=1,
+                                    height = step,
+                                    transform=trans,
+                                    color=self.palette['rect5'],
+                                    alpha=.15,
+                                    path_effects=[])
                                 self.ax.add_patch(rectEvent)
                             if self.mode == 'C':
                                 jump -= 10.
@@ -8195,7 +8296,14 @@ class tgraphcanvas(FigureCanvas):
                                 else:
                                     color = self.palette[c1] #self.palette["rect1"] # green # the even ones
                                 if i != 10: # don't draw the first and the last bar in clamp mode
-                                    rectEvent = patches.Rectangle((0,barposition), width=1, height = step, transform=trans, color=color,alpha=.15)
+                                    rectEvent = patches.Rectangle(
+                                        (0,barposition),
+                                        width=1,
+                                        height = step,
+                                        transform=trans,
+                                        color=color,
+                                        alpha=.15,
+                                        path_effects=[])
                                     self.ax.add_patch(rectEvent)
                             self.eventpositionbars[jj] = barposition
                             jump -= small_step
@@ -8887,9 +8995,6 @@ class tgraphcanvas(FigureCanvas):
 
                         #END of Background
 
-                    if self.patheffects:
-                        rcParams['path.effects'] = [PathEffects.withStroke(linewidth=self.patheffects, foreground=self.palette['background'])]
-
                     self.handles = []
                     self.labels = []
                     self.legend_lines = []
@@ -8971,7 +9076,13 @@ class tgraphcanvas(FigureCanvas):
                                 if len(netypes[p]) > 1:
                                     for i in range(len(netypes[p])-1):
                                         #draw differentiating color bars between events and place then in a different height according with type
-                                        rect = patches.Rectangle((netypes[p][i], row[ltr]), width = (netypes[p][i+1]-netypes[p][i]), height = step, color = rotating_colors[i%2],alpha=0.5)
+                                        rect = patches.Rectangle(
+                                            (netypes[p][i], row[ltr]),
+                                            width = (netypes[p][i+1]-netypes[p][i]),
+                                            height = step,
+                                            color = rotating_colors[i%2],
+                                            alpha=0.5,
+                                            path_effects=[])
                                         self.ax.add_patch(rect)
 
                             # annotate event
@@ -9567,9 +9678,14 @@ class tgraphcanvas(FigureCanvas):
                                 if not self.flagstart and self.aw.extraFill1[i] > 0:
                                     self.ax.fill_between(self.extratimex[i], 0, visible_extratemp1,transform=trans,color=self.extradevicecolor1[i],alpha=self.aw.extraFill1[i]/100.,sketch_params=None)
                                 self.extratemp1lines.append(self.ax.plot(self.extratimex[i],visible_extratemp1,transform=trans,color=self.extradevicecolor1[i],
-                                    sketch_params=None,path_effects=[PathEffects.withStroke(linewidth=self.extralinewidths1[i]+self.patheffects,foreground=self.palette['background'])],
-                                    markersize=self.extramarkersizes1[i],marker=self.extramarkers1[i],linewidth=self.extralinewidths1[i],linestyle=self.extralinestyles1[i],
-                                    drawstyle=self.extradrawstyles1[i],label=extraname1_subst[i])[0])
+                                    sketch_params=None,
+                                    path_effects=self.line_path_effects(self.glow, self.patheffects, self.aw.light_background_p, self.extralinewidths1[i],self.extradevicecolor1[i]),
+                                    markersize=self.extramarkersizes1[i],
+                                    marker=self.extramarkers1[i],
+                                    linewidth=self.extralinewidths1[i],
+                                    linestyle=self.extralinestyles1[i],
+                                    drawstyle=self.extradrawstyles1[i],
+                                    label=extraname1_subst[i])[0])
                         except Exception as ex: # pylint: disable=broad-except
                             _log.exception(ex)
                             _, _, exc_tb = sys.exc_info()
@@ -9605,8 +9721,14 @@ class tgraphcanvas(FigureCanvas):
                                 if not self.flagstart and self.aw.extraFill2[i] > 0:
                                     self.ax.fill_between(self.extratimex[i], 0, visible_extratemp2,transform=trans,color=self.extradevicecolor2[i],alpha=self.aw.extraFill2[i]/100.,sketch_params=None)
                                 self.extratemp2lines.append(self.ax.plot(self.extratimex[i],visible_extratemp2,transform=trans,color=self.extradevicecolor2[i],
-                                    sketch_params=None,path_effects=[PathEffects.withStroke(linewidth=self.extralinewidths2[i]+self.patheffects,foreground=self.palette['background'])],
-                                    markersize=self.extramarkersizes2[i],marker=self.extramarkers2[i],linewidth=self.extralinewidths2[i],linestyle=self.extralinestyles2[i],drawstyle=self.extradrawstyles2[i],label= extraname2_subst[i])[0])
+                                    sketch_params=None,
+                                    path_effects=self.line_path_effects(self.glow, self.patheffects, self.aw.light_background_p, self.extralinewidths2[i],self.extradevicecolor2[i]),
+                                    markersize=self.extramarkersizes2[i],
+                                    marker=self.extramarkers2[i],
+                                    linewidth=self.extralinewidths2[i],
+                                    linestyle=self.extralinestyles2[i],
+                                    drawstyle=self.extradrawstyles2[i],
+                                    label= extraname2_subst[i])[0])
                         except Exception as ex: # pylint: disable=broad-except
                             _log.exception(ex)
                             _, _, exc_tb = sys.exc_info()
@@ -9754,7 +9876,6 @@ class tgraphcanvas(FigureCanvas):
 
                     #write legend
                     if self.legendloc and not self.flagon and len(self.timex) > 2:
-                        rcParams['path.effects'] = []
                         prop = self.aw.mpl_fontproperties.copy()
                         prop.set_size('x-small')
                         if len(self.handles) > 7:
@@ -9763,8 +9884,7 @@ class tgraphcanvas(FigureCanvas):
                             ncol = int(math.ceil(len(self.handles)/2.))
                         else:
                             ncol = int(math.ceil(len(self.handles)))
-                        if self.graphfont == 1:
-                            self.labels = [self.__to_ascii(l) for l in self.labels]
+                        self.labels = [self.__dijstra_to_ascii(l) for l in self.labels]
                         loc:Union[int, Tuple[float,float]]
                         if self.legend is None:
                             if self.legendloc_pos is None:
@@ -9808,8 +9928,6 @@ class tgraphcanvas(FigureCanvas):
                         except Exception: # pylint: disable=broad-except
                             pass
 
-                        if self.patheffects:
-                            rcParams['path.effects'] = [PathEffects.withStroke(linewidth=self.patheffects, foreground=self.palette['background'])]
                     else:
                         self.legend = None
 
@@ -9862,9 +9980,6 @@ class tgraphcanvas(FigureCanvas):
                 ############  ready to plot ############
                 self.updateBackground() # update bitlblit backgrounds
                 #######################################
-
-                if self.patheffects:
-                    rcParams['path.effects'] = []
 
             except Exception as ex: # pylint: disable=broad-except
                 _log.exception(ex)
@@ -9950,16 +10065,16 @@ class tgraphcanvas(FigureCanvas):
             #background curve values
             if applyto == 'background':
                 e = self.backgroundEvalues[eventnum]
-                y1 = str(self.aw.float2float(self.temp1B[self.backgroundEvents[eventnum]],self.LCDdecimalplaces))
-                y2 = str(self.aw.float2float(self.temp2B[self.backgroundEvents[eventnum]],self.LCDdecimalplaces))
+                y1 = str(float2float(self.temp1B[self.backgroundEvents[eventnum]],self.LCDdecimalplaces))
+                y2 = str(float2float(self.temp2B[self.backgroundEvents[eventnum]],self.LCDdecimalplaces))
                 try:
                     d1b = self.delta1B[self.backgroundEvents[eventnum]]
-                    delta1 = str(self.aw.float2float(d1b)) if d1b is not None else '--'
+                    delta1 = str(float2float(d1b)) if d1b is not None else '--'
                 except Exception: # pylint: disable=broad-except
                     delta1 = '\u03C5\u03c5'
                 try:
                     d2b = self.delta2B[self.backgroundEvents[eventnum]]
-                    delta2 = str(self.aw.float2float(d2b)) if d2b is not None else '--'
+                    delta2 = str(float2float(d2b)) if d2b is not None else '--'
                 except Exception: # pylint: disable=broad-except
                     delta2 = '\u03C5\u03c5'
                 descr = str(self.backgroundEStrings[eventnum])
@@ -9968,26 +10083,26 @@ class tgraphcanvas(FigureCanvas):
 
                 if self.timeindexB[2] > 0 and self.timeB[self.backgroundEvents[eventnum]] > self.timeB[self.timeindexB[2]]:
                     postFCs = True
-                    dtr = str(self.aw.float2float(100 * (self.timeB[self.backgroundEvents[eventnum]] - self.timeB[self.timeindexB[2]]) / (self.timeB[self.backgroundEvents[eventnum]] - self.timeB[self.timeindexB[0]]),1))
+                    dtr = str(float2float(100 * (self.timeB[self.backgroundEvents[eventnum]] - self.timeB[self.timeindexB[2]]) / (self.timeB[self.backgroundEvents[eventnum]] - self.timeB[self.timeindexB[0]]),1))
                 else:
                     postFCs = False
                     dtr = '0'
                 if self.timeindexB[2] > 0:
-                    _dfcs = self.aw.float2float(self.timeB[self.backgroundEvents[eventnum]] - self.timeB[self.timeindexB[2]],0)
+                    _dfcs = float2float(self.timeB[self.backgroundEvents[eventnum]] - self.timeB[self.timeindexB[2]],0)
                     dfcs = str(_dfcs)
                     dfcs_ms = stringfromseconds(_dfcs,False)
                 else:
                     dfcs = '*'
                     dfcs_ms = '*'
                 if self.timeindexB[2] > 0 and self.timeB[self.backgroundEvents[eventnum]] < self.timeB[self.timeindexB[2]]:
-                    _prefcs = self.aw.float2float(self.timeB[self.timeindexB[2]] - self.timeB[self.backgroundEvents[eventnum]],0)
+                    _prefcs = float2float(self.timeB[self.timeindexB[2]] - self.timeB[self.backgroundEvents[eventnum]],0)
                     prefcs = str(_prefcs)
                     prefcs_ms = stringfromseconds(_prefcs,False)
                 else:
                     prefcs = '*'
                     prefcs_ms = '*'
                 if self.timeindexB[0] > -1:
-                    _dcharge = self.aw.float2float(self.timeB[self.backgroundEvents[eventnum]] - self.timeB[self.timeindexB[0]],0)
+                    _dcharge = float2float(self.timeB[self.backgroundEvents[eventnum]] - self.timeB[self.timeindexB[0]],0)
                     dcharge = str(_dcharge)
                     dcharge_ms = stringfromseconds(_dcharge,False)
                 else:
@@ -10022,16 +10137,16 @@ class tgraphcanvas(FigureCanvas):
             # foreground curve values
             else:
                 e = self.specialeventsvalue[eventnum]
-                y1 = str(self.aw.float2float(self.temp1[self.specialevents[eventnum]],self.LCDdecimalplaces))
-                y2 = str(self.aw.float2float(self.temp2[self.specialevents[eventnum]],self.LCDdecimalplaces))
+                y1 = str(float2float(self.temp1[self.specialevents[eventnum]],self.LCDdecimalplaces))
+                y2 = str(float2float(self.temp2[self.specialevents[eventnum]],self.LCDdecimalplaces))
                 try:
                     d1 = self.delta1[self.specialevents[eventnum]]
-                    delta1 = str(self.aw.float2float(d1)) if d1 is not None else '--'
+                    delta1 = str(float2float(d1)) if d1 is not None else '--'
                 except Exception: # pylint: disable=broad-except
                     delta1 = '\u03C5\u03c5'
                 try:
                     d2 = self.delta2[self.specialevents[eventnum]]
-                    delta2 = str(self.aw.float2float(d2)) if d2 is not None else '--'
+                    delta2 = str(float2float(d2)) if d2 is not None else '--'
                 except Exception: # pylint: disable=broad-except
                     delta2 = '\u03C5\u03c5'
                 descr = str(self.specialeventsStrings[eventnum])
@@ -10040,12 +10155,12 @@ class tgraphcanvas(FigureCanvas):
 
                 if self.timeindex[2] > 0 and self.timex[self.specialevents[eventnum]] > self.timex[self.timeindex[2]]:
                     postFCs = True
-                    dtr = str(self.aw.float2float(100 * (self.timex[self.specialevents[eventnum]] - self.timex[self.timeindex[2]]) / (self.timex[self.specialevents[eventnum]] - self.timex[self.timeindex[0]]),1))
+                    dtr = str(float2float(100 * (self.timex[self.specialevents[eventnum]] - self.timex[self.timeindex[2]]) / (self.timex[self.specialevents[eventnum]] - self.timex[self.timeindex[0]]),1))
                 else:
                     postFCs = False
                     dtr = '0'
                 if self.timeindex[2] > 0:
-                    _dfcs = self.aw.float2float(self.timex[self.specialevents[eventnum]] - self.timex[self.timeindex[2]],0)
+                    _dfcs = float2float(self.timex[self.specialevents[eventnum]] - self.timex[self.timeindex[2]],0)
                     dfcs = str(_dfcs)
                     dfcs_ms = stringfromseconds(_dfcs,False)
 #                    print(f'{dfcs_ms=}')
@@ -10053,14 +10168,14 @@ class tgraphcanvas(FigureCanvas):
                     dfcs = '*'
                     dfcs_ms = '*'
                 if self.timeindex[2] > 0 and self.timex[self.specialevents[eventnum]] < self.timex[self.timeindex[2]]:
-                    _prefcs = self.aw.float2float(self.timex[self.timeindex[2]] - self.timex[self.specialevents[eventnum]],0)
+                    _prefcs = float2float(self.timex[self.timeindex[2]] - self.timex[self.specialevents[eventnum]],0)
                     prefcs = str(_prefcs)
                     prefcs_ms = stringfromseconds(_prefcs,False)
                 else:
                     prefcs = '*'
                     prefcs_ms = '*'
                 if self.timeindex[0] > -1:
-                    _dcharge = self.aw.float2float(self.timex[self.specialevents[eventnum]] - self.timex[self.timeindex[0]],0)
+                    _dcharge = float2float(self.timex[self.specialevents[eventnum]] - self.timex[self.timeindex[0]],0)
                     dcharge = str(_dcharge)
                     dcharge_ms = stringfromseconds(_dcharge,False)
                 else:
@@ -10113,17 +10228,17 @@ class tgraphcanvas(FigureCanvas):
 
             #text between single quotes ' will show only before FCs
 
-            eventanno = re.sub(r'{pd}([^{pd}]+){pd}'.format(pd=preFCsDelim), # noqa: UP032
-                r'\1',eventanno) if not postFCs else re.sub(r'{pd}([^{pd}]+){pd}'.format(pd=preFCsDelim),
+            eventanno = re.sub(fr'{preFCsDelim}([^{preFCsDelim}]+){preFCsDelim}',
+                r'\1',eventanno) if not postFCs else re.sub(fr'{preFCsDelim}([^{preFCsDelim}]+){preFCsDelim}',
                 r'',eventanno)
             #text between double quotes " will show only after FCs
-            eventanno = re.sub(r'{pd}([^{pd}]+){pd}'.format(pd=postFCsDelim),
-                r'\1',eventanno) if postFCs else re.sub(r'{pd}([^{pd}]+){pd}'.format(pd=postFCsDelim),
+            eventanno = re.sub(fr'{postFCsDelim}([^{postFCsDelim}]+){postFCsDelim}',
+                r'\1',eventanno) if postFCs else re.sub(fr'{postFCsDelim}([^{postFCsDelim}]+){postFCsDelim}',
                 r'',eventanno)
 
             #text between back ticks ` will show only within 90 seconds before FCs
-            eventanno = re.sub(r'{wd}([^{wd}]+){wd}'.format(wd=fcsWindowDelim),
-                r'\1',eventanno) if (fcsWindow) else re.sub(r'{wd}([^{wd}]+){wd}'.format(wd=fcsWindowDelim),
+            eventanno = re.sub(fr'{fcsWindowDelim}([^{fcsWindowDelim}]+){fcsWindowDelim}',
+                r'\1',eventanno) if (fcsWindow) else re.sub(fr'{fcsWindowDelim}([^{fcsWindowDelim}]+){fcsWindowDelim}',
                 r'',eventanno)
 
             # substitute numeric to nominal values if in the annotationstring
@@ -10170,7 +10285,7 @@ class tgraphcanvas(FigureCanvas):
                     # do simple math if an operator is in the string
                     if matched.group('mathop') is not None:
                         replacestring += matched.group('mathop')
-                        replacestring = str(self.aw.float2float(eval(replacestring),1)) # pylint: disable=eval-used
+                        replacestring = str(float2float(eval(replacestring),1)) # pylint: disable=eval-used
 
                     pattern = re.compile(fr'{fieldDelim}{field[0]}([/*+-][0-9.]+)?',_ignorecase)
                     eventanno = pattern.sub(replacestring,eventanno)
@@ -10249,7 +10364,15 @@ class tgraphcanvas(FigureCanvas):
                 self.logoimg = self.convertQImageToNumpyArray(newImage)
                 self.aw.logofilename = filename
                 self.aw.sendmessage(QApplication.translate('Message','Loaded watermark image {0}').format(filename))
-                QTimer.singleShot(500, lambda : self.redraw(recomputeAllDeltas=False)) #some time needed before the redraw on artisan start with no profile loaded.  processevents() does not work here.
+#                QTimer.singleShot(500, lambda : self.redraw(recomputeAllDeltas=False)) #some time needed before the redraw on artisan start with no profile loaded.  processevents() does not work here.
+                # we avoid a potentially leaking QTimer.signleShot with lambda by emitting a signal
+                self.redrawSignal.emit(
+                    False, # recomputeAllDeltas (default: True)
+                    True, # re_smooth_foreground (default: True)
+                    True,  # takelock (default: True)
+                    False, # forceRenewAxis (default: False)
+                    False, # re_smooth_background (default: False)
+                    )
             else:
                 self.aw.sendmessage(QApplication.translate('Message','Unable to load watermark image {0}').format(filename))
                 _log.info('Unable to load watermark image %s', filename)
@@ -10308,7 +10431,7 @@ class tgraphcanvas(FigureCanvas):
                     if self.ambient_humidity not in [None,0]:
                         statstr_segments += [str(int(round(self.ambient_humidity))), '%  ']
                     if self.ambient_pressure not in [None,0]:
-                        statstr_segments += [str(self.aw.float2float(self.ambient_pressure,2)), 'hPa']
+                        statstr_segments += [str(float2float(self.ambient_pressure,2)), 'hPa']
                 if self.roastertype or self.drumspeed:
                     statstr_segments.append(skipline)
                     if self.roastertype:
@@ -10338,25 +10461,26 @@ class tgraphcanvas(FigureCanvas):
 
                 if self.density[0]!=0 and self.density[2] != 0:
                     statstr_segments += ['\n', QApplication.translate('AddlInfo', 'Density Green'), ': ',
-                        str(self.aw.float2float(self.density[0]/self.density[2],2)), ' ', self.density[1], '/', self.density[3]]
+                        str(float2float(self.density[0]/self.density[2],2)), ' ', self.density[1], '/', self.density[3]]
                 if self.moisture_greens:
-                    statstr_segments += ['\n', QApplication.translate('AddlInfo', 'Moisture Green'), ': ', str(self.aw.float2float(self.moisture_greens,1)), '%']
+                    statstr_segments += ['\n', QApplication.translate('AddlInfo', 'Moisture Green'), ': ', str(float2float(self.moisture_greens,1)), '%']
                 if self.weight[0] != 0:
                     if self.weight[2] == 'g':
-                        w =str(self.aw.float2float(self.weight[0],0))
+                        w =str(float2float(self.weight[0],0))
                     else:
-                        w = str(self.aw.float2float(self.weight[0],2))
+                        w = str(float2float(self.weight[0],2))
                     statstr_segments += ['\n', self.__dijstra_to_ascii(QApplication.translate('AddlInfo', 'Batch Size')) , ': ', w, self.weight[2], ' ']
                     if self.weight[1]:
-                        statstr_segments += ['(-', str(self.aw.float2float(self.aw.weight_loss(self.weight[0],self.weight[1]),1)), '%)']
+                        statstr_segments += ['(-', str(float2float(self.aw.weight_loss(self.weight[0],self.weight[1]),1)), '%)']
 
                 # Roast Info Section
                 statstr_segments.append(skipline)
-                if 'roasted_density' in cp:
-                    statstr_segments += ['\n', self.__dijstra_to_ascii(QApplication.translate('AddlInfo', 'Density Roasted')), ': ', str(cp['roasted_density']),
-                        ' ', self.density[1], '/', self.density[3]]
+                roasted_density = (self.aw.qmc.density_roasted[0] if self.aw.qmc.density_roasted[0] != 0 else cp.get('roasted_density', 0))
+                if roasted_density:
+                    statstr_segments += ['\n', self.__dijstra_to_ascii(QApplication.translate('AddlInfo', 'Density Roasted')), ': ', str(roasted_density),
+                        ' ', self.density_roasted[1], '/', self.density_roasted[3]]
                 if self.moisture_roasted:
-                    statstr_segments += ['\n', self.__dijstra_to_ascii(QApplication.translate('AddlInfo', 'Moisture Roasted')), ': ', str(self.aw.float2float(self.moisture_roasted,1)), '%']
+                    statstr_segments += ['\n', self.__dijstra_to_ascii(QApplication.translate('AddlInfo', 'Moisture Roasted')), ': ', str(float2float(self.moisture_roasted,1)), '%']
                 if self.whole_color > 0:
                     statstr_segments += ['\n', QApplication.translate('AddlInfo', 'Whole Color'), ': #', str(self.whole_color), ' ',
                         str(self.color_systems[self.color_system_idx])]
@@ -10365,13 +10489,13 @@ class tgraphcanvas(FigureCanvas):
                         str(self.color_systems[self.color_system_idx])]
                 if 'BTU_batch' in cp and cp['BTU_batch']:
                     statstr_segments += ['\n', QApplication.translate('AddlInfo', 'Energy'), ': ',
-                        str(self.aw.float2float(self.convertHeat(cp['BTU_batch'],0,3),2)), 'kWh']
+                        str(float2float(self.convertHeat(cp['BTU_batch'],0,3),2)), 'kWh']
                     if 'BTU_batch_per_green_kg' in cp and cp['BTU_batch_per_green_kg']:
-                        statstr_segments += [' (', str(self.aw.float2float(self.convertHeat(cp['BTU_batch_per_green_kg'], 0,3), 2)), 'kWh/kg)']
+                        statstr_segments += [' (', str(float2float(self.convertHeat(cp['BTU_batch_per_green_kg'], 0,3), 2)), 'kWh/kg)']
                 if 'CO2_batch' in cp and cp['CO2_batch']:
-                    statstr_segments += ['\n', QApplication.translate('AddlInfo', 'CO2'), ': ', str(self.aw.float2float(cp['CO2_batch'],0)),'g']
+                    statstr_segments += ['\n', QApplication.translate('AddlInfo', 'CO2'), ': ', str(float2float(cp['CO2_batch'],0)),'g']
                     if 'CO2_batch_per_green_kg' in cp and cp['CO2_batch_per_green_kg']:
-                        statstr_segments += [' (', str(self.aw.float2float(cp['CO2_batch_per_green_kg'],0)), 'g/kg)']
+                        statstr_segments += [' (', str(float2float(cp['CO2_batch_per_green_kg'],0)), 'g/kg)']
                 if cp['AUC']:
                     statstr_segments += ['\n', QApplication.translate('AddlInfo', 'AUC'), ': ', str(cp['AUC']), 'C*min [', str(cp['AUCbase']), '\u00b0', self.mode, ']']
 
@@ -10389,7 +10513,7 @@ class tgraphcanvas(FigureCanvas):
 
                 cupping_score, cupping_all_default = self.aw.cuppingSum(self.flavors)
                 if not cupping_all_default:
-                    statstr_segments += ['\n', QApplication.translate('HTML Report Template', 'Cupping:'), ' ', str(self.aw.float2float(cupping_score))]
+                    statstr_segments += ['\n', QApplication.translate('HTML Report Template', 'Cupping:'), ' ', str(float2float(cupping_score))]
 
                 render_notes(self.cuppingnotes,statstr_segments)
 
@@ -10472,8 +10596,17 @@ class tgraphcanvas(FigureCanvas):
                     pos_x = eventtext_end + border + start
 
                 pos_y = statsheight
-#               self.stats_summary_rect = patches.Rectangle((pos_x-margin,pos_y+margin),stats_textbox_width+2*margin,-stats_textbox_height-2*margin,linewidth=0.5,edgecolor=self.palette["grid"],facecolor=fc,fill=True,alpha=a,zorder=10)
-                self.stats_summary_rect = patches.Rectangle((pos_x-margin,pos_y - (stats_textbox_height + 2*margin)),stats_textbox_width+2*margin,stats_textbox_height+3*margin,linewidth=0.5,edgecolor=self.palette['grid'],facecolor=fc,fill=True,alpha=a,zorder=10)
+                self.stats_summary_rect = patches.Rectangle(
+                        (pos_x-margin,pos_y - (stats_textbox_height + 2*margin)),
+                        stats_textbox_width+2*margin,
+                        stats_textbox_height+3*margin,
+                        linewidth=0.5,
+                        edgecolor=self.palette['grid'],
+                        facecolor=fc,
+                        fill=True,
+                        alpha=a,
+                        zorder=10,
+                        path_effects=[])
                 self.ax.add_patch(self.stats_summary_rect)
 
                 text = self.ax.text(pos_x, pos_y, statstr, verticalalignment='top',linespacing=ls,
@@ -10549,12 +10682,13 @@ class tgraphcanvas(FigureCanvas):
         if self.aw is not None and self.mode != self.mode_tempsliders:
             for i in range(4):
                 if self.aw.eventslidertemp[i]:
+                    # a minimum of 0 will be mapped to 0 always!
                     if self.mode == 'C':
-                        self.aw.eventslidermin[i] = int(round(fromFtoCstrict(self.aw.eventslidermin[i])))
-                        self.aw.eventslidermax[i] = int(round(fromFtoCstrict(self.aw.eventslidermax[i])))
+                        self.aw.eventslidermin[i] = (0 if self.aw.eventslidermin[i] == 0 else max(0, min(999, int(round(fromFtoCstrict(self.aw.eventslidermin[i]))))))
+                        self.aw.eventslidermax[i] = max(0, min(999, int(round(fromFtoCstrict(self.aw.eventslidermax[i])))))
                     else:
-                        self.aw.eventslidermin[i] = int(round(fromCtoFstrict(self.aw.eventslidermin[i])))
-                        self.aw.eventslidermax[i] = int(round(fromCtoFstrict(self.aw.eventslidermax[i])))
+                        self.aw.eventslidermin[i] = (0 if self.aw.eventslidermin[i] == 0 else max(0, min(999, int(round(fromCtoFstrict(self.aw.eventslidermin[i]))))))
+                        self.aw.eventslidermax[i] = max(0, min(999, int(round(fromCtoFstrict(self.aw.eventslidermax[i])))))
             self.aw.updateSliderMinMax()
             # adjust SV slider limits
             if self.mode == 'C':
@@ -10580,6 +10714,9 @@ class tgraphcanvas(FigureCanvas):
             if self.step100temp is not None:
                 self.step100temp = int(round(fromCtoFstrict(self.step100temp)))
             self.AUCbase = int(round(fromCtoFstrict(self.AUCbase)))
+            self.dropDuplicatesLimit = fromCtoFstrict(100 + self.dropDuplicatesLimit) - fromCtoFstrict(100)
+            self.RoRlimitm = int(round(fromCtoFstrict(self.RoRlimitm)))
+            self.RoRlimit = int(round(fromCtoFstrict(self.RoRlimit)))
             self.alarmtemperature = [(fromCtoFstrict(t) if t != 500 else t) for t in self.alarmtemperature]
 #            # conv Arduino mode
 #            if self.aw:
@@ -10614,6 +10751,9 @@ class tgraphcanvas(FigureCanvas):
             if self.step100temp is not None:
                 self.step100temp = int(round(fromFtoCstrict(self.step100temp)))
             self.AUCbase = int(round(fromFtoCstrict(self.AUCbase)))
+            self.dropDuplicatesLimit = fromFtoCstrict(212 + self.dropDuplicatesLimit) - fromFtoCstrict(212)
+            self.RoRlimitm = int(round(fromFtoCstrict(self.RoRlimitm)))
+            self.RoRlimit = int(round(fromFtoCstrict(self.RoRlimit)))
             self.alarmtemperature = [(fromFtoCstrict(t) if t != 500 else t) for t in self.alarmtemperature]
 #            # conv Arduino mode
 #            self.aw.pidcontrol.conv2celsius()
@@ -11344,7 +11484,7 @@ class tgraphcanvas(FigureCanvas):
         try:
             self.generateNoneTempHints()
             self.block_update = True # block the updating of the bitblit canvas (unblocked at the end of this function to avoid multiple redraws)
-            res = self.reset(redraw=False, soundOn=False, keepProperties=True)
+            res = self.reset(redraw=False, soundOn=False, keepProperties=True, onMonitor=True)
             if not res: # reset canceled
                 return
 
@@ -11429,7 +11569,7 @@ class tgraphcanvas(FigureCanvas):
                             connected_handler=lambda : self.aw.sendmessageSignal.emit(QApplication.translate('Message', '{} connected').format('IKAWA'),True,None),
                             disconnected_handler=lambda : self.aw.sendmessageSignal.emit(QApplication.translate('Message', '{} disconnected').format('IKAWA'),True,None))
                         if self.aw.ikawa is not None:
-                            self.aw.ikawa.start()
+                            self.aw.ikawa.start(self.device_logging)
                             self.aw.sendmessageSignal.emit(QApplication.translate('Message', 'scanning for device'),True,None)
                     except Exception as ex:  # pylint: disable=broad-except
                         _log.error(ex)
@@ -11437,6 +11577,10 @@ class tgraphcanvas(FigureCanvas):
                         self.adderror((QApplication.translate('Error Message', 'Exception:') + ' Bluetooth BLE support not available {0}').format(str(ex)),getattr(exc_tb, 'tb_lineno', '?'))
 
             self.aw.initializedMonitoringExtraDeviceStructures()
+
+            # reset LCD int/float cache
+            #_log.info("intChannel cache: %s",self.intChannel.cache_info())
+            self.intChannel.cache_clear()
 
             #reset alarms
             self.silent_alarms = False
@@ -11495,7 +11639,7 @@ class tgraphcanvas(FigureCanvas):
 
             if not bool(self.aw.simulator):
                 QTimer.singleShot(300,self.StartAsyncSamplingAction)
-            _log.info('MODE: ON MONITOR (sampling @%ss)', self.aw.float2float(self.delay/1000))
+            _log.info('MODE: ON MONITOR (sampling @%ss)', float2float(self.delay/1000))
         except Exception as ex: # pylint: disable=broad-except
             _log.exception(ex)
             _, _, exc_tb = sys.exc_info()
@@ -11509,6 +11653,12 @@ class tgraphcanvas(FigureCanvas):
         _log.debug('MODE: OffMonitorCloseDown')
         try:
             self.threadserver.terminatingSignal.disconnect(self.OffMonitorCloseDown)
+
+            # reset WebLCDs
+            resLCD = '-.-' if self.LCDdecimalplaces else '--'
+            if self.aw.WebLCDs:
+                self.updateWebLCDs(bt=resLCD,et=resLCD)
+
             if len(self.timex) < 3:
                 # clear data from monitoring-only mode
                 self.clearMeasurements()
@@ -11539,6 +11689,11 @@ class tgraphcanvas(FigureCanvas):
                 # disconnect IKAWA
                 if not bool(self.aw.simulator) and self.device == 142 and self.aw.ikawa is not None:
                     self.aw.ikawa.stop()
+                    try:
+                        if self.aw.ikawa.ambient_pressure != -1:
+                            self.ambient_pressure = self.aw.ikawa.ambient_pressure
+                    except Exception as e: # pylint: disable=broad-except
+                        _log.error(e)
                     self.aw.ikawa = None
 
                 # at OFF we stop the follow-background on FujiPIDs and set the SV to 0
@@ -11579,10 +11734,7 @@ class tgraphcanvas(FigureCanvas):
             self.aw.buttonONOFF.setText(QApplication.translate('Button', 'ON')) # text means click to turn OFF (it is ON)
             # reset time LCD color to the default (might have been changed to red due to long cooling!)
             self.aw.updateReadingsLCDsVisibility()
-            # reset WebLCDs
-            resLCD = '-.-' if self.LCDdecimalplaces else '--'
-            if self.aw.WebLCDs:
-                self.updateWebLCDs(bt=resLCD,et=resLCD)
+
             if not self.aw.HottopControlActive:
                 self.aw.hideExtraButtons(changeDefault=False)
             self.aw.updateSlidersVisibility() # update visibility of sliders based on the users preference
@@ -11674,6 +11826,7 @@ class tgraphcanvas(FigureCanvas):
                 except Exception as e: # pylint: disable=broad-except
                     _log.exception(e)
 
+
                 self.threadserver.terminatingSignal.connect(self.OffMonitorCloseDown)
                 self.flagon = False
 
@@ -11724,7 +11877,7 @@ class tgraphcanvas(FigureCanvas):
 
             # set and report
             if humidity is not None:
-                self.ambient_humidity = self.aw.float2float(humidity,1)
+                self.ambient_humidity = float2float(humidity,1)
                 self.ambient_humidity_sampled = self.ambient_humidity
                 self.aw.sendmessage(QApplication.translate('Message','Humidity: {}%').format(self.ambient_humidity))
                 libtime.sleep(1)
@@ -11732,13 +11885,13 @@ class tgraphcanvas(FigureCanvas):
             if temp is not None:
                 if self.mode == 'F':
                     temp = fromCtoFstrict(temp)
-                self.ambientTemp = self.aw.float2float(temp,1)
+                self.ambientTemp = float2float(temp,1)
                 self.ambientTemp_sampled = self.ambientTemp
                 self.aw.sendmessage(QApplication.translate('Message','Temperature: {}{}').format(self.ambientTemp,self.mode))
                 libtime.sleep(1)
 
             if pressure is not None:
-                self.ambient_pressure = self.aw.float2float(pressure,1)
+                self.ambient_pressure = float2float(pressure,1)
                 self.ambient_pressure_sampled = self.ambient_pressure
                 self.aw.sendmessage(QApplication.translate('Message','Pressure: {}hPa').format(self.ambient_pressure))
         except Exception as e:  # pylint: disable=broad-except
@@ -12294,7 +12447,7 @@ class tgraphcanvas(FigureCanvas):
                                     slidervalue = self.aw.slider4.value()
                                 # only mark events that are non-zero # and have not been marked before not to duplicate the event values
                                 if slidervalue != 0: #  and slidernr not in self.specialeventstype:
-                                    value = self.aw.float2float((slidervalue + 10.0) / 10.0)
+                                    value = float2float((slidervalue + 10.0) / 10.0)
                                     # note that EventRecordAction avoids to generate events were type and value matches to the previously recorded one
                                     self.EventRecordAction(extraevent = 1,eventtype=slidernr,eventvalue=value,takeLock=False,doupdategraphics=False)
                                     # we don't take another lock in EventRecordAction as we already hold that lock!
@@ -12359,7 +12512,7 @@ class tgraphcanvas(FigureCanvas):
                     if time_temp_annos is not None:
                         self.l_annotations += time_temp_annos
                     self.updateBackground() # but we need to update the background cache with the new annotation
-                    st2 = f'{temp:.1f} {self.mode}'
+                    st2 = f'{temp:.1f}{self.mode}'
                     message = QApplication.translate('Message','[TP] recorded at {0} BT = {1}').format(st,st2)
                     #set message at bottom
                     self.aw.sendmessage(message)
@@ -12480,7 +12633,7 @@ class tgraphcanvas(FigureCanvas):
                         else:
                             start = 0
                         st = stringfromseconds(self.timex[self.timeindex[1]]-start)
-                        st2 = f'{self.temp2[self.timeindex[1]]:.1f} {self.mode}'
+                        st2 = f'{self.temp2[self.timeindex[1]]:.1f}{self.mode}'
                         message = QApplication.translate('Message','[DRY END] recorded at {0} BT = {1}').format(st,st2)
                         #set message at bottom
                         self.aw.sendmessage(message)
@@ -12595,7 +12748,7 @@ class tgraphcanvas(FigureCanvas):
                     else:
                         start = 0
                     st1 = stringfromseconds(self.timex[self.timeindex[2]]-start)
-                    st2 = f'{self.temp2[self.timeindex[2]]:.1f} {self.mode}'
+                    st2 = f'{self.temp2[self.timeindex[2]]:.1f}{self.mode}'
                     message = QApplication.translate('Message','[FC START] recorded at {0} BT = {1}').format(st1,st2)
                     self.aw.sendmessage(message)
                 self.aw.onMarkMoveToNext(self.aw.buttonFCs)
@@ -12705,7 +12858,7 @@ class tgraphcanvas(FigureCanvas):
                     else:
                         start = 0
                     st1 = stringfromseconds(self.timex[self.timeindex[3]]-start)
-                    st2 = f'{self.temp2[self.timeindex[3]]:.1f} {self.mode}'
+                    st2 = f'{self.temp2[self.timeindex[3]]:.1f}{self.mode}'
                     message = QApplication.translate('Message','[FC END] recorded at {0} BT = {1}').format(st1,st2)
                     self.aw.sendmessage(message)
                 self.aw.onMarkMoveToNext(self.aw.buttonFCe)
@@ -12819,7 +12972,7 @@ class tgraphcanvas(FigureCanvas):
                             start = 0
                         try:
                             st1 = stringfromseconds(self.timex[self.timeindex[4]]-start)
-                            st2 = f'{self.temp2[self.timeindex[4]]:.1f} {self.mode}'
+                            st2 = f'{self.temp2[self.timeindex[4]]:.1f}{self.mode}'
                         except Exception: # pylint: disable=broad-except
                             pass
                         message = QApplication.translate('Message','[SC START] recorded at {0} BT = {1}').format(st1,st2)
@@ -12936,7 +13089,7 @@ class tgraphcanvas(FigureCanvas):
                     else:
                         start = 0
                     st1 = stringfromseconds(self.timex[self.timeindex[5]]-start)
-                    st2 = f'{self.temp2[self.timeindex[5]]:.1f} {self.mode}'
+                    st2 = f'{self.temp2[self.timeindex[5]]:.1f}{self.mode}'
                     message = QApplication.translate('Message','[SC END] recorded at {0} BT = {1}').format(st1,st2)
                     self.aw.sendmessage(message)
                 self.aw.onMarkMoveToNext(self.aw.buttonSCe)
@@ -13239,7 +13392,7 @@ class tgraphcanvas(FigureCanvas):
                     else:
                         start = 0
                     st1 = stringfromseconds(self.timex[self.timeindex[7]]-start)
-                    st2 = f'{self.temp2[self.timeindex[7]]:.1f} {self.mode}'
+                    st2 = f'{self.temp2[self.timeindex[7]]:.1f}{self.mode}'
                     message = QApplication.translate('Message','[COOL END] recorded at {0} BT = {1}').format(st1,st2)
                     #set message at bottom
                     self.aw.sendmessage(message)
@@ -13577,13 +13730,13 @@ class tgraphcanvas(FigureCanvas):
                                         pass
                         if doupdatebackground:
                             self.updateBackground() # call to canvas.draw() not needed as self.annotate does the (partial) redraw, but updateBackground() is needed
-                        temp2 = f'{self.temp2[i]:.1f} {self.mode}'
+                        temp2 = f'{self.temp2[i]:.1f}{self.mode}'
                         if self.timeindex[0] != -1:
                             start = self.timex[self.timeindex[0]]
                         else:
                             start = 0
                         timed = stringfromseconds(self.timex[i] - start)
-                        message = QApplication.translate('Message','Event # {0} recorded at BT = {1} Time = {2}').format(str(Nevents+1),temp2,timed)
+                        message = QApplication.translate('Message','Event # {0} recorded at BT = {1}{2} Time = {3}').format(str(Nevents+1),temp2,self.mode,timed)
                         self.aw.sendmessage(message)
                         #write label in mini recorder if flag checked
                         self.aw.eventlabel.setText(QApplication.translate('Label', 'Event #<b>{0} </b>').format(Nevents+1))
@@ -13633,7 +13786,7 @@ class tgraphcanvas(FigureCanvas):
                     else:
                         start = 0
                     timed = stringfromseconds(self.timex[i]-start)
-                    message = QApplication.translate('Message','Computer Event # {0} recorded at BT = {1} Time = {2}').format(str(Nevents+1),temp_str,timed)
+                    message = QApplication.translate('Message','Event # {0} recorded at BT = {1}{2} Time = {3}').format(str(Nevents+1),temp_str,self.mode,timed)
                     self.aw.sendmessage(message)
                     #write label in mini recorder if flag checked
                     self.aw.eNumberSpinBox.setValue(Nevents+1)
@@ -13723,7 +13876,7 @@ class tgraphcanvas(FigureCanvas):
                 if self.idx_met is not None:
                     if self.timeindex[2] != 0:
                         # time between MET and FCs
-                        met_delta = self.aw.float2float(self.timex[self.timeindex[2]] - self.timex[self.idx_met],0)
+                        met_delta = float2float(self.timex[self.timeindex[2]] - self.timex[self.idx_met],0)
                     else:
                         met_delta = None
                     self.met_timex_temp1_delta = ((self.timex[self.idx_met]-self.timex[self.timeindex[0]]), met_temp, met_delta) #used in onpick() to display the MET temp and time
@@ -13836,13 +13989,13 @@ class tgraphcanvas(FigureCanvas):
                         msg = f"{msg} {abbrevString(self.beans.replace(chr(10),' '),25)}"
                     if self.weight[0]:
                         if self.weight[2] in {'g', 'oz'}:
-                            msg += f'{sep}{self.aw.float2float(self.weight[0],0)}{self.weight[2]}'
+                            msg += f'{sep}{float2float(self.weight[0],0)}{self.weight[2]}'
                         else:
-                            msg += f'{sep}{self.aw.float2float(self.weight[0],1)}{self.weight[2]}'
+                            msg += f'{sep}{float2float(self.weight[0],1)}{self.weight[2]}'
                         if self.weight[1]:
-                            msg += f'{sep}{-1*self.aw.float2float(self.aw.weight_loss(self.weight[0],self.weight[1]),1)}%'
+                            msg += f'{sep}{-1*float2float(self.aw.weight_loss(self.weight[0],self.weight[1]),1)}%'
                     if self.volume[0] and self.volume[1]:
-                        msg += f'{sep}{self.aw.float2float(self.aw.volume_increase(self.volume[0],self.volume[1]),1)}%'
+                        msg += f'{sep}{float2float(self.aw.volume_increase(self.volume[0],self.volume[1]),1)}%'
                     if self.whole_color and self.ground_color:
                         msg += f'{sep}#{self.whole_color}/{self.ground_color}'
                     elif self.ground_color:
@@ -13954,14 +14107,15 @@ class tgraphcanvas(FigureCanvas):
 
                 #if DROP
                 if self.timeindex[6] and self.timeindex[2]:
-                    totaltime = self.timex[self.timeindex[6]]-self.timex[self.timeindex[0]]
+                    starttime = (self.timex[self.timeindex[0]] if -1 < self.timeindex[0] < len(self.timex) else 0)
+                    totaltime = self.timex[self.timeindex[6]]-starttime
                     if totaltime == 0:
                         return dryEndIndex, statisticstimes
 
                     statisticstimes[0] = totaltime
-                    dryphasetime = dryEndTime - self.timex[self.timeindex[0]] # self.aw.float2float(dryEndTime - self.timex[self.timeindex[0]])
-                    midphasetime = self.timex[self.timeindex[2]] - dryEndTime # self.aw.float2float(self.timex[self.timeindex[2]] - dryEndTime)
-                    finishphasetime = self.timex[self.timeindex[6]] - self.timex[self.timeindex[2]] # self.aw.float2float(self.timex[self.timeindex[6]] - self.timex[self.timeindex[2]])
+                    dryphasetime = dryEndTime - starttime # float2float(dryEndTime - starttime)
+                    midphasetime = self.timex[self.timeindex[2]] - dryEndTime # float2float(self.timex[self.timeindex[2]] - dryEndTime)
+                    finishphasetime = self.timex[self.timeindex[6]] - self.timex[self.timeindex[2]] # float2float(self.timex[self.timeindex[6]] - self.timex[self.timeindex[2]])
 
                     if self.timeindex[7]:
                         coolphasetime = self.timex[self.timeindex[7]] - self.timex[self.timeindex[6]] # int(round(self.timex[self.timeindex[7]] - self.timex[self.timeindex[6]]))
@@ -13986,6 +14140,8 @@ class tgraphcanvas(FigureCanvas):
                 return
 
             LP:Optional[float] = None
+
+            starttime = (self.timex[self.timeindex[0]] if -1 < self.timeindex[0] < len(self.timex) else 0)
 
             dryEndIndex, statisticstimes = self.calcStatistics(TP_index)
 
@@ -14033,26 +14189,50 @@ class tgraphcanvas(FigureCanvas):
 
                     #Draw cool phase rectangle
                     if self.timeindex[7]:
-                        rect = patches.Rectangle((self.timex[self.timeindex[6]], statisticsheight), width = self.statisticstimes[4], height = statisticsbarheight,
-                                                color = self.palette['rect4'],alpha=0.5)
+                        rect = patches.Rectangle(
+                                (self.timex[self.timeindex[6]], statisticsheight),
+                                width = self.statisticstimes[4],
+                                height = statisticsbarheight,
+                                color = self.palette['rect4'],
+                                alpha=0.5,
+                                path_effects=[])
                         self.ax.add_patch(rect)
 
                     if self.timeindex[2]: # only if FCs exists
                         #Draw finish phase rectangle
                         #check to see if end of 1C exists. If so, use half between start of 1C and end of 1C. Otherwise use only the start of 1C
-                        rect = patches.Rectangle((self.timex[self.timeindex[2]], statisticsheight), width = self.statisticstimes[3], height = statisticsbarheight,
-                                                color = self.palette['rect3'],alpha=0.5)
+                        rect = patches.Rectangle(
+                                (self.timex[self.timeindex[2]], statisticsheight),
+                                width = self.statisticstimes[3],
+                                height = statisticsbarheight,
+                                color = self.palette['rect3'],
+                                alpha=0.5,
+                                path_effects=[])
                         self.ax.add_patch(rect)
 
                         # Draw mid phase rectangle
-                        rect = patches.Rectangle((self.timex[self.timeindex[0]]+self.statisticstimes[1], statisticsheight), width = self.statisticstimes[2], height = statisticsbarheight,
-                                              color = self.palette['rect2'],alpha=0.5)
+                        rect = patches.Rectangle(
+                                (starttime+self.statisticstimes[1],
+                                statisticsheight),
+                                width = self.statisticstimes[2],
+                                height = statisticsbarheight,
+                                color = self.palette['rect2'],
+                                alpha=0.5,
+                                path_effects=[])
                         self.ax.add_patch(rect)
 
                     # Draw dry phase rectangle
-                    rect = patches.Rectangle((self.timex[self.timeindex[0]], statisticsheight), width = self.statisticstimes[1], height = statisticsbarheight,
-                                              color = self.palette['rect1'],alpha=0.5)
-                    self.ax.add_patch(rect)
+                    if self.timeindex[0] > -1:
+                        # only if CHARGE is set
+                        rect = patches.Rectangle(
+                                (starttime,
+                                statisticsheight),
+                                width = self.statisticstimes[1],
+                                height = statisticsbarheight,
+                                color = self.palette['rect1'],
+                                alpha=0.5,
+                                path_effects=[])
+                        self.ax.add_patch(rect)
 
                 fmtstr = '{0:.1f}' if self.LCDdecimalplaces else '{0:.0f}'
                 if self.statisticstimes[0]:
@@ -14070,23 +14250,31 @@ class tgraphcanvas(FigureCanvas):
                     LP = self.temp2[TP_index]
 
                 if self.statisticsflags[0]:
-                    text = self.ax.text(self.timex[self.timeindex[0]]+ self.statisticstimes[1]/2.,statisticsupper,st1 + '  '+ dryphaseP+'%',color=self.palette['text'],ha='center',
-                        fontsize='medium'
-                        )
-                    try:
-                        text.set_in_layout(False)
-                    except Exception: # pylint: disable=broad-except
-                        pass
+                    if self.timeindex[0] > -1:
+                        # only if CHARGE is set
+                        text = self.ax.text(starttime + self.statisticstimes[1]/2.,statisticsupper,
+                                f'{st1}  {dryphaseP}%',
+                                color=self.palette['text'],ha='center',
+                            fontsize='medium'
+                            )
+                        try:
+                            text.set_in_layout(False)
+                        except Exception: # pylint: disable=broad-except
+                            pass
                     if self.timeindex[2]: # only if FCs exists
                         if self.statisticstimes[2]*100./self.statisticstimes[0]>1: # annotate only if mid phase is at least 1% of the total
-                            text = self.ax.text(self.timex[self.timeindex[0]]+ self.statisticstimes[1]+self.statisticstimes[2]/2.,statisticsupper,st2+ '  ' + midphaseP+'%',color=self.palette['text'],ha='center',
+                            text = self.ax.text(starttime + self.statisticstimes[1]+self.statisticstimes[2]/2.,statisticsupper,
+                                    (f'{st2}  {midphaseP}%' if self.timeindex[0] > -1 else st2),
+                                    color=self.palette['text'],ha='center',
                                 fontsize='medium'
                                 )
                             try:
                                 text.set_in_layout(False)
                             except Exception: # pylint: disable=broad-except
                                 pass
-                        text = self.ax.text(self.timex[self.timeindex[0]]+ self.statisticstimes[1]+self.statisticstimes[2]+self.statisticstimes[3]/2.,statisticsupper,st3 + '  ' + finishphaseP+ '%',color=self.palette['text'],ha='center',
+                        text = self.ax.text(starttime + self.statisticstimes[1]+self.statisticstimes[2]+self.statisticstimes[3]/2.,statisticsupper,
+                                    (f'{st3}  {finishphaseP}%' if self.timeindex[0] > -1 else st3),
+                                    color=self.palette['text'],ha='center',
                             fontsize='medium'
                             )
                         try:
@@ -14094,7 +14282,7 @@ class tgraphcanvas(FigureCanvas):
                         except Exception:  # pylint: disable=broad-except
                             pass
                     if self.timeindex[7]: # only if COOL exists
-                        text = self.ax.text(self.timex[self.timeindex[0]]+ self.statisticstimes[1]+self.statisticstimes[2]+self.statisticstimes[3]+self.statisticstimes[4]/2.,statisticsupper,st4,color=self.palette['text'],ha='center',
+                        text = self.ax.text(starttime + self.statisticstimes[1]+self.statisticstimes[2]+self.statisticstimes[3]+self.statisticstimes[4]/2.,statisticsupper,st4,color=self.palette['text'],ha='center',
                             fontsize='medium'
                             )
                         try:
@@ -14122,17 +14310,19 @@ class tgraphcanvas(FigureCanvas):
                     if rates_of_changes[5] != -1:
                         st3 = st3 + fmtstr.format(rates_of_changes[5], self.mode, rates_of_changes[2], unit)
 
-                    text = self.ax.text(self.timex[self.timeindex[0]] + self.statisticstimes[1]/2.,statisticslower,st1,
-                        color=self.palette['text'],
-                        ha='center',
-                        fontsize='medium')
-                    try:
-                        text.set_in_layout(False)
-                    except Exception: # pylint: disable=broad-except
-                        pass
+
+                    if self.timeindex[0] > -1:
+                        text = self.ax.text(starttime + self.statisticstimes[1]/2.,statisticslower,st1,
+                            color=self.palette['text'],
+                            ha='center',
+                            fontsize='medium')
+                        try:
+                            text.set_in_layout(False)
+                        except Exception: # pylint: disable=broad-except
+                            pass
                     if self.timeindex[2]: # only if FCs exists
                         if self.statisticstimes[2]*100./self.statisticstimes[0]>1: # annotate only if mid phase is at least 1% of the total
-                            text = self.ax.text(self.timex[self.timeindex[0]] + self.statisticstimes[1]+self.statisticstimes[2]/2.,statisticslower,st2,color=self.palette['text'],ha='center',
+                            text = self.ax.text(starttime + self.statisticstimes[1]+self.statisticstimes[2]/2.,statisticslower,st2,color=self.palette['text'],ha='center',
                                 #fontproperties=statsprop # fails be rendered in PDF exports on MPL v3.4.x
                                 fontsize='medium'
                                 )
@@ -14140,7 +14330,7 @@ class tgraphcanvas(FigureCanvas):
                                 text.set_in_layout(False)
                             except Exception: # pylint: disable=broad-except
                                 pass
-                        text = self.ax.text(self.timex[self.timeindex[0]] + self.statisticstimes[1]+self.statisticstimes[2]+self.statisticstimes[3]/2.,statisticslower,st3,color=self.palette['text'],ha='center',
+                        text = self.ax.text(starttime + self.statisticstimes[1]+self.statisticstimes[2]+self.statisticstimes[3]/2.,statisticslower,st3,color=self.palette['text'],ha='center',
                             #fontproperties=statsprop # fails be rendered in PDF exports on MPL v3.4.x
                             fontsize='medium'
                             )
@@ -14149,7 +14339,7 @@ class tgraphcanvas(FigureCanvas):
                         except Exception: # pylint: disable=broad-except
                             pass
                     if self.timeindex[7]: # only if COOL exists
-                        text = self.ax.text(self.timex[self.timeindex[0]]+ self.statisticstimes[1]+self.statisticstimes[2]+self.statisticstimes[3]+max(self.statisticstimes[4]/2.,self.statisticstimes[4]/3.),statisticslower,st4,color=self.palette['text'],ha='center',
+                        text = self.ax.text(starttime + self.statisticstimes[1]+self.statisticstimes[2]+self.statisticstimes[3]+max(self.statisticstimes[4]/2.,self.statisticstimes[4]/3.),statisticslower,st4,color=self.palette['text'],ha='center',
                             #fontproperties=statsprop # fails be rendered in PDF exports on MPL v3.4.x
                             fontsize='medium'
                             )
@@ -14195,7 +14385,7 @@ class tgraphcanvas(FigureCanvas):
                 w = toFloat(beanweightstr)
             else:
                 w = self.weight[0]
-            bean_weight = self.aw.convertWeight(w,self.weight_units.index(self.weight[2]),1) # to kg
+            bean_weight = convertWeight(w, weight_units.index(self.weight[2]),1) # to kg
 
             #reference: https://www.eia.gov/environment/emissions/co2_vol_mass.php (dated Nov-18-2021, accessed Jan-02-2022)
             #           https://www.eia.gov/tools/faqs/faq.php?id=74&t=11 (referencing data from 2020, accessed Jan-02-2022)
@@ -14383,19 +14573,19 @@ class tgraphcanvas(FigureCanvas):
                 btu_lpg += item['BTUs'] if item['SourceType'] == 0 else 0
                 btu_ng += item['BTUs'] if item['SourceType'] == 1 else 0
                 btu_elec += item['BTUs'] if item['SourceType'] == 2 else 0
-            btu_batch = self.aw.float2float(btu_batch,3)
-            btu_preheat = self.aw.float2float(btu_preheat,3)
-            btu_bbp = self.aw.float2float(btu_bbp,3)
-            btu_cooling = self.aw.float2float(btu_cooling,3)
-            btu_roast = self.aw.float2float(btu_roast,3)
-            co2_batch = self.aw.float2float(co2_batch,3)
-            co2_preheat = self.aw.float2float(co2_preheat,3)
-            co2_bbp = self.aw.float2float(co2_bbp,3)
-            co2_cooling = self.aw.float2float(co2_cooling,3)
-            co2_roast = self.aw.float2float(co2_roast,3)
-            btu_lpg = self.aw.float2float(btu_lpg,3)
-            btu_ng = self.aw.float2float(btu_ng,3)
-            btu_elec = self.aw.float2float(btu_elec,3)
+            btu_batch = float2float(btu_batch,3)
+            btu_preheat = float2float(btu_preheat,3)
+            btu_bbp = float2float(btu_bbp,3)
+            btu_cooling = float2float(btu_cooling,3)
+            btu_roast = float2float(btu_roast,3)
+            co2_batch = float2float(co2_batch,3)
+            co2_preheat = float2float(co2_preheat,3)
+            co2_bbp = float2float(co2_bbp,3)
+            co2_cooling = float2float(co2_cooling,3)
+            co2_roast = float2float(co2_roast,3)
+            btu_lpg = float2float(btu_lpg,3)
+            btu_ng = float2float(btu_ng,3)
+            btu_elec = float2float(btu_elec,3)
             if bean_weight > 0:
                 co2_batch_per_green_kg = co2_batch / bean_weight
                 co2_roast_per_green_kg = co2_roast / bean_weight
@@ -14406,12 +14596,12 @@ class tgraphcanvas(FigureCanvas):
                 co2_roast_per_green_kg = 0
                 btu_batch_per_green_kg = 0
                 btu_roast_per_green_kg = 0
-            co2_batch_per_green_kg = self.aw.float2float(co2_batch_per_green_kg,3)
-            co2_roast_per_green_kg = self.aw.float2float(co2_roast_per_green_kg,3)
-            btu_batch_per_green_kg = self.aw.float2float(btu_batch_per_green_kg,3)
-            btu_roast_per_green_kg = self.aw.float2float(btu_roast_per_green_kg,3)
-            kwh_batch_per_green_kg = self.aw.float2float(self.convertHeat(btu_batch_per_green_kg,0,3),3)
-            kwh_roast_per_green_kg = self.aw.float2float(self.convertHeat(btu_roast_per_green_kg,0,3),3)
+            co2_batch_per_green_kg = float2float(co2_batch_per_green_kg,3)
+            co2_roast_per_green_kg = float2float(co2_roast_per_green_kg,3)
+            btu_batch_per_green_kg = float2float(btu_batch_per_green_kg,3)
+            btu_roast_per_green_kg = float2float(btu_roast_per_green_kg,3)
+            kwh_batch_per_green_kg = float2float(self.convertHeat(btu_batch_per_green_kg,0,3),3)
+            kwh_roast_per_green_kg = float2float(self.convertHeat(btu_roast_per_green_kg,0,3),3)
 
 
             # energymetrics
@@ -15488,11 +15678,11 @@ class tgraphcanvas(FigureCanvas):
                 # initialize bitblit background
                 axfig = self.ax.get_figure()
                 if axfig is not None and hasattr(self.fig.canvas,'copy_from_bbox'):
-                    self.ax_background_designer = self.fig.canvas.copy_from_bbox(axfig.bbox)  # pyright: ignore[reportGeneralTypeIssues]
+                    self.ax_background_designer = self.fig.canvas.copy_from_bbox(axfig.bbox)  # pyright: ignore[reportAttributeAccessIssue]
 
             # restore background
             if hasattr(self.fig.canvas,'restore_region'):
-                self.fig.canvas.restore_region(self.ax_background_designer) # pyright: ignore[reportGeneralTypeIssues]
+                self.fig.canvas.restore_region(self.ax_background_designer) # pyright: ignore[reportAttributeAccessIssue]
 
 
             #create statistics bar
@@ -15760,7 +15950,7 @@ class tgraphcanvas(FigureCanvas):
 
                 #check for possible CHARGE time moving
                 if self.indexpoint == self.timeindex[0]:
-                    self.designer_timez = numpy.arange(self.timex[0],self.timex[-1],1).tolist()
+                    self.designer_timez = numpy.arange(self.timex[0],self.timex[-1]+1,1).tolist()
                     self.xaxistosm(redraw=False)
 
                 #check for possible DROP/COOL time moving
@@ -15886,7 +16076,7 @@ class tgraphcanvas(FigureCanvas):
         try:
             from scipy.interpolate import UnivariateSpline
             funcBT = UnivariateSpline(self.timex,self.temp2, k = self.BTsplinedegree)
-            timez = numpy.arange(self.timex[0],self.timex[-1],1).tolist()
+            timez = numpy.arange(self.timex[0],self.timex[-1]+1,1).tolist()
             btvals = funcBT(timez).tolist()
             min_bt = min(btvals)
             idx_min_bt = btvals.index(min_bt)
@@ -16079,7 +16269,7 @@ class tgraphcanvas(FigureCanvas):
             funcET = UnivariateSpline(self.timex,self.temp1, k = self.ETsplinedegree)
 
             #create longer list of time values
-            timez = numpy.arange(self.timex[0],self.timex[-1],1).tolist()
+            timez = numpy.arange(self.timex[0],self.timex[-1]+1,1).tolist()
 
             #convert all time values to temperature
             btvals = funcBT(timez).tolist()
@@ -16547,9 +16737,8 @@ class tgraphcanvas(FigureCanvas):
 
                     barwheel.append(self.ax2.bar(theta, radii, width=segmentwidth, bottom=lbottom[z],edgecolor=self.wheellinecolor,
                                             linewidth=self.wheellinewidth,picker=3))
-                    count:int = 0
                     #set color, alpha, and text
-                    for _,barwheel[z] in zip(radii, barwheel[z]): # noqa: B020 # type:ignore # pyright: error: "object*" is not iterable
+                    for count, (_, barwheel[z]) in enumerate(zip(radii, barwheel[z])): # noqa: B020 # type:ignore # pyright: error: "object*" is not iterable
                         barwheel_z = barwheel[z]
                         if isinstance(barwheel_z, Rectangle):
                             barwheel_z.set_facecolor(self.wheelcolor[z][count])
@@ -16567,7 +16756,6 @@ class tgraphcanvas(FigureCanvas):
                             anno.set_in_layout(False)  # remove text annotations from tight_layout calculation
                         except Exception: # pylint: disable=broad-except # mpl before v3.0 do not have this set_in_layout() function
                             pass
-                        count += 1
                 with warnings.catch_warnings():
                     warnings.simplefilter('ignore')
                     self.fig.canvas.draw()
@@ -16679,14 +16867,14 @@ class tgraphcanvas(FigureCanvas):
                     y = event.ydata
                     if self.delta_ax is not None and x is not None and y is not None and self.baseX and self.baseY:
                         deltaX = stringfromseconds(x - self.baseX)
-                        deltaY = str(self.aw.float2float(y - self.baseY,1))
-                        RoR = str(self.aw.float2float(60 * (y - self.baseY) / (x - self.baseX),1))
+                        deltaY = str(float2float(y - self.baseY,1))
+                        RoR = str(float2float(60 * (y - self.baseY) / (x - self.baseX),1))
                         deltaRoR = (self.delta_ax.transData.inverted().transform((0,self.ax.transData.transform((0,y))[1]))[1]
                                     - self.delta_ax.transData.inverted().transform((0,self.ax.transData.transform((0,self.baseY))[1]))[1])
                         #RoRoR is always in C/min/min
                         if self.mode == 'F':
                             deltaRoR = RoRfromFtoCstrict(deltaRoR)
-                        RoRoR = str(self.aw.float2float(60 * (deltaRoR)/(x - self.baseX),1))
+                        RoRoR = str(float2float(60 * (deltaRoR)/(x - self.baseX),1))
                         message = f'delta Time= {deltaX},    delta Temp= {deltaY} {self.mode},    RoR= {RoR} {self.mode}/min,    RoRoR= {RoRoR} C/min/min'
                         self.aw.sendmessage(message)
                         self.base_messagevisible = True
@@ -16722,15 +16910,14 @@ class tgraphcanvas(FigureCanvas):
 
     def __to_ascii(self, s:str) -> str:
         utf8_string = str(s)
-        if self.locale_str.startswith('de'):
-            for k, uml in self.umlaute_dict.items():
-                utf8_string = utf8_string.replace(k, uml)
+        for k, uml in self.umlaute_dict.items():
+            utf8_string = utf8_string.replace(k, uml)
         from unidecode import unidecode
         return unidecode(utf8_string)
 
     # convert German Umlauts if Dijkstra font is selected
     def __dijstra_to_ascii(self, s:str) -> str:
-        if self.graphfont == 9: # font Dijkstra selected
+        if self.graphfont in {1,9,10}: # font Humor, Dijkstra, or Xkcd selected
             return self.__to_ascii(s)
         return s
 

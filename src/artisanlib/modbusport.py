@@ -18,11 +18,11 @@
 import sys
 import time
 import logging
-from typing import Final, Optional, List, Dict, Tuple, Union, Any, Awaitable, cast, TYPE_CHECKING
+from typing import Final, Optional, List, Dict, Tuple, Union, Any, Awaitable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from artisanlib.main import ApplicationWindow # pylint: disable=unused-import
-    from pymodbus.client.base import ModbusBaseSyncClient # pylint: disable=unused-import
+    from pymodbus.client import ModbusSerialClient, ModbusTcpClient, ModbusUdpClient # pylint: disable=unused-import
     from pymodbus.payload import BinaryPayloadBuilder # pylint: disable=unused-import
     from pymodbus.payload import BinaryPayloadDecoder # pylint: disable=unused-import
     from pymodbus.pdu import ModbusResponse # pylint: disable=unused-import
@@ -88,7 +88,7 @@ def getBinaryPayloadDecoderFromRegisters(registers:List[int], byteorderLittle:bo
     from pymodbus.payload import BinaryPayloadDecoder
     byteorder = Endian.LITTLE if byteorderLittle else Endian.BIG
     wordorder = Endian.LITTLE if wordorderLittle else Endian.BIG
-    return BinaryPayloadDecoder.fromRegisters(registers, byteorder=byteorder, wordorder=wordorder) # type:ignore
+    return BinaryPayloadDecoder.fromRegisters(registers, byteorder=byteorder, wordorder=wordorder) # type:ignore[no-untyped-call, no-any-return]
 
 
 ###########################################################################################
@@ -170,7 +170,8 @@ class modbusport:
         self.PIDmultiplier:int = 0  # 0:no, 1:10x, 2:100x # :Literal[0,1,2]
         self.byteorderLittle:bool = False
         self.wordorderLittle:bool = True
-        self.master:Optional['ModbusBaseSyncClient'] = None
+#        self.master:Optional['ModbusBaseSyncClient'] = None
+        self.master:Union[None, 'ModbusSerialClient', 'ModbusTcpClient', 'ModbusUdpClient'] = None
         self.COMsemaphore:QSemaphore = QSemaphore(1)
         self.default_host:Final[str] = '127.0.0.1'
         self.host:str = self.default_host # the TCP/UDP host
@@ -213,7 +214,7 @@ class modbusport:
         try:
             if self.master is not None:
                 _log.debug('disconnect()')
-                self.master.close()
+                self.master.close() # type:ignore[no-untyped-call]
                 self.clearReadingsCache()
                 self.aw.sendmessage(QApplication.translate('Message', 'MODBUS disconnected'))
                 del self.master
@@ -292,9 +293,9 @@ class modbusport:
                         self.master = ModbusTcpClient(
                                 host=self.host,
                                 port=self.port,
-                                retries=2, # number of send retries
+                                retries=1,                # number of send retries
                                 retry_on_empty=True,      # retry on empty response
-                                retry_on_invalid=True,   # retry on invalid response # retired
+                                retry_on_invalid=True,    # retry on invalid response # retired
                                 close_comm_on_error=self.reset_socket,
                                 reset_socket=self.reset_socket,
                                 reconnect_delay=0, # avoid automatic reconnection
@@ -314,12 +315,12 @@ class modbusport:
                         self.master = ModbusUdpClient(
                             host=self.host,
                             port=self.port,
-                            retries=2, # number of send retries
+                            retries=0,                # number of send retries (if set to n>0 each requests is sent n-types on MODBUS UDP!)
                             retry_on_empty=True,      # retry on empty response
-                            retry_on_invalid=True,   # retry on invalid response # retired
+                            retry_on_invalid=True,    # retry on invalid response # retired
                             close_comm_on_error=self.reset_socket,
                             reset_socket=self.reset_socket,
-                            reconnect_delay=0, # avoid automatic reconnection
+                            reconnect_delay=0,        # avoid automatic reconnection
                             on_reconnect_callback=self.reconnect,
                             # timeout is in seconds (int) and defaults to 3
                             timeout=min((self.aw.qmc.delay/2000), self.IP_timeout) # the timeout should not be larger than half of the sampling interval
@@ -352,7 +353,8 @@ class modbusport:
                     self.readRetries = self.serial_readRetries
                 _log.debug('connect(): connecting')
                 time.sleep(.2) # avoid possible hickups on startup
-                self.master.connect() # type:ignore[no-untyped-call]
+                if self.master is not None:
+                    self.master.connect() # type:ignore[no-untyped-call]
                 if self.isConnected():
                     self.updateActiveRegisters()
                     self.clearReadingsCache()
@@ -463,9 +465,9 @@ class modbusport:
                                     try:
                                         # we cache only MODBUS function 3 and 4 (not 1 and 2!)
                                         if code == 3:
-                                            res = cast('ModbusResponse', self.master.read_holding_registers(register,count,slave=slave))
+                                            res = self.master.read_holding_registers(register,count,slave=slave)
                                         elif code == 4:
-                                            res = cast('ModbusResponse', self.master.read_input_registers(register,count,slave=slave))
+                                            res = self.master.read_input_registers(register,count,slave=slave)
                                     except Exception as e: # pylint: disable=broad-except
                                         _log.info('readActive(%d,%d,%d,%d)', slave, code, register, count)
                                         _log.debug(e)
@@ -784,9 +786,9 @@ class modbusport:
                 while True:
                     try:
                         if code==3:
-                            res = cast('ModbusResponse', self.master.read_holding_registers(int(register),2,slave=int(slave)))
+                            res = self.master.read_holding_registers(int(register),2,slave=int(slave))
                         else:
-                            res = cast('ModbusResponse', self.master.read_input_registers(int(register),2,slave=int(slave)))
+                            res = self.master.read_input_registers(int(register),2,slave=int(slave))
                     except Exception as ex: # pylint: disable=broad-except
                         _log.debug(ex)
                         res = None
@@ -866,9 +868,9 @@ class modbusport:
                 while True:
                     try:
                         if code==3:
-                            res = cast('ModbusResponse', self.master.read_holding_registers(int(register),2,slave=int(slave)))
+                            res = self.master.read_holding_registers(int(register),2,slave=int(slave))
                         else:
-                            res = cast('ModbusResponse', self.master.read_input_registers(int(register),2,slave=int(slave)))
+                            res = self.master.read_input_registers(int(register),2,slave=int(slave))
                     except Exception as ex: # pylint: disable=broad-except
                         _log.debug(ex)
                         res = None
@@ -924,20 +926,20 @@ class modbusport:
             if self.isConnected():
                 assert self.master is not None
                 if code==1:
-                    res = cast('ModbusResponse', self.master.read_coils(int(register),1,slave=int(slave)))
+                    res = self.master.read_coils(int(register),1,slave=int(slave))
                 elif code==2:
-                    res = cast('ModbusResponse', self.master.read_discrete_inputs(int(register),1,slave=int(slave)))
+                    res = self.master.read_discrete_inputs(int(register),1,slave=int(slave))
                 elif code==4:
-                    res = cast('ModbusResponse', self.master.read_input_registers(int(register),1,slave=int(slave)))
+                    res = self.master.read_input_registers(int(register),1,slave=int(slave))
                 else: # code==3
-                    res = cast('ModbusResponse', self.master.read_holding_registers(int(register),1,slave=int(slave)))
+                    res = self.master.read_holding_registers(int(register),1,slave=int(slave))
         except Exception as ex: # pylint: disable=broad-except
             _log.info('peekSingleRegister(%d,%d,%d) failed', slave, register, code)
             _log.debug(ex)
         error, _ = self.invalidResult(res,1)
         if res is not None and not error:
             if code in {1, 2}:
-                if hasattr(res, 'bits') and res.bits[0]:
+                if hasattr(res, 'bits') and len(res.bits)>0 and res.bits[0]:
                     return 1
                 return 0
             if hasattr(res, 'registers'):
@@ -988,13 +990,13 @@ class modbusport:
                 while True:
                     try:
                         if code==1:
-                            res = cast('ModbusResponse', self.master.read_coils(int(register),1,slave=int(slave)))
+                            res = self.master.read_coils(int(register),1,slave=int(slave))
                         elif code==2:
-                            res = cast('ModbusResponse', self.master.read_discrete_inputs(int(register),1,slave=int(slave)))
+                            res = self.master.read_discrete_inputs(int(register),1,slave=int(slave))
                         elif code==4:
-                            res = cast('ModbusResponse', self.master.read_input_registers(int(register),1,slave=int(slave)))
+                            res = self.master.read_input_registers(int(register),1,slave=int(slave))
                         else: # code==3
-                            res = cast('ModbusResponse', self.master.read_holding_registers(int(register),1,slave=int(slave)))
+                            res = self.master.read_holding_registers(int(register),1,slave=int(slave))
                     except Exception as ex: # pylint: disable=broad-except
                         _log.debug(ex)
                         res = None
@@ -1011,7 +1013,7 @@ class modbusport:
                         break
                 if res is not None:
                     if code in {1, 2} and hasattr(res, 'bits'):
-                        r = 1 if res is not None and res.bits[0] else 0
+                        r = 1 if len(res.bits)>0 and res.bits[0] else 0
                         # we clear the previous error and send a message
                         self.clearCommError()
                         return r
@@ -1083,9 +1085,9 @@ class modbusport:
                 assert self.master is not None
                 while True:
                     if code==3:
-                        res = cast('ModbusResponse', self.master.read_holding_registers(int(register),2,slave=int(slave)))
+                        res = self.master.read_holding_registers(int(register),2,slave=int(slave))
                     else:
-                        res = cast('ModbusResponse', self.master.read_input_registers(int(register),2,slave=int(slave)))
+                        res = self.master.read_input_registers(int(register),2,slave=int(slave))
                     error, disconnect = self.invalidResult(res,2)
                     if error:
                         error_disconnect = error_disconnect or disconnect
@@ -1164,9 +1166,9 @@ class modbusport:
                 while True:
                     try:
                         if code==3:
-                            res = cast('ModbusResponse', self.master.read_holding_registers(int(register),1,slave=int(slave)))
+                            res = self.master.read_holding_registers(int(register),1,slave=int(slave))
                         else:
-                            res = cast('ModbusResponse', self.master.read_input_registers(int(register),1,slave=int(slave)))
+                            res = self.master.read_input_registers(int(register),1,slave=int(slave))
                     except Exception: # pylint: disable=broad-except
                         res = None
                     error, disconnect = self.invalidResult(res,1)

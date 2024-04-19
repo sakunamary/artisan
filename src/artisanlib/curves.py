@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from PyQt6.QtGui import QCloseEvent # pylint: disable=unused-import
 
 from artisanlib.util import (deltaLabelBigPrefix, deltaLabelPrefix, deltaLabelUTF8,
-                             stringtoseconds, stringfromseconds, toFloat)
+                             stringtoseconds, stringfromseconds, toFloat, float2float)
 from artisanlib.dialogs import ArtisanDialog
 from artisanlib.widgets import MyQDoubleSpinBox
 from help import symbolic_help # pyright:ignore [attr-defined] # pylint: disable=no-name-in-module
@@ -311,6 +311,7 @@ class CurvesDlg(ArtisanDialog):
         self.org_BTProjection = self.aw.qmc.BTprojectFlag
         self.org_ProjectionDelta = self.aw.qmc.projectDeltaFlag
         self.org_patheffects = self.aw.qmc.patheffects
+        self.org_glow = self.aw.qmc.glow
         self.org_graphstyle = self.aw.qmc.graphstyle
         self.org_graphfont = self.aw.qmc.graphfont
         self.org_filterDropOuts = self.aw.qmc.filterDropOuts
@@ -1185,16 +1186,22 @@ class CurvesDlg(ArtisanDialog):
         self.soundCheck.setChecked(bool(self.aw.soundflag))
         self.soundCheck.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.soundCheck.stateChanged.connect(self.soundset) #toggle
+        self.glowCheck = QCheckBox(QApplication.translate('CheckBox', 'Glow'))
+        self.glowCheck.setChecked(bool(self.aw.qmc.glow))
+        self.glowCheck.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.glowCheck.stateChanged.connect(self.glowset) #toggle
         self.notifications = QCheckBox(QApplication.translate('CheckBox', 'Notifications'))
         self.notifications.setChecked(self.aw.notificationsflag)
         self.notifications.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         notifyLayout = QHBoxLayout()
         notifyLayout.addWidget(self.notifications)
+        notifyLayout.addSpacing(15)
+        notifyLayout.addWidget(self.soundCheck)
         notifyLayout.addStretch()
         appLayout1 = QHBoxLayout()
         appLayout1.addLayout(pathEffectsLayout)
         appLayout1.addStretch()
-        appLayout1.addWidget(self.soundCheck)
+        appLayout1.addWidget(self.glowCheck)
         appLayout1.addStretch()
         appLayout1.addWidget(self.styleComboBox)
         appLayout2 = QHBoxLayout()
@@ -1409,6 +1416,8 @@ class CurvesDlg(ArtisanDialog):
             ok_button: Optional[QPushButton] = self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
             if ok_button is not None:
                 ok_button.setFocus()
+        else:
+            self.TabWidget.setFocus()
 
         settings = QSettings()
         if settings.contains('CurvesPosition'):
@@ -1464,7 +1473,7 @@ class CurvesDlg(ArtisanDialog):
 
     @pyqtSlot()
     def segmentdeltathresholdChanged(self) -> None:
-        self.aw.qmc.segmentdeltathreshold = self.aw.float2float(toFloat(self.segmentdeltathreshold.text()),4)
+        self.aw.qmc.segmentdeltathreshold = float2float(toFloat(self.segmentdeltathreshold.text()),4)
 
     @pyqtSlot()
     def curvefittimeoffsetChanged(self) -> None:
@@ -2247,6 +2256,11 @@ class CurvesDlg(ArtisanDialog):
             self.aw.sendmessage(QApplication.translate('Message','Sound turned OFF'))
 
     @pyqtSlot(int)
+    def glowset(self, _:int) -> None:
+        self.aw.qmc.glow = (self.aw.qmc.glow + 1) % 2
+        self.aw.qmc.redraw_keep_view(recomputeAllDeltas=False)
+
+    @pyqtSlot(int)
     def changeDeltaET(self, _:int = 0) -> None:
         self.aw.qmc.DeltaETflag = not self.aw.qmc.DeltaETflag
         if self.aw.qmc.crossmarker:
@@ -2277,10 +2291,12 @@ class CurvesDlg(ArtisanDialog):
 
     @pyqtSlot(int)
     def changeDeltaBT(self, _:int = 0) -> None:
+        twoAxis_before = self.aw.qmc.twoAxisMode()
         self.aw.qmc.DeltaBTflag = not self.aw.qmc.DeltaBTflag
+        twoAxis_after = self.aw.qmc.twoAxisMode()
         if self.aw.qmc.crossmarker:
             self.aw.qmc.togglecrosslines() # turn crossmarks off to adjust for new coordinate system
-        self.aw.qmc.redraw_keep_view(recomputeAllDeltas=True)
+        self.aw.qmc.redraw_keep_view(recomputeAllDeltas=True, forceRenewAxis=twoAxis_before != twoAxis_after)
 
     @pyqtSlot(int)
     def changeDeltaETlcd(self, _:int = 0) -> None:
@@ -2481,6 +2497,7 @@ class CurvesDlg(ArtisanDialog):
         self.aw.qmc.BTprojectFlag = self.org_BTProjection
         self.aw.qmc.projectDeltaFlag = self.org_ProjectionDelta
         self.aw.qmc.patheffects = self.org_patheffects
+        self.aw.qmc.glow = self.org_glow
         self.aw.qmc.graphstyle = self.org_graphstyle
         self.aw.qmc.graphfont = self.org_graphfont
         self.aw.qmc.filterDropOuts = self.org_filterDropOuts
