@@ -640,10 +640,10 @@ class profileTransformatorDlg(ArtisanDialog):
         if self.aw.qmc.transMappingMode == 0:
             # discrete mapping
             # adding CHARGE
-            fits:List[Optional['npt.NDArray[numpy.float64]']] = self.calcDiscretefits([0] + self.profileTimes,[0] + self.targetTimes)
+            fits:List[Optional[npt.NDArray[numpy.float64]]] = self.calcDiscretefits([0] + self.profileTimes,[0] + self.targetTimes)
             if len(fits)>4 and len(self.profileTimes)>3:
                 for i in range(4):
-                    fit:Optional['npt.NDArray[numpy.float64]'] = fits[i+1]
+                    fit:Optional[npt.NDArray[numpy.float64]] = fits[i+1]
                     profileTime = self.profileTimes[i]
                     if fit is not None and profileTime is not None:
                         res.append(numpy.poly1d(fit)(profileTime))
@@ -660,8 +660,8 @@ class profileTransformatorDlg(ArtisanDialog):
                             res.append(fit_fuc(profileTime))
                         else:
                             res.append(None)
-                except numpy.RankWarning:
-                    pass
+#                except numpy.exceptions.RankWarning:
+#                    pass
                 except Exception: # pylint: disable=broad-except
                     pass
         return res
@@ -669,7 +669,7 @@ class profileTransformatorDlg(ArtisanDialog):
     # returns the list of results temperatures and the polyfit or None as second result
     def calcTempResults(self) -> Tuple[List[Optional[float]], Optional[str]]:
         res:List[Optional[float]] = []
-        fit:Optional['npt.NDArray[numpy.float64]'] = None
+        fit:Optional[npt.NDArray[numpy.float64]] = None
         fit_str:Optional[str] = None
         profileTemp:Optional[float]
         if self.aw.qmc.transMappingMode == 0:
@@ -711,8 +711,8 @@ class profileTransformatorDlg(ArtisanDialog):
                         fit_str = self.aw.fit2str(fit_func)
                     else:
                         res = [None]*5
-                except numpy.RankWarning:
-                    pass
+#                except numpy.exceptions.RankWarning:
+#                    pass
                 except Exception: # pylint: disable=broad-except
                     pass
         return res,fit_str
@@ -829,8 +829,8 @@ class profileTransformatorDlg(ArtisanDialog):
     def calcDiscretefits(sources:List[Optional[float]], targets:List[Optional[float]]) -> List[Optional['npt.NDArray[numpy.float64]']]:
         if len(sources) != len(targets):
             return [None]*len(sources)
-        fits:List[Optional['npt.NDArray[numpy.float64]']] = [None]*len(sources)
-        last_fit:Optional['npt.NDArray[numpy.float64]'] = None
+        fits:List[Optional[npt.NDArray[numpy.float64]]] = [None]*len(sources)
+        last_fit:Optional[npt.NDArray[numpy.float64]] = None
         for i, _ in enumerate(sources):
             if sources[i] is not None:
                 if targets[i] is None:
@@ -948,7 +948,9 @@ class profileTransformatorDlg(ArtisanDialog):
                                 new_timex = [tx+foffset for tx in new_timex]
                             extratimex.append(new_timex)
                         self.aw.qmc.extratimex = extratimex
-                except numpy.RankWarning:
+#                except numpy.exceptions.RankWarning:
+#                    pass
+                except Exception: # pylint: disable=broad-except
                     pass
         return True
 
@@ -994,7 +996,9 @@ class profileTransformatorDlg(ArtisanDialog):
                     fit = numpy.poly1d(p)
                     if fit is not None:
                         self.aw.qmc.temp2 = [(-1 if (temp is None) or (temp == -1) else fit(temp)) for temp in self.org_temp2]
-            except numpy.RankWarning:
+#            except numpy.exceptions.RankWarning:
+#                pass
+            except Exception: # pylint: disable=broad-except
                 pass
         return True
 

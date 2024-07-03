@@ -451,7 +451,7 @@ class backgroundDlg(ArtisanResizeablDialog):
         self.TabWidget.currentChanged.connect(self.tabSwitched)
 
         # we set the active tab with a QTimer after the tabbar has been rendered once, as otherwise
-        # some tabs are not rendered at all on Winwos using Qt v6.5.1 (https://bugreports.qt.io/projects/QTBUG/issues/QTBUG-114204?filter=allissues)
+        # some tabs are not rendered at all on Windows using Qt v6.5.1 (https://bugreports.qt.io/projects/QTBUG/issues/QTBUG-114204?filter=allissues)
         QTimer.singleShot(50, self.setActiveTab)
 
     @pyqtSlot(int)
@@ -487,6 +487,9 @@ class backgroundDlg(ArtisanResizeablDialog):
     def accept(self) -> None:
         self.aw.qmc.backgroundmovespeed = self.speedSpinBox.value()
         self.aw.qmc.backgroundKeyboardControlFlag = bool(self.keyboardControlflag.isChecked())
+        if self.aw.qmc.backgroundPlaybackEvents:
+            # turn on again after background load to ignore already passed events
+            self.aw.qmc.turn_playback_event_ON()
         self.close()
 
     @pyqtSlot('QCloseEvent')
@@ -510,10 +513,10 @@ class backgroundDlg(ArtisanResizeablDialog):
     def setplaybackevent(self, _:int) -> None:
         s = None
         if self.backgroundPlaybackEvents.isChecked():
-            self.aw.qmc.backgroundPlaybackEvents = True
+            self.aw.qmc.turn_playback_event_ON()
             msg = QApplication.translate('Message','Playback Events set ON')
         else:
-            self.aw.qmc.backgroundPlaybackEvents = False
+            self.aw.qmc.turn_playback_event_OFF()
             msg = QApplication.translate('StatusBar','Playback Events set OFF')
             s = "background-color:'transparent';"
         self.aw.sendmessage(msg, style=s)

@@ -117,7 +117,8 @@ def getTemplate(bp: 'ProfileData', background:bool=False) -> Dict[str, Any]:  #f
             except Exception as e:  # pylint: disable=broad-except
                 _log.exception(e)
 
-        util.add2dict(bp, config.uuid_tag, d, 'id')
+        util.add2dict(bp, config.uuid_tag, d, 'id')                 # roast UUID
+        util.add2dict(bp, config.schedule_uuid_tag, d, 's_item_id') # ScheduleItem UUID
 
         try:
             util.addNum2dict(bp, 'moisture_roasted', d, 'moisture', 0, 100, 1)
@@ -265,7 +266,7 @@ def getRoast() -> Dict[str, Any]:  #for Python >= 3.9 can replace 'Dict' with th
         _log.debug('getRoast()')
         assert config.app_window is not None
         aw = config.app_window
-        p:'ProfileData' = aw.getProfile()
+        p:ProfileData = aw.getProfile()
 
         d = getTemplate(p)
 

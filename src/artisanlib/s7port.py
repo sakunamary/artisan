@@ -25,7 +25,8 @@ if TYPE_CHECKING:
     from artisanlib.main import ApplicationWindow # noqa: F401 # pylint: disable=unused-import
 
 from snap7.types import Areas
-from snap7.util import get_bool, set_bool, get_int, set_int, get_real, set_real
+from snap7.util.getters import get_bool, get_int, get_real
+from snap7.util.setters import set_bool, set_int, set_real
 
 import artisanlib.util
 
@@ -107,7 +108,7 @@ class s7port:
 
         self.is_connected:bool = False # local cache of the connection state
 
-        self.plc:Optional['S7Client'] = None
+        self.plc:Optional[S7Client] = None
         self.commError:bool = False # True after a communication error was detected and not yet cleared by receiving proper data
 
 ################

@@ -29,7 +29,7 @@ _log: Final[logging.Logger] = logging.getLogger(__name__)
 
 # returns a dict containing all profile information contained in the given RoastLog document pointed by the given QUrl
 def extractProfileRoastLog(url:'QUrl', _:'ApplicationWindow') -> Optional['ProfileData']:
-    res:'ProfileData' = {} # the interpreted data set
+    res:ProfileData = {} # the interpreted data set
     try:
         s = requests.Session()
         s.mount('file://', FileAdapter())
@@ -217,13 +217,13 @@ def extractProfileRoastLog(url:'QUrl', _:'ApplicationWindow') -> Optional['Profi
                         if 'label' in te and 'time' in te:
                             if te['label'] in timex_events:
                                 try:
-                                    timex_idx = res['timex'].index(stringtoseconds(te['time']))
+                                    timex_idx = res['timex'].index(stringtoseconds(te['time'])) # pyright:ignore[reportTypedDictNotRequiredAccess]
                                     timeindex[timex_events[te['label']]] = max(0,timex_idx)
                                 except Exception: # pylint: disable=broad-except
                                     pass
                             else:
                                 try:
-                                    timex_idx = res['timex'].index(stringtoseconds(te['time']))
+                                    timex_idx = res['timex'].index(stringtoseconds(te['time'])) # pyright:ignore[reportTypedDictNotRequiredAccess]
                                     specialeventsStrings.append(te['label'])
                                     specialevents.append(timex_idx)
                                     specialeventstype.append(4)

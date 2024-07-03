@@ -1696,7 +1696,7 @@ class EventsDlg(ArtisanResizeablDialog):
         self.TabWidget.currentChanged.connect(self.tabSwitched)
 
         # we set the active tab with a QTimer after the tabbar has been rendered once, as otherwise
-        # some tabs are not rendered at all on Winwos using Qt v6.5.1 (https://bugreports.qt.io/projects/QTBUG/issues/QTBUG-114204?filter=allissues)
+        # some tabs are not rendered at all on Windows using Qt v6.5.1 (https://bugreports.qt.io/projects/QTBUG/issues/QTBUG-114204?filter=allissues)
         QTimer.singleShot(50, self.setActiveTab)
 
     @pyqtSlot()
@@ -2183,7 +2183,7 @@ class EventsDlg(ArtisanResizeablDialog):
         if pindex is None:
             pindex = self.transferpalettecombobox.currentIndex()
         if 0 <= pindex < 10:
-            copy:'Palette' = (
+            copy:Palette = (
                 self.extraeventstypes[:],
                 self.extraeventsvalues[:],
                 self.extraeventsactions[:],

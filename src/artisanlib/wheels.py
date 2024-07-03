@@ -219,7 +219,7 @@ class WheelDlg(ArtisanDialog):
             self.labeltable.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
             self.labeltable.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
             self.labeltable.setShowGrid(True)
-            vheader: Optional['QHeaderView'] = self.labeltable.verticalHeader()
+            vheader: Optional[QHeaderView] = self.labeltable.verticalHeader()
             if vheader is not None:
                 vheader.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
             #populate table
@@ -649,7 +649,6 @@ class WheelDlg(ArtisanDialog):
                 self.aw.sendmessage(QApplication.translate('Message','Wheel Graph saved'))
         except OSError as e:
             self.aw.qmc.adderror((QApplication.translate('Error Message','IO Error:') + ' Wheel graph filesave(): {0}').format(str(e)))
-            return
 
     @pyqtSlot(bool)
     def loadWheel(self, _:bool = False) -> None:

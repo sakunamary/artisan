@@ -68,7 +68,7 @@ class tphasescanvas(FigureCanvas):
         self.fig.set_layout_engine('tight', **self.tight_layout_params)
         #
         super().__init__(self.fig) # type:ignore # Call to untyped function "__init__" in typed context
-        self.ax:Optional['Axes'] = None
+        self.ax:Optional[Axes] = None
         self.clear_phases()
 
     def clear_phases(self) -> None:
@@ -119,7 +119,7 @@ class tphasescanvas(FigureCanvas):
             self.aw.scroller.setVisible(True)
             # set canvas background color
             background_color = self.aw.qmc.palette['background']
-            self.setStyleSheet(f'background-color: {background_color}')
+            self.setStyleSheet(f'background-color: {background_color[:7]}')
             # maximum total roast time of all given profiles
             max_total_time = max(p[1] for p in self.data)
             # set font

@@ -1426,7 +1426,7 @@ class CurvesDlg(ArtisanDialog):
         Slayout.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
 
         # we set the active tab with a QTimer after the tabbar has been rendered once, as otherwise
-        # some tabs are not rendered at all on Winwos using Qt v6.5.1 (https://bugreports.qt.io/projects/QTBUG/issues/QTBUG-114204?filter=allissues)
+        # some tabs are not rendered at all on Windows using Qt v6.5.1 (https://bugreports.qt.io/projects/QTBUG/issues/QTBUG-114204?filter=allissues)
         QTimer.singleShot(50, self.setActiveTab)
 
     @pyqtSlot()
@@ -1441,8 +1441,6 @@ class CurvesDlg(ArtisanDialog):
             QApplication.processEvents()  #occasionally the fit curve remains showing.
             self.aw.qmc.redraw(recomputeAllDeltas=True)
             #self.updatetargets()  #accept and close dialog
-        else:
-            return
 
     @pyqtSlot(int)
     def changeAnalyzecombobox(self, i:int) -> None:
@@ -1703,7 +1701,8 @@ class CurvesDlg(ArtisanDialog):
 
             if error:
                 string = QApplication.translate('Message','Incompatible variables found in %s')%error
-                QMessageBox.warning(self,QApplication.translate('Message','Assignment problem'),string)
+                QMessageBox.warning(None, #self, # only without super this one shows the native dialog on macOS under Qt 6.6.2 and later
+                    QApplication.translate('Message','Assignment problem'),string)
 
             else:
                 extratemp1:List[float] = []

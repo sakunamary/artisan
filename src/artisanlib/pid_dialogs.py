@@ -480,10 +480,16 @@ class PID_DlgControl(ArtisanDialog):
         if pid_controller != 0:
             self.createEvents.setEnabled(False)
 
+        self.loadPIDfromBackground = QCheckBox(QApplication.translate('CheckBox', 'Load p-i-d from background'))
+        self.loadPIDfromBackground.setToolTip(QApplication.translate('Tooltip', 'Load kp, ki, kd, PID Input, P on Error/Input and Lookahead settings from background profile'))
+        self.loadPIDfromBackground.setChecked(self.aw.pidcontrol.loadpidfrombackground)
+
         flagsLayout = QHBoxLayout()
         flagsLayout.addWidget(self.startPIDonCHARGE)
         flagsLayout.addSpacing(10)
         flagsLayout.addWidget(self.createEvents)
+        flagsLayout.addSpacing(10)
+        flagsLayout.addWidget(self.loadPIDfromBackground)
         flagsLayout.addStretch()
 
         tab1Layout.addLayout(pidBox)
@@ -808,7 +814,7 @@ class PID_DlgControl(ArtisanDialog):
         mainLayout.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
 
         # we set the active tab with a QTimer after the tabbar has been rendered once, as otherwise
-        # some tabs are not rendered at all on Winwos using Qt v6.5.1 (https://bugreports.qt.io/projects/QTBUG/issues/QTBUG-114204?filter=allissues)
+        # some tabs are not rendered at all on Windows using Qt v6.5.1 (https://bugreports.qt.io/projects/QTBUG/issues/QTBUG-114204?filter=allissues)
         QTimer.singleShot(10, self.setActiveTab)
 
     @pyqtSlot()
@@ -1174,6 +1180,7 @@ class PID_DlgControl(ArtisanDialog):
         self.aw.pidcontrol.setPID(kp,ki,kd,source,cycle,pOnE)
         #
         self.aw.pidcontrol.pidOnCHARGE = self.startPIDonCHARGE.isChecked()
+        self.aw.pidcontrol.loadpidfrombackground = self.loadPIDfromBackground.isChecked()
         self.aw.pidcontrol.createEvents = self.createEvents.isChecked()
         self.aw.pidcontrol.loadRampSoakFromProfile = self.loadRampSoakFromProfile.isChecked()
         self.aw.pidcontrol.loadRampSoakFromBackground = self.loadRampSoakFromBackground.isChecked()
@@ -2334,11 +2341,11 @@ class PXG4pidDlgControl(PXpidDlgControl):
         button_writeall.clicked.connect(self.writeAll)
 
         #create layouts and place tab1 widgets inside
-        buttonRampSoakLayout1 = QVBoxLayout() #TAB1/COLUNM 1
+        buttonRampSoakLayout1 = QVBoxLayout() #TAB1/COLUMN 1
         buttonRampSoakLayout1.setSpacing(10)
         buttonRampSoakLayout2 = QVBoxLayout() #TAB1/COLUMN 2
         buttonRampSoakLayout2.setSpacing(10)
-        #place rs labels in RampSoakLayout1 #TAB1/COLUNM 1
+        #place rs labels in RampSoakLayout1 #TAB1/COLUMN 1
         buttonRampSoakLayout1.addWidget(labelrs1)
         buttonRampSoakLayout1.addWidget(self.label_rs1)
         buttonRampSoakLayout1.addWidget(self.label_rs2)

@@ -108,8 +108,8 @@ class AillioR1:
         self.roast_number:int = -1
         self.fan_rpm:float = 0
 
-        self.parent_pipe:Optional['Connection'] = None # type:ignore[no-any-unimported,unused-ignore]
-        self.child_pipe:Optional['Connection'] = None # type:ignore[no-any-unimported,unused-ignore]
+        self.parent_pipe:Optional[Connection] = None # type:ignore[no-any-unimported,unused-ignore]
+        self.child_pipe:Optional[Connection] = None # type:ignore[no-any-unimported,unused-ignore]
         self.irt:float = 0
         self.pcbt:float = 0
         self.coil_fan:int = 0
@@ -161,10 +161,10 @@ class AillioR1:
                 self.usbhandle = usb.core.find(idVendor=self.AILLIO_VID,
                                                idProduct=self.AILLIO_PID_REV3, backend=backend)
         else:
-            self.usbhandle = libusb_package.find(idVendor=self.AILLIO_VID, # pyright:ignore[reportPossiblyUnboundVariable]
+            self.usbhandle = libusb_package.find(idVendor=self.AILLIO_VID, # pyright:ignore[reportPossiblyUnboundVariable] # pylint: disable=possibly-used-before-assignment
                                                  idProduct=self.AILLIO_PID)
             if self.usbhandle is None:
-                self.usbhandle = libusb_package.find(idVendor=self.AILLIO_VID, # pyright:ignore[reportPossiblyUnboundVariable]
+                self.usbhandle = libusb_package.find(idVendor=self.AILLIO_VID, # pyright:ignore[reportPossiblyUnboundVariable] # pylint: disable=possibly-used-before-assignment
                                                      idProduct=self.AILLIO_PID_REV3)
         if self.usbhandle is None:
             raise OSError('not found or no permission')
@@ -338,8 +338,8 @@ class AillioR1:
 
     def __updatestate(self, p:'Connection') -> None: # type:ignore[no-any-unimported,unused-ignore]
         while self.worker_thread_run:
-            state1:'array.array[int]' = array.array('B', bytes(0))
-            state2:'array.array[int]' = array.array('B', bytes(0))
+            state1:array.array[int] = array.array('B', bytes(0)) # pylint: disable=unsubscriptable-object
+            state2:array.array[int] = array.array('B', bytes(0)) # pylint: disable=unsubscriptable-object
             try:
                 self.__dbg('updatestate')
                 self.__sendcmd(self.AILLIO_CMD_STATUS1)

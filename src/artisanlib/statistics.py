@@ -172,7 +172,7 @@ class StatisticsDlg(ArtisanDialog):
         mainLayout.addLayout(buttonsLayout)
         mainLayout.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
         self.setLayout(mainLayout)
-        ok_button: Optional['QPushButton'] = self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
+        ok_button: Optional[QPushButton] = self.dialogbuttons.button(QDialogButtonBox.StandardButton.Ok)
         if ok_button is not None:
             ok_button.setFocus()
 
@@ -253,13 +253,10 @@ class StatisticsDlg(ArtisanDialog):
         self.aw.qmc.AUCguideFlag = self.guideFlag.isChecked()
         self.aw.qmc.AUClcdFlag = self.AUClcdFlag.isChecked()
         try:
-            if self.aw.qmc.TP_time_B:
-                _,_,auc,_ = self.aw.ts(tp=self.aw.qmc.backgroundtime2index(self.aw.qmc.TP_time_B),background=True)
-            else:
-                _,_,auc,_ = self.aw.ts(tp=0,background=True)
-            self.aw.qmc.AUCbackground = auc
+            self.aw.qmc.AUCbackground = self.aw.compute_auc_background()
         except Exception: # pylint: disable=broad-except
-            pass
+            self.aw.qmc.AUCbackground = -1
+
         if self.timez.isChecked():
             self.aw.qmc.statisticsflags[0] = 1
         else:

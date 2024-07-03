@@ -34,15 +34,15 @@ from artisanlib.widgets import MyQComboBox, MyQDoubleSpinBox
 _log: Final[logging.Logger] = logging.getLogger(__name__)
 
 try:
-    from PyQt6.QtCore import (Qt, pyqtSlot, QSettings, QTimer) # @UnusedImport @Reimport  @UnresolvedImport
-    from PyQt6.QtGui import (QStandardItemModel, QStandardItem, QColor) # @UnusedImport @Reimport  @UnresolvedImport
+    from PyQt6.QtCore import (Qt, pyqtSlot, QSettings, QTimer, QRegularExpression) # @UnusedImport @Reimport  @UnresolvedImport
+    from PyQt6.QtGui import (QStandardItemModel, QStandardItem, QColor, QIntValidator, QRegularExpressionValidator) # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtWidgets import (QApplication, QWidget, QCheckBox, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,  # @UnusedImport @Reimport  @UnresolvedImport
                                  QPushButton, QSpinBox, QTabWidget, QComboBox, QDialogButtonBox, QGridLayout, # @UnusedImport @Reimport  @UnresolvedImport
                                  QGroupBox, QRadioButton, # @UnusedImport @Reimport  @UnresolvedImport
                                  QTableWidget, QMessageBox, QHeaderView, QTableWidgetItem) # @UnusedImport @Reimport  @UnresolvedImport
 except ImportError:
-    from PyQt5.QtCore import (Qt, pyqtSlot, QSettings, QTimer) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
-    from PyQt5.QtGui import (QStandardItemModel, QStandardItem, QColor) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
+    from PyQt5.QtCore import (Qt, pyqtSlot, QSettings, QTimer, QRegularExpression) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
+    from PyQt5.QtGui import (QStandardItemModel, QStandardItem, QColor, QIntValidator, QRegularExpressionValidator) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtWidgets import (QApplication, QWidget, QCheckBox, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
                                  QPushButton, QSpinBox, QTabWidget, QComboBox, QDialogButtonBox, QGridLayout, # @UnusedImport @Reimport  @UnresolvedImport
                                  QGroupBox, QRadioButton, # @UnusedImport @Reimport  @UnresolvedImport
@@ -1117,15 +1117,23 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         ambientVBox.addLayout(ambientHBox)
         ambientVBox.addStretch()
         ambientVBox.setContentsMargins(0,0,0,0)
+
+        #https://stackoverflow.com/questions/106179/regular-expression-to-match-dns-hostname-or-ip-address
+        #ValidIpAddressRegex = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$";
+        #ValidHostnameRegex = "^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$";
+        regexhost = QRegularExpression(r'(^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$)|(^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$)')
+
         santokerHostLabel = QLabel(QApplication.translate('Label','Host'))
         self.santokerHost = QLineEdit(self.aw.santokerHost)
         self.santokerHost.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.santokerHost.setFixedWidth(150)
+        self.santokerHost.setValidator(QRegularExpressionValidator(regexhost,self.santokerHost))
         self.santokerHost.setEnabled(not self.aw.santokerSerial)
         santokerPortLabel = QLabel(QApplication.translate('Label','Port'))
         self.santokerPort = QLineEdit(str(self.aw.santokerPort))
         self.santokerPort.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.santokerPort.setFixedWidth(150)
+        self.santokerPort.setValidator(QIntValidator(1, 65535,self.santokerPort))
         self.santokerPort.setEnabled(not self.aw.santokerSerial)
         self.santokerSerialFlag = QCheckBox()
         self.santokerSerialFlag.setChecked(not self.aw.santokerSerial)
@@ -1134,11 +1142,13 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         self.kaleidoHost = QLineEdit(self.aw.kaleidoHost)
         self.kaleidoHost.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.kaleidoHost.setFixedWidth(150)
+        self.kaleidoHost.setValidator(QRegularExpressionValidator(regexhost,self.kaleidoHost))
         self.kaleidoHost.setEnabled(not self.aw.kaleidoSerial)
         kaleidoPortLabel = QLabel(QApplication.translate('Label','Port'))
         self.kaleidoPort = QLineEdit(str(self.aw.kaleidoPort))
         self.kaleidoPort.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.kaleidoPort.setFixedWidth(150)
+        self.kaleidoPort.setValidator(QIntValidator(1, 65535,self.kaleidoPort))
         self.kaleidoPort.setEnabled(not self.aw.kaleidoSerial)
         self.kaleidoSerialFlag = QCheckBox()
         self.kaleidoSerialFlag.setChecked(not self.aw.kaleidoSerial)
@@ -1146,6 +1156,17 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 #        kaleidoPIDLabel = QLabel('PID')
 #        self.kaleidoPIDFlag = QCheckBox()
 #        self.kaleidoPIDFlag.setChecked(self.aw.kaleidoPID)
+
+        mugmaHostLabel = QLabel(QApplication.translate('Label','Host'))
+        self.mugmaHost = QLineEdit(self.aw.mugmaHost)
+        self.mugmaHost.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.mugmaHost.setFixedWidth(150)
+        self.mugmaHost.setValidator(QRegularExpressionValidator(regexhost,self.mugmaHost))
+        mugmaPortLabel = QLabel(QApplication.translate('Label','Port'))
+        self.mugmaPort = QLineEdit(str(self.aw.mugmaPort))
+        self.mugmaPort.setValidator(QIntValidator(1, 65535,self.mugmaPort))
+        self.mugmaPort.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.mugmaPort.setFixedWidth(150)
 
         santokerNetworkGrid = QGridLayout()
         santokerNetworkGrid.addWidget(self.santokerSerialFlag,0,0)
@@ -1186,6 +1207,24 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         kaleidoVBox.addStretch()
         kaleidoVBox.setSpacing(5)
         kaleidoVBox.setContentsMargins(0,0,0,0)
+
+        mugmaNetworkGrid = QGridLayout()
+        mugmaNetworkGrid.addWidget(mugmaHostLabel,0,1)
+        mugmaNetworkGrid.addWidget(self.mugmaHost,0,2)
+        mugmaNetworkGrid.addWidget(mugmaPortLabel,1,1)
+        mugmaNetworkGrid.addWidget(self.mugmaPort,1,2)
+        mugmaNetworkGrid.setSpacing(20)
+        mugmaNetworkGroupBox = QGroupBox('Mugma')
+        mugmaNetworkGroupBox.setLayout(mugmaNetworkGrid)
+        mugmaHBox = QHBoxLayout()
+        mugmaHBox.addStretch()
+        mugmaHBox.addWidget(mugmaNetworkGroupBox)
+        mugmaHBox.addStretch()
+        mugmaVBox = QVBoxLayout()
+        mugmaVBox.addLayout(mugmaHBox)
+        mugmaVBox.addStretch()
+        mugmaVBox.setSpacing(5)
+        mugmaVBox.setContentsMargins(0,0,0,0)
 
         # create pid box
         PIDgrid = QGridLayout()
@@ -1334,9 +1373,13 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         tab6Layout.addLayout(ambientVBox)
         tab6Layout.setContentsMargins(2,10,2,5)
         #LAYOUT TAB 7 (Santoker)
-        tab7Layout = QVBoxLayout()
-        tab7Layout.addLayout(santokerVBox)
-        tab7Layout.addLayout(kaleidoVBox)
+        tab7VLayout = QVBoxLayout()
+        tab7VLayout.addLayout(santokerVBox)
+        tab7VLayout.addLayout(kaleidoVBox)
+        tab7VLayout.addStretch()
+        tab7Layout = QHBoxLayout()
+        tab7Layout.addLayout(tab7VLayout)
+        tab7Layout.addLayout(mugmaVBox)
         tab7Layout.addStretch()
         tab7Layout.setContentsMargins(2,10,2,5)
         #main tab widget
@@ -1381,7 +1424,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             self.restoreGeometry(settings.value('DeviceAssignmentGeometry'))
 
         # we set the active tab with a QTimer after the tabbar has been rendered once, as otherwise
-        # some tabs are not rendered at all on Winwos using Qt v6.5.1 (https://bugreports.qt.io/projects/QTBUG/issues/QTBUG-114204?filter=allissues)
+        # some tabs are not rendered at all on Windows using Qt v6.5.1 (https://bugreports.qt.io/projects/QTBUG/issues/QTBUG-114204?filter=allissues)
         QTimer.singleShot(50, self.setActiveTab)
 
     @pyqtSlot()
@@ -1929,9 +1972,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                 bindex = selected[0].topRow()
             if 0 <= bindex < len(self.aw.qmc.extradevices):
                 self.delextradevice(bindex)
-            self.aw.updateExtraLCDvisibility()
-            self.aw.qmc.resetlinecountcaches()
-            self.enableDisableAddDeleteButtons()
+                self.enableDisableAddDeleteButtons()
         except Exception as e: # pylint: disable=broad-except
             _t, _e, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message', 'Exception:') + ' deldevice(): {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
@@ -2008,7 +2049,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             self.aw.qmc.extraname2.pop(x)
             self.aw.qmc.extramathexpression1.pop(x)
             self.aw.qmc.extramathexpression2.pop(x)
-            self.aw.updateExtraLCDvisibility()
+            self.aw.updateLCDproperties()
             #pop serial port settings
             if len(self.aw.extracomport) > x:
                 self.aw.extracomport.pop(x)
@@ -2108,7 +2149,8 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 
                 # confirm the action
                 string = QApplication.translate('Message', 'Overwrite existing ET and BT values?')
-                reply = QMessageBox.warning(self.aw,QApplication.translate('Message', 'Caution - About to overwrite profile data'),string,
+                reply = QMessageBox.warning(None, #self.aw, # only without super this one shows the native dialog on macOS under Qt 6.6.2 and later
+                            QApplication.translate('Message', 'Caution - About to overwrite profile data'),string,
                             QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.Cancel)
                 if reply == QMessageBox.StandardButton.Cancel:
                     return
@@ -2119,7 +2161,8 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                 for j in range(len(self.aw.qmc.extradevices)):
                     if (re.search(etorbt,self.aw.qmc.extramathexpression1[j]) or re.search(etorbt,self.aw.qmc.extramathexpression2[j])):
                         string = QApplication.translate('Message', 'At least one Virtual Extra Device depends on ET or BT.  Do you want to update all the Virtual Extra Devices after ET and BT are updated?')
-                        reply = QMessageBox.warning(self.aw,QApplication.translate('Message', 'Caution - About to overwrite profile data'),string,
+                        reply = QMessageBox.warning(None, #self.aw, # only without super this one shows the native dialog on macOS under Qt 6.6.2 and later
+                                    QApplication.translate('Message', 'Caution - About to overwrite profile data'),string,
                                     QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No)
                         if reply == QMessageBox.StandardButton.Yes:
                             updatevirtualextradevices = True
@@ -2219,7 +2262,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                     colorname = argb_colorname2rgba_colorname(colorf.name(QColor.NameFormat.HexArgb))
                     self.aw.qmc.extradevicecolor1[i] = colorname
                     # set LCD label color
-                    self.aw.setLabelColor(self.aw.extraLCDlabel1[i],QColor(colorname[:7]))
+                    self.aw.setLabelColor(self.aw.extraLCDlabel1[i],colorname)
                     color1Button = cast(QPushButton, self.devicetable.cellWidget(i,1))
                     color1Button.setStyleSheet(f'border: none; outline: none; background-color: rgba{ImageColor.getcolor(self.aw.qmc.extradevicecolor1[i], "RGBA")}; color: { self.aw.labelBorW(self.aw.qmc.extradevicecolor1[i])}')
                     color1Button.setText(colorname)
@@ -2233,7 +2276,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                     colorname = argb_colorname2rgba_colorname(colorf.name(QColor.NameFormat.HexArgb))
                     self.aw.qmc.extradevicecolor2[i] = colorname
                     # set LCD label color
-                    self.aw.setLabelColor(self.aw.extraLCDlabel2[i],QColor(colorname))
+                    self.aw.setLabelColor(self.aw.extraLCDlabel2[i],colorname)
                     color2Button = cast(QPushButton, self.devicetable.cellWidget(i,2))
                     color2Button.setStyleSheet(f'border: none; outline: none; background-color: rgba{ImageColor.getcolor(self.aw.qmc.extradevicecolor2[i], "RGBA")}; color: {self.aw.labelBorW(self.aw.qmc.extradevicecolor2[i])}')
                     color2Button.setText(colorname)
@@ -3077,7 +3120,8 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                     permission_status:Optional[bool] = self.aw.app.getBluetoothPermission(request=True)
                     if permission_status is False:
                         msg:str = QApplication.translate('Message','Bluetootooth access denied')
-                        QMessageBox.warning(self, msg, msg)
+                        QMessageBox.warning(None, #self, # only without super this one shows the native dialog on macOS under Qt 6.6.2 and later
+                            msg, msg)
                 ##########################
                 ####  DEVICE 143 is +IKAWA SET/RPM but +DEVICE cannot be set as main device
                 ##########################
@@ -3158,6 +3202,22 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                     self.aw.ser.stopbits = 1
                     self.aw.ser.timeout = 0.7
                     message = QApplication.translate('Message','Device set to {0}. Now, choose serial port').format(meter)
+                ##########################
+                ####  DEVICE 164 is Mugma BT/ET
+                elif meter == 'Mugma BT/ET':
+                    self.aw.qmc.device = 164
+                    message = QApplication.translate('Message','Device set to {0}').format(meter)
+                ##########################
+                ##########################
+                ####  DEVICE 165 is +Mugma Heater/Fan but +DEVICE cannot be set as main device
+                ##########################
+                ##########################
+                ####  DEVICE 166 is +Mugma Catalyzer but +DEVICE cannot be set as main device
+                ##########################
+                ##########################
+                ####  DEVICE 167 is +Mugma SV but +DEVICE cannot be set as main device
+                ##########################
+
 
                 # ADD DEVICE:
 
@@ -3340,7 +3400,11 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                 9, # 160
                 3, # 161
                 3, # 162
-                3  # 163
+                3, # 163
+                1, # 164
+                1, # 165
+                1, # 166
+                1  # 167
                 ]
             #init serial settings of extra devices
             for i, _ in enumerate(self.aw.qmc.extradevices):
@@ -3466,6 +3530,11 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             except Exception: # pylint: disable=broad-except
                 pass
 #            self.aw.kaleidoPID = self.kaleidoPIDFlag.isChecked()
+            self.aw.mugmaHost = self.mugmaHost.text().strip()
+            try:
+                self.aw.mugmaPort = int(self.mugmaPort.text())
+            except Exception: # pylint: disable=broad-except
+                pass
             for i in range(8):
                 self.aw.qmc.phidget1018_async[i] = self.asyncCheckBoxes[i].isChecked()
                 self.aw.qmc.phidget1018_ratio[i] = self.ratioCheckBoxes[i].isChecked()

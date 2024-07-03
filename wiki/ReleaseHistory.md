@@ -5,19 +5,34 @@ Detailed Release History
 v2.10.6 (XX, 2024)
 ------------------
 
+
 * ADDITIONS
-  - adds flag to toggle compression, detailed device logging, and origin header for WebSocket communication
+  - adds compression toggle, detailed device logging, and origin header to WebSocket communication
+
 * NEW HARDWARE SUPPORT
-  - adds Bühler RM20 Simatic Legacy setup suporting older firmware versions not returning the machine state
+  - adds setups for [IP CC machines]() featuring Mitshubishi PLCs
+  - adds [Bühler RM20](https://www.buhlergroup.com/global/de/products/roastmaster_coffeeroaster.html) Simatic Legacy setup supporting older firmware versions not returning the machine state
+  - adds support for the [Phidget RCC0004 server motor controller](https://phidgets.com/?prodid=1147) ([Discussion #1546](../../../discussions/1546))
+  - adds Hottop Command `control` to activate and deactivate the control function of the machine via event buttons and alarms
+  - adds `{WEIGHTin}` placeholder substitude by the current batch size (g) in command actions
+  - adds "Load p-i-d from background" setting to configure the PID to the settings stored in background profile
+  - adds support for transparent colors
+
 * CHANGES
-  - only reset roasting notes on reset if profile is loaded ([Issue #1521](../../../issues/1521))
+  - only reset roasting notes on RESET if profile is loaded ([Issue #1521](../../../issues/1521))
+  - disable input filtering for device channel of binary or special types like NONE, dummy, and slider values
+
 * FIXES
   - fixes regression preventing Artisan v2.10.2 and v2.10.4 to connect successfully to Probat Series III machines via WebSockets incl. the Probat Sample Roaster
   - fixes regression in Roast Properties, unable to change/add ground color value ([Issue #1520](../../../issues/1520))
   - fixes regressions in table copy functions
+  - fixes regression introduced in v2.8.4 that prevented the cupping chart being added properly to roast reports ([Discussion #1563](../../../discussions/1563))
+  - fixes event playback by temperature being blocked by already past background events if playback is turned ON during a roast
   - avoids rendering timestamps as "xx:60" in mouse pointer time/temp/RoR widget
   - ensures that time-axis ticks extend over the full range of readings w.r.t. the loaded background and foreground profiles
+
 * REMOVALS
+
 
 ----
 v2.10.4 (March 21, 2024)

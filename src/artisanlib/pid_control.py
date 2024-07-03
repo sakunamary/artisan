@@ -765,7 +765,7 @@ class FujiPID:
             if self.aw.ser.useModbusPort or (r is not None and r == command):
                 if not silent:
                     # [Not sure the following will translate or even format properly... Need testing!]
-                    message = QApplication.translate('Message','PXG/PXF sv#{0} set to {1}').format(reg_dict['selectsv'][0],'%.1f' % float(value)) # pylint: disable=consider-using-f-string
+                    message = QApplication.translate('Message','PXG/PXF sv#{0} set to {1}').format(reg_dict['selectsv'][0],'%.1f' % float(value)) # pylint: disable=consider-using-f-string # noqa: UP031
                     self.aw.sendmessage(message)
                     reg_dict[svkey][0] = value
                     #record command as an Event
@@ -794,7 +794,7 @@ class FujiPID:
             if self.aw.ser.useModbusPort or (r is not None and r == command):
                 if not silent:
                     # [Not sure the following will translate or even format properly... Need testing!]
-                    message = QApplication.translate('Message','PXR sv set to {0}').format('%.1f' % float(value)) # pylint: disable=consider-using-f-string
+                    message = QApplication.translate('Message','PXR sv set to {0}').format('%.1f' % float(value)) # pylint: disable=consider-using-f-string # noqa: UP031
                     self.aw.fujipid.PXR['sv0'][0] = value
                     self.aw.sendmessage(message)
                     #record command as an Event
@@ -1134,7 +1134,7 @@ class FujiPID:
 ###################################################################################
 
 class PIDcontrol:
-    __slots__ = [ 'aw', 'pidActive', 'sv', 'pidOnCHARGE', 'createEvents', 'loadRampSoakFromProfile', 'loadRampSoakFromBackground', 'svLen', 'svLabel',
+    __slots__ = [ 'aw', 'pidActive', 'sv', 'pidOnCHARGE', 'loadpidfrombackground', 'createEvents', 'loadRampSoakFromProfile', 'loadRampSoakFromBackground', 'svLen', 'svLabel',
             'svValues', 'svRamps', 'svSoaks', 'svActions', 'svBeeps', 'svDescriptions','svTriggeredAlarms', 'RSLen', 'RS_svLabels', 'RS_svValues', 'RS_svRamps', 'RS_svSoaks',
             'RS_svActions', 'RS_svBeeps', 'RS_svDescriptions', 'svSlider', 'svButtons', 'svMode', 'svLookahead', 'dutySteps', 'svSliderMin', 'svSliderMax', 'svValue',
             'dutyMin', 'dutyMax', 'pidKp', 'pidKi', 'pidKd', 'pOnE', 'pidSource', 'pidCycle', 'pidPositiveTarget', 'pidNegativeTarget', 'invertControl',
@@ -1143,11 +1143,12 @@ class PIDcontrol:
             'negativeTargetMin', 'negativeTargetMax', 'derivative_filter']
 
     def __init__(self, aw:'ApplicationWindow') -> None:
-        self.aw:'ApplicationWindow' = aw
+        self.aw:ApplicationWindow = aw
         self.pidActive:bool = False
         self.sv:Optional[float] = None # the last sv send to the Arduino
         #
         self.pidOnCHARGE:bool = False
+        self.loadpidfrombackground = False # if True, p-i-d parameters pidKp, pidKi, pidKd, pidSource, pOnE and svLookahead are set from the background profile
         self.createEvents:bool = False
         self.loadRampSoakFromProfile:bool = False
         self.loadRampSoakFromBackground:bool = False
@@ -1577,7 +1578,7 @@ class PIDcontrol:
             if self.aw.qmc.timeindex[0] < 0: # before CHARGE, the CHARGE temp of the background profile is returned
                 if self.aw.qmc.timeindexB[0] < 0:
                     # no CHARGE in background, return manual SV
-                    return max(self.svSliderMin,(min(self.svSliderMax,self.svValue)))
+                    return max(float(self.svSliderMin),(min(float(self.svSliderMax),self.svValue)))
                 # if background contains a CHARGE event
                 if followCurveNr == 1: # we observe the BT
                     res = self.aw.qmc.backgroundBTat(self.aw.qmc.timeB[self.aw.qmc.timeindexB[0]]) # approximated background

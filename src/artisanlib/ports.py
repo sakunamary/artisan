@@ -379,7 +379,7 @@ class comportDlg(ArtisanResizeablDialog):
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False) # overwrite the ArtisanDialog class default here!!
         self.setWindowTitle(QApplication.translate('Form Caption','Ports Configuration'))
         self.setModal(True)
-        self.helpdialog:Optional['HelpDlg'] = None
+        self.helpdialog:Optional[HelpDlg] = None
         ##########################    TAB 1 WIDGETS
         comportlabel =QLabel(QApplication.translate('Label', 'Comm Port'))
         self.comportEdit = PortComboBox(selection = self.aw.ser.comport)
@@ -1675,7 +1675,8 @@ class comportDlg(ArtisanResizeablDialog):
             permission_status:Optional[bool] = self.aw.app.getBluetoothPermission(request=True)
             if permission_status is False:
                 message:str = QApplication.translate('Message','Bluetootooth access denied')
-                QMessageBox.warning(self, message, message)
+                QMessageBox.warning(None, #self, # only without super this one shows the native dialog on macOS under Qt 6.6.2 and later
+                    message, message)
 
 
     @pyqtSlot(int)
