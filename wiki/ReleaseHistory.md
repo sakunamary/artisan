@@ -2,36 +2,59 @@ Detailed Release History
 ========================
 
 ----
-v2.10.6 (XX, 2024)
+v3.0.1
+------------------
+
+* ADDITIONS
+
+* NEW HARDWARE SUPPORT
+
+* CHANGES
+
+* FIXES
+
+* REMOVALS
+  - removes support for MOBDUS Serial Binary
+
+
+----
+v3.0.0 (August 1, 2024)
 ------------------
 
 
 * ADDITIONS
-  - adds compression toggle, detailed device logging, and origin header to WebSocket communication
+  - adds support for the [execution of roast plans](https://doc.artisan.plus/docs/schedule/#plan-execution) scheduled on [artisan.plus](https://artisan.plus)
+  - adds advanced summary statistics
+  - adds support for transparent colors
+  - adds `{WEIGHTin}` placeholder substitute by the current batch size (g) in command actions
+  - adds additional button label substitutions, `\V`, `\F` and `\T` reporting the event value, the event value interpreted as temperature in Fahrenheit, and the event value interpreted as temperature in Celsius. The last two are automatically converted to the currently selected temperature unit.
+  - adds "Load p-i-d from background" setting to configure the PID to the settings stored in background profile
+  - capture and persist between-batch protocol (BBP) data as measured during a roasting session
 
 * NEW HARDWARE SUPPORT
-  - adds setups for [IP CC machines]() featuring Mitshubishi PLCs
-  - adds [Bühler RM20](https://www.buhlergroup.com/global/de/products/roastmaster_coffeeroaster.html) Simatic Legacy setup supporting older firmware versions not returning the machine state
+  - adds machine support for the [BeanGo Cube X](https://artisan-scope.org/machines/beango/)
+  - adds machine support for [MUGMA Roasters](https://artisan-scope.org/machines/mugma/)
+  - adds updated [Sivetz fluid bed roasting machines](https://artisan-scope.org/machines/sivetz/) support for the latest machines recording also fan changes
+  - adds machine support for [iRm roasting machines](https://www.irm.coffee/) featuring Mitshubishi PLCs
+  - adds [Bühler RM20](https://www.buhlergroup.com/global/de/products/roastmaster_coffeeroaster.html) Simatic Legacy setup supporting older firmware versions not returning the machine state ([Issue #1529](../../../issues/1529))
   - adds support for the [Phidget RCC0004 server motor controller](https://phidgets.com/?prodid=1147) ([Discussion #1546](../../../discussions/1546))
+  - adds support for the to-be-release Phidget TMP1202 module
   - adds Hottop Command `control` to activate and deactivate the control function of the machine via event buttons and alarms
-  - adds `{WEIGHTin}` placeholder substitude by the current batch size (g) in command actions
-  - adds "Load p-i-d from background" setting to configure the PID to the settings stored in background profile
-  - adds support for transparent colors
+  - adds compression toggle, detailed device logging, and origin header to WebSocket communication
 
 * CHANGES
   - only reset roasting notes on RESET if profile is loaded ([Issue #1521](../../../issues/1521))
-  - disable input filtering for device channel of binary or special types like NONE, dummy, and slider values
+  - disable input filtering on device channel of binary or special types like NONE, dummy, and slider values
 
 * FIXES
-  - fixes regression preventing Artisan v2.10.2 and v2.10.4 to connect successfully to Probat Series III machines via WebSockets incl. the Probat Sample Roaster
+  - fixes regression preventing Artisan v2.10.2 and v2.10.4 to connect successfully to Probat Series III machines via WebSockets incl. the Probat Sample Roaster ([Issue #1531](../../../issues/1531))
   - fixes regression in Roast Properties, unable to change/add ground color value ([Issue #1520](../../../issues/1520))
   - fixes regressions in table copy functions
   - fixes regression introduced in v2.8.4 that prevented the cupping chart being added properly to roast reports ([Discussion #1563](../../../discussions/1563))
   - fixes event playback by temperature being blocked by already past background events if playback is turned ON during a roast
   - avoids rendering timestamps as "xx:60" in mouse pointer time/temp/RoR widget
   - ensures that time-axis ticks extend over the full range of readings w.r.t. the loaded background and foreground profiles
-
-* REMOVALS
+  - fixes a regression preventing the correct persistence of default SV values ([Issue #1631](../../../issues/1631))
 
 
 ----
@@ -46,9 +69,9 @@ v2.10.4 (March 21, 2024)
   - fixes regression which broke devices Omega HH309 34 and the just introduced Digi-Sense 20250-07 and Extech 42570 ([PR #1481](../../../pull/1481))
   - fixes regression introduced in v2.8.4 which broke persisting volume changes made in Roast Properties dialog ([Discussion #1511](../../../discussions/1511))
   - fixes regression which broke persistence of custom column width of alarm and extra device and table
-  - fixes regression which broke the formating of extra curve data in background event table
+  - fixes regression which broke the formatting of extra curve data in background event table
   - fixes regression which broke the automatic opening of completed profiles in ArtisanViewer ([Issue #1516](../../../issues/1516))
-  - improves formating of profile and background data tables, custom event button table, alarm table and extra device table
+  - improves formatting of profile and background data tables, custom event button table, alarm table and extra device table
   - fixes Linux builds that failed to start Artisan v2.10.2 on some configurations
   - fixes phases bar rendering in case CHARGE is not set
 

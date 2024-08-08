@@ -1059,8 +1059,8 @@ class EventsDlg(ArtisanResizeablDialog):
         self.curvenames.append(QApplication.translate('ComboBox','ET'))
         self.curvenames.append(QApplication.translate('ComboBox','BT'))
         for i in range(len(self.aw.qmc.extradevices)):
-            self.curvenames.append(str(i) + 'xT1: ' + self.aw.qmc.extraname1[i])
-            self.curvenames.append(str(i) + 'xT2: ' + self.aw.qmc.extraname2[i])
+            self.curvenames.append(self.aw.qmc.extraname1[i].format(self.etype0.text(),self.etype1.text(),self.etype2.text(),self.etype3.text()))
+            self.curvenames.append(self.aw.qmc.extraname2[i].format(self.etype0.text(),self.etype1.text(),self.etype2.text(),self.etype3.text()))
         self.E1SourceComboBox = QComboBox()
         self.E1SourceComboBox.addItems(self.curvenames)
         if self.aw.eventquantifiersource[0] < len(self.curvenames):
@@ -1844,8 +1844,7 @@ class EventsDlg(ArtisanResizeablDialog):
                     # loop over that data and classify each value
                     ld:Optional[float] = None # last digitized value
                     lt:Optional[float] = None # last digitized temp value
-                    for ii, __ in enumerate(temp):
-                        t = temp[ii]
+                    for ii, t in enumerate(temp):
                         if t != -1: # -1 is an error value
                             d = self.aw.digitize(t,linespace,self.aw.eventquantifiercoarse[i],i)
                             if d is not None and (ld is None or ld != d) and (ld is None or lt is None or linespacethreshold < abs(t - lt)):
@@ -1947,6 +1946,31 @@ class EventsDlg(ArtisanResizeablDialog):
         self.E2max.setValue(self.aw.eventquantifiermax[1])
         self.E3max.setValue(self.aw.eventquantifiermax[2])
         self.E4max.setValue(self.aw.eventquantifiermax[3])
+        self.curvenames = []
+#        self.curvenames.append(QApplication.translate('ComboBox','ET'))
+#        self.curvenames.append(QApplication.translate('ComboBox','BT'))
+        self.curvenames.append(self.aw.ETname.format(self.etype0.text(),self.etype1.text(),self.etype2.text(),self.etype3.text()))
+        self.curvenames.append(self.aw.BTname.format(self.etype0.text(),self.etype1.text(),self.etype2.text(),self.etype3.text()))
+        for i in range(len(self.aw.qmc.extradevices)):
+            self.curvenames.append(self.aw.qmc.extraname1[i].format(self.etype0.text(),self.etype1.text(),self.etype2.text(),self.etype3.text()))
+            self.curvenames.append(self.aw.qmc.extraname2[i].format(self.etype0.text(),self.etype1.text(),self.etype2.text(),self.etype3.text()))
+        self.E1SourceComboBox.clear()
+        self.E1SourceComboBox.addItems(self.curvenames)
+        if self.aw.eventquantifiersource[0] < len(self.curvenames):
+            self.E1SourceComboBox.setCurrentIndex(self.aw.eventquantifiersource[0])
+        self.E2SourceComboBox.clear()
+        self.E2SourceComboBox.addItems(self.curvenames)
+        if self.aw.eventquantifiersource[1] < len(self.curvenames):
+            self.E2SourceComboBox.setCurrentIndex(self.aw.eventquantifiersource[1])
+        self.E3SourceComboBox.clear()
+        self.E3SourceComboBox.addItems(self.curvenames)
+        if self.aw.eventquantifiersource[2] < len(self.curvenames):
+            self.E3SourceComboBox.setCurrentIndex(self.aw.eventquantifiersource[2])
+        self.E4SourceComboBox.clear()
+        self.E4SourceComboBox.addItems(self.curvenames)
+        if self.aw.eventquantifiersource[3] < len(self.curvenames):
+            self.E4SourceComboBox.setCurrentIndex(self.aw.eventquantifiersource[3])
+
 
     def updateStyleTab(self) -> None:
         # update color button texts
@@ -2579,7 +2603,7 @@ class EventsDlg(ArtisanResizeablDialog):
             colorButton.clicked.connect(self.setbuttoncolor)
             label = self.extraeventslabels[i][:]
             et = self.extraeventstypes[i]
-            label = self.aw.substButtonLabel(-1,label,et)
+            label = self.aw.substButtonLabel(-1,label,et, self.extraeventsvalues[i])
             colorButton.setText(label)
             colorButton.setStyleSheet(f'border: none; outline: none; background-color: {self.extraeventbuttoncolor[i]}; color: {self.extraeventbuttontextcolor[i]};')
             #8 Text Color
@@ -2767,7 +2791,7 @@ class EventsDlg(ArtisanResizeablDialog):
             label = label.replace('\\n', chr(10))
             if i < len(self.extraeventslabels):
                 self.extraeventslabels[i] = label
-                label = self.aw.substButtonLabel(-1, label, self.extraeventstypes[i])
+                label = self.aw.substButtonLabel(-1, label, self.extraeventstypes[i], self.extraeventsvalues[i])
             #Update Color Buttons
             colorButton = cast(QPushButton, self.eventbuttontable.cellWidget(i,7))
             colorButton.setText(label)
@@ -2794,13 +2818,12 @@ class EventsDlg(ArtisanResizeablDialog):
                 elif evType == 4:
                     evType = 9 # and map the entry 4 to 9
                 self.extraeventstypes[i] = evType
-
             labeledit = cast(QLineEdit, self.eventbuttontable.cellWidget(i,0))
             label = labeledit.text()
             label = label.replace('\\n', chr(10))
             if i < len(self.extraeventslabels):
                 self.extraeventslabels[i] = label
-                label = self.aw.substButtonLabel(-1, label, self.extraeventstypes[i])
+                label = self.aw.substButtonLabel(-1, label, self.extraeventstypes[i], self.extraeventsvalues[i])
             #Update Color Buttons
             colorButton = cast(QPushButton, self.eventbuttontable.cellWidget(i,7))
             colorButton.setText(label)
@@ -2814,6 +2837,18 @@ class EventsDlg(ArtisanResizeablDialog):
             valueedit = cast(QLineEdit, self.eventbuttontable.cellWidget(i,3))
             if i < len(self.extraeventsvalues):
                 self.extraeventsvalues[i] = self.aw.qmc.str2eventsvalue(str(valueedit.text()))
+                labeledit = cast(QLineEdit, self.eventbuttontable.cellWidget(i,0))
+                label = labeledit.text()
+                label = label.replace('\\n', chr(10))
+                if i < len(self.extraeventslabels):
+                    self.extraeventslabels[i] = label
+                    label = self.aw.substButtonLabel(-1, label, self.extraeventstypes[i], self.extraeventsvalues[i])
+                #Update Color Buttons
+                colorButton = cast(QPushButton, self.eventbuttontable.cellWidget(i,7))
+                colorButton.setText(label)
+                colorTextButton = cast(QPushButton, self.eventbuttontable.cellWidget(i,8))
+                colorTextButton.setText(label)
+
 
     @pyqtSlot(int)
     def setactioneventbutton(self, _:int) -> None:

@@ -241,8 +241,9 @@ def addNum2dict(
         if n is not None and factor is not None and isinstance(n, (float, int)):
             n = n * factor
         n = limitnum(minn, maxn, n)  # may return None
+        n = float2floatMin(n, digits)
         if n:
-            dict_target[key_target] = float2floatMin(n, digits)
+            dict_target[key_target] = n
 
 
 # consumes a list of source-target pairs, or just strings used as both source
@@ -420,6 +421,8 @@ def roastLink(plus_roast:str) -> str:
 def remindersLink() -> str:
     return f'{config.web_base_url}/{getLanguage()}/reminders'
 
+def schedulerLink() -> str:
+    return f'{config.web_base_url}/{getLanguage()}/schedule'
 
 # HiRes plus QMessageBox icon
 

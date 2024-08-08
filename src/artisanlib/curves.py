@@ -329,7 +329,6 @@ class CurvesDlg(ArtisanDialog):
         self.org_deltaBTfilter = self.aw.qmc.deltaBTfilter
         self.org_deltaBTspan = self.aw.qmc.deltaBTspan
         self.org_deltaETspan = self.aw.qmc.deltaETspan
-        self.org_graphstyle = self.aw.qmc.graphstyle
         self.org_ETname = self.aw.ETname
         self.org_BTname = self.aw.BTname
         self.org_foregroundShowFullflag = self.aw.qmc.foregroundShowFullflag
@@ -1693,11 +1692,11 @@ class CurvesDlg(ArtisanDialog):
             EQU = [str(self.equedit1.text()),str(self.equedit2.text())]
             incompatiblevars:List[str] = ['P','F','$','#']
             error = ''
-            for i, _iv in enumerate(incompatiblevars):
-                if incompatiblevars[i] in EQU[0]:
-                    error = f'P1: \n-{incompatiblevars[i]}\n\n[{EQU[0]}]'
-                elif incompatiblevars[i] in EQU[1]:
-                    error = f'P2: \n-{incompatiblevars[i]}\n\n[{EQU[1]}]'
+            for iv in incompatiblevars:
+                if iv in EQU[0]:
+                    error = f'P1: \n-{iv}\n\n[{EQU[0]}]'
+                elif iv in EQU[1]:
+                    error = f'P2: \n-{iv}\n\n[{EQU[1]}]'
 
             if error:
                 string = QApplication.translate('Message','Incompatible variables found in %s')%error
@@ -2329,7 +2328,11 @@ class CurvesDlg(ArtisanDialog):
     @pyqtSlot(int)
     def changeGraphFont(self, n:int) -> None:
         self.aw.qmc.graphfont = n
-        self.aw.setFonts()
+        #self.aw.setFonts()
+        self.aw.setFonts(redraw=True)
+        # addl redraw only when not ON and Show Summary is enabled
+        if not self.aw.qmc.flagon and self.aw.qmc.statssummary:
+            self.aw.qmc.redraw(recomputeAllDeltas=True, re_smooth_background=True)  #note:for summary statistics there is still a slight shift seen on redraw() at accept.
 
     @pyqtSlot()
     def changeDeltaBTfilter(self) -> None:
@@ -2523,7 +2526,11 @@ class CurvesDlg(ArtisanDialog):
         self.aw.qmc.resetlinecountcaches()
         self.aw.qmc.resetlines()
         self.aw.qmc.updateDeltaSamples()
-        self.aw.qmc.redraw_keep_view(recomputeAllDeltas=True, re_smooth_background=True)
+
+        if self.aw.qmc.statssummary and self.aw.qmc.autotimex:
+            self.aw.qmc.redraw(recomputeAllDeltas=True, re_smooth_background=True)
+        else:
+            self.aw.qmc.redraw_keep_view(recomputeAllDeltas=True, re_smooth_background=True)
         self.aw.clearMessageLine() #clears plotter possible exceptions if Cancel
 
         self.reject()
@@ -2568,7 +2575,7 @@ class CurvesDlg(ArtisanDialog):
         self.aw.qmc.filterDropOuts = self.FilterSpikes.isChecked()
         self.aw.qmc.dropSpikes = self.DropSpikes.isChecked()
         self.aw.qmc.dropDuplicates = self.DropDuplicates.isChecked()
-        self.aw.qmc.dropDuplicatesLimit = self.DropDuplicatesLimit.value()
+        self.aw.qmc.dropDuplicatesLimit = float2float(self.DropDuplicatesLimit.value(),2)
         self.aw.qmc.minmaxLimits = self.MinMaxLimits.isChecked()
         self.aw.qmc.filterDropOut_tmin = int(self.minLimit.value())
         self.aw.qmc.filterDropOut_tmax = int(self.maxLimit.value())
@@ -2586,6 +2593,10 @@ class CurvesDlg(ArtisanDialog):
         self.aw.cacheCurveVisibilities()
         self.aw.qmc.resetlinecountcaches()
         self.aw.qmc.resetlines()
-        self.aw.qmc.redraw_keep_view(recomputeAllDeltas=True, re_smooth_background=True)
+        if self.aw.qmc.statssummary and self.aw.qmc.autotimex:
+            self.aw.qmc.redraw(recomputeAllDeltas=True, re_smooth_background=True)
+        else:
+            self.aw.qmc.redraw_keep_view(recomputeAllDeltas=True, re_smooth_background=True)
+
 #        self.aw.closeEventSettings()
         self.accept()

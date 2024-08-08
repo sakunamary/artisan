@@ -775,7 +775,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 #        phidgetBox1200_2.setSpacing(1)
         phidgetGroupBoxLayout.setContentsMargins(0,0,0,0) # left, top, right, bottom
 
-        phidget1200GroupBox = QGroupBox('TMP1200 RTD')
+        phidget1200GroupBox = QGroupBox('TMP1200/1202 RTD')
         phidget1200GroupBox.setLayout(phidgetGroupBoxLayout)
         phidget1200GroupBox.setContentsMargins(0,2,0,0) # left, top, right, bottom
 
@@ -3212,10 +3212,18 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                 ####  DEVICE 165 is +Mugma Heater/Fan but +DEVICE cannot be set as main device
                 ##########################
                 ##########################
-                ####  DEVICE 166 is +Mugma Catalyzer but +DEVICE cannot be set as main device
+                ####  DEVICE 166 is +Mugma Heater/Catalyzer but +DEVICE cannot be set as main device
                 ##########################
                 ##########################
                 ####  DEVICE 167 is +Mugma SV but +DEVICE cannot be set as main device
+                ##########################
+                ##########################
+                elif meter == 'Phidget TMP1202 1xRTD A':
+                    self.aw.qmc.device = 168
+                    message = QApplication.translate('Message','Device set to {0}').format(meter)
+                ##########################
+                ##########################
+                ####  DEVICE 169 is +TMP1202_2 (a second TMP1202 configuration)
                 ##########################
 
 
@@ -3404,7 +3412,9 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                 1, # 164
                 1, # 165
                 1, # 166
-                1  # 167
+                1, # 167
+                1, # 168
+                1  # 169
                 ]
             #init serial settings of extra devices
             for i, _ in enumerate(self.aw.qmc.extradevices):
@@ -3558,6 +3568,8 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             except Exception as e: # pylint: disable=broad-except
                 _log.exception(e)
 
+            self.aw.qmc.intChannel.cache_clear() # device type and thus int channels might have been changed
+            self.aw.qmc.clearLCDs()
             self.aw.qmc.redraw(recomputeAllDeltas=False)
             self.aw.sendmessage(message)
             #open serial conf Dialog

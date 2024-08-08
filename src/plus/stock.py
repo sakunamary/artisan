@@ -33,6 +33,7 @@ except Exception: # pylint: disable=broad-except
 import copy
 import json
 import time
+import datetime
 import logging
 
 from artisanlib.util import (decodeLocal, encodeLocal, getDirectory, is_int_list, is_float_list, render_weight,
@@ -192,37 +193,36 @@ class Worker(QObject): # pyright: ignore [reportGeneralTypeIssues] # Argument to
         global stock  # pylint: disable=global-statement
         _log.debug('fetch()')
         try:
-            # fetch from server
-            d = connection.getData(config.stock_url)
+            # fetch from server (send along the current date to have the server filter the schedule correctly for the local timezone)
+            d = connection.getData(f'{config.stock_url}?today={datetime.datetime.now().astimezone().date()}')
             _log.debug('-> %s', d.status_code)
-            j = d.json()
-            if j:
-                rlimit,rused,pu,notifications,machines = util.extractAccountState(j)
-                self.replySignal.emit(rlimit,rused,pu,notifications,machines)
-            if 'success' in j and j['success'] and 'result' in j and j['result'] is not None:
-                try:
-                    stock_semaphore.acquire(1)
-                    stock = j['result']
-                    if stock is not None:
-                        stock['retrieved'] = time.time()
-                    _log.debug('-> retrieved')
-#                    _log.debug("stock = %s", stock)
-                finally:
-                    if stock_semaphore.available() < 1:
-                        stock_semaphore.release(1)
-                controller.reconnected()
-                return True
+            if d.status_code != 204 and d.headers['content-type'].strip().startswith('application/json'):
+                j = d.json()
+                if j:
+                    rlimit,rused,pu,notifications,machines = util.extractAccountState(j)
+                    self.replySignal.emit(rlimit,rused,pu,notifications,machines)
+                if 'success' in j and j['success'] and 'result' in j and j['result'] is not None:
+                    try:
+                        stock_semaphore.acquire(1)
+                        stock = j['result']
+                        if stock is not None:
+                            stock['retrieved'] = time.time()
+                        _log.debug('-> retrieved')
+    #                    _log.debug("stock = %s", stock)
+                    finally:
+                        if stock_semaphore.available() < 1:
+                            stock_semaphore.release(1)
+                    controller.reconnected()
+                    return True
+            _log.error('204: empty response on fetching stock')
             return False
         except Exception as e:  # pylint: disable=broad-except
             _log.exception(e)
             controller.disconnect(remove_credentials=False, stop_queue=False)
             return False
 
-@pyqtSlot()
-def update() -> None:
-    _log.debug('update()')
+def getWorker() -> Optional['Worker']:
     global worker, worker_thread  # pylint: disable=global-statement
-
     try:
         if worker_thread is None:
             worker_thread = QThread()
@@ -233,6 +233,16 @@ def update() -> None:
             worker.replySignal.connect(util.updateLimits)
             worker.updatedSignal.connect(util.updateSchedule)
             worker.upToDateSignal.connect(util.updateSchedule)
+        return worker
+    except Exception as e:  # pylint: disable=broad-except
+        _log.exception(e)
+    return None
+
+@pyqtSlot()
+def update() -> None:
+    _log.debug('update()')
+    try:
+        getWorker()
         if worker is not None:
             worker.startSignal.emit()
     except Exception as e:  # pylint: disable=broad-except
@@ -253,7 +263,7 @@ def save() -> None:
         if stock is not None:
             f:TextIO
             with open(stock_cache_path, 'w', encoding='utf-8') as f:
-                json.dump(stock, f)
+                json.dump(stock, f, indent=None, separators=(',', ':'), ensure_ascii=False)
     except Exception as e:  # pylint: disable=broad-except
         _log.error(e)
     finally:
@@ -520,7 +530,7 @@ def coffee2beans(c:Coffee) -> str:
             vs = [
                 v.strip()
                 for v in c['varietals']
-                if v is not None and v != 'null' and v != ''
+                if v is not None and v not in {'null', ''}
             ]
             if processing == '':
                 varietals = f" {', '.join(vs)}"

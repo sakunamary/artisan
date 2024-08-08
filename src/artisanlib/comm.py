@@ -529,8 +529,10 @@ class serialport:
                                    self.Extech42570,          #163
                                    self.Mugma_BTET,           #164
                                    self.Mugma_HeaterFan,      #165
-                                   self.Mugma_Catalyzer,      #166
-                                   self.Mugma_SV              #167
+                                   self.Mugma_HeaterCatalyzer, #166
+                                   self.Mugma_SV,             #167
+                                   self.PHIDGET_TMP1202,      #168
+                                   self.PHIDGET_TMP1202_2     #169
                                    ]
         #string with the name of the program for device #27
         self.externalprogram:str = 'test.py'
@@ -1084,6 +1086,19 @@ class serialport:
         t,a = self.PHIDGET1045temperature(DeviceID.PHIDID_TMP1200,alternative_conf=True)
         return tx,a,t
 
+    def PHIDGET_TMP1202(self) -> Tuple[float,float,float]:
+        tx = self.aw.qmc.timeclock.elapsedMilli()
+        t,a = self.PHIDGET1045temperature(
+            158) #DeviceID.PHIDID_TMP1202)
+        return tx,a,t
+
+    def PHIDGET_TMP1202_2(self) -> Tuple[float,float,float]:
+        tx = self.aw.qmc.timeclock.elapsedMilli()
+        t,a = self.PHIDGET1045temperature(
+            158, #DeviceID.PHIDID_TMP1202,
+            alternative_conf=True)
+        return tx,a,t
+
     def PHIDGET_HUB0000(self) -> Tuple[float,float,float]:
         tx = self.aw.qmc.timeclock.elapsedMilli()
         v2,v1  = self.PHIDGET1018values(DeviceID.PHIDID_HUB0000,0,'voltage')
@@ -1635,19 +1650,20 @@ class serialport:
     def Mugma_HeaterFan(self) -> Tuple[float,float,float]:
         tx = self.aw.qmc.timeclock.elapsedMilli()
         if self.aw.mugma is not None:
-            t1 = self.aw.mugma.getHeater()
-            t2 = self.aw.mugma.getFan()
+            t1 = self.aw.mugma.getFan()
+            t2 = self.aw.mugma.getHeater()
         else:
             t1 = t2 = -1
         return tx,t1,t2 # time, Fan (chan2), Heater (chan1)
 
-    def Mugma_Catalyzer(self) -> Tuple[float,float,float]:
+    def Mugma_HeaterCatalyzer(self) -> Tuple[float,float,float]:
         tx = self.aw.qmc.timeclock.elapsedMilli()
         if self.aw.mugma is not None:
-            t1 = t2 = self.aw.mugma.getCatalyzer()
+            t1 = self.aw.mugma.getCatalyzer()
+            t2 = self.aw.mugma.getHeater()
         else:
             t1 = t2 = -1
-        return tx,t1,t2 # time, Catalyzer (chan2), Catalyzer (chan1)
+        return tx,t1,t2 # time, Catalyzer (chan2), Heater (chan1)
 
     def Mugma_SV(self) -> Tuple[float,float,float]:
         tx = self.aw.qmc.timeclock.elapsedMilli()
@@ -3254,7 +3270,7 @@ class serialport:
         try:
             if self.aw.qmc.phidgetManager is not None:
                 self.aw.qmc.phidgetManager.reserveSerialPort(serial,port,0,'PhidgetTemperatureSensor',deviceType,remote=self.aw.qmc.phidgetRemoteFlag,remoteOnly=self.aw.qmc.phidgetRemoteOnlyFlag)
-                if deviceType != DeviceID.PHIDID_TMP1200:
+                if deviceType not in {DeviceID.PHIDID_TMP1200, 158}: #DeviceID.PHIDID_TMP1202}:
                     self.aw.qmc.phidgetManager.reserveSerialPort(serial,port,1,'PhidgetTemperatureSensor',deviceType,remote=self.aw.qmc.phidgetRemoteFlag,remoteOnly=self.aw.qmc.phidgetRemoteOnlyFlag)
                 if deviceType == DeviceID.PHIDID_1045:
                     self.configure1045()
@@ -3265,7 +3281,7 @@ class serialport:
                 elif deviceType == DeviceID.PHIDID_TMP1100:
                     self.configureOneTC()
                     self.aw.sendmessage(QApplication.translate('Message','Phidget Isolated Thermocouple 1-input attached'))
-                elif deviceType == DeviceID.PHIDID_TMP1200:
+                elif deviceType in {DeviceID.PHIDID_TMP1200, 158}: #DeviceID.PHIDID_TMP1202}:
                     if alternative_conf:
                         self.configureOneRTD_2()
                     else:
@@ -3279,7 +3295,7 @@ class serialport:
         try:
             if self.aw.qmc.phidgetManager is not None:
                 self.aw.qmc.phidgetManager.releaseSerialPort(serial,port,0,'PhidgetTemperatureSensor',deviceType,remote=self.aw.qmc.phidgetRemoteFlag,remoteOnly=self.aw.qmc.phidgetRemoteOnlyFlag)
-                if deviceType != DeviceID.PHIDID_TMP1200:
+                if deviceType not in {DeviceID.PHIDID_TMP1200, 158}: #DeviceID.PHIDID_TMP1202}:
                     self.aw.qmc.phidgetManager.releaseSerialPort(serial,port,1,'PhidgetTemperatureSensor',deviceType,remote=self.aw.qmc.phidgetRemoteFlag,remoteOnly=self.aw.qmc.phidgetRemoteOnlyFlag)
                 if deviceType == DeviceID.PHIDID_1045:
                     self.aw.sendmessage(QApplication.translate('Message','Phidget Temperature Sensor IR detached'))
@@ -3287,13 +3303,13 @@ class serialport:
                     self.aw.sendmessage(QApplication.translate('Message','Phidget Temperature Sensor 1-input detached'))
                 elif deviceType == DeviceID.PHIDID_TMP1100:
                     self.aw.sendmessage(QApplication.translate('Message','Phidget Isolated Thermocouple 1-input detached'))
-                elif deviceType == DeviceID.PHIDID_TMP1200:
+                elif deviceType in {DeviceID.PHIDID_TMP1200, 158}: #DeviceID.PHIDID_TMP1202}:
                     self.aw.sendmessage(QApplication.translate('Message','Phidget VINT RTD 1-input detached'))
         except Exception as e: # pylint: disable=broad-except
             _log.exception(e)
 
-    # this one is reused for the 1045 (IR), the 1051 (1xTC), TMP1100 (1xTC), and TMP1200 (1xRTD)
-    # if alternative_conf is set, the second configuration for the TMP1200 module is used
+    # this one is reused for the 1045 (IR), the 1051 (1xTC), TMP1100 (1xTC), and TMP1200/TMP1202 (1xRTD)
+    # if alternative_conf is set, the second configuration for the TMP1200/TMP1202 module is used
     def PHIDGET1045temperature(self, deviceType:int=DeviceID.PHIDID_1045, retry:bool = True, alternative_conf:bool = False) -> Tuple[float, float]:
         try:
             if not self.PhidgetIRSensor and self.aw.qmc.phidgetManager is not None:
@@ -3301,8 +3317,8 @@ class serialport:
                             remote=self.aw.qmc.phidgetRemoteFlag,remoteOnly=self.aw.qmc.phidgetRemoteOnlyFlag)
                 if ser is not None:
                     self.PhidgetIRSensor = PhidgetTemperatureSensor()
-                    if deviceType == DeviceID.PHIDID_TMP1200:
-                        self.PhidgetIRSensorIC = None # the TMP1200 does not has an internal temperature sensor
+                    if deviceType in {DeviceID.PHIDID_TMP1200, 158}: #DeviceID.PHIDID_TMP1202}:
+                        self.PhidgetIRSensorIC = None # the TMP1200/TMP1202 does not has an internal temperature sensor
                     else:
                         self.PhidgetIRSensorIC = PhidgetTemperatureSensor()
                     try:
@@ -3313,7 +3329,7 @@ class serialport:
                                 self.addPhidgetServer()
                             if port is not None:
                                 self.PhidgetIRSensor.setHubPort(port)
-                                if self.PhidgetIRSensorIC is not None and deviceType != DeviceID.PHIDID_TMP1200:
+                                if self.PhidgetIRSensorIC is not None and deviceType not in {DeviceID.PHIDID_TMP1200, 158}: #DeviceID.PHIDID_TMP1202}:
                                     self.PhidgetIRSensorIC.setHubPort(port)
                             self.PhidgetIRSensor.setDeviceSerialNumber(ser)
                             self.PhidgetIRSensor.setChannel(0) # attached to the IR channel
@@ -3324,7 +3340,7 @@ class serialport:
                                 self.PhidgetIRSensor.open() #.openWaitForAttachment(timeout) # wait attach for the TMP1200 takes about 1sec on USB
                             except Exception: # pylint: disable=broad-except
                                 pass
-                            if self.PhidgetIRSensorIC is not None and deviceType != DeviceID.PHIDID_TMP1200:
+                            if self.PhidgetIRSensorIC is not None and deviceType not in {DeviceID.PHIDID_TMP1200, 158}: #DeviceID.PHIDID_TMP1202}:
                                 self.PhidgetIRSensorIC.setDeviceSerialNumber(ser)
                                 self.PhidgetIRSensorIC.setChannel(1) # attached to the IC channel
                                 if self.aw.qmc.phidgetRemoteFlag and self.aw.qmc.phidgetRemoteOnlyFlag:
@@ -3362,7 +3378,8 @@ class serialport:
                 try:
                     if (deviceType == DeviceID.PHIDID_1045 and self.aw.qmc.phidget1045_async) or \
                         (deviceType in [DeviceID.PHIDID_1051,DeviceID.PHIDID_TMP1100] and self.aw.qmc.phidget1048_async[0]) or \
-                        (deviceType == DeviceID.PHIDID_TMP1200 and ((alternative_conf and self.aw.qmc.phidget1200_2_async) or self.aw.qmc.phidget1200_async)):
+                        (deviceType in {DeviceID.PHIDID_TMP1200, 158} #DeviceID.PHIDID_TMP1202}
+                            and ((alternative_conf and self.aw.qmc.phidget1200_2_async) or self.aw.qmc.phidget1200_async)):
                         async_res = None
                         try:
                             #### lock shared resources #####
@@ -3437,7 +3454,7 @@ class serialport:
                         pass # the value might be still unknown. This can happen right after attach.
                     except Exception as e: # pylint: disable=broad-except
                         _log.exception(e)
-                    if deviceType == DeviceID.PHIDID_TMP1200:
+                    if deviceType in {DeviceID.PHIDID_TMP1200, 158}: #DeviceID.PHIDID_TMP1202}:
                         ambient = res
                     if ambient == -1:
                         return -1,-1
@@ -5716,8 +5733,8 @@ class serialport:
         if YOCTOsensor:
             productName = YOCTOsensor.get_module().get_productName()
             if (YOCTOsensor.get_hardwareId() not in connected_yoctos) and  \
-                ((mode == 0 and productName == 'Yocto-Thermocouple') or (mode == 1 and productName == 'Yocto-PT100') or \
-                 (mode == 2 and productName == 'Yocto-Temperature-IR') or \
+                ((mode == 0 and productName.startswith('Yocto-Thermocouple')) or (mode == 1 and productName.startswith('Yocto-PT100')) or \
+                 (mode == 2 and productName.startswith('Yocto-Temperature-IR')) or \
                  (mode == 3 and productName.startswith('Yocto-Meteo')) or \
                  (mode == 4 and productName is not None and productName.startswith(productNameFilter)) or \
                  (mode in {5, 6, 7, 8} and productName.startswith('Yocto-Watt')) or \
@@ -6798,7 +6815,12 @@ class scaleport(extraserialport):
             'acaia' : self.readAcaia,
             #"Shore 930" : self.readShore930,
         }
-        self.bluetooth_devices:List[str] = ['acaia']
+        #TODO removes acaia from Windows 11 (and 7/8) until BLE is fixed in Qt/PyQt # pylint: disable=fixme
+        self.bluetooth_devices:List[str] = []
+        if platform.system() == "Windows" and "Windows-10" not in platform.platform():
+            del self.devicefunctionlist['acaia']
+        else:
+            self.bluetooth_devices = ['acaia']
 
     def closeport(self) -> None:
         if self.device == 'acaia':
@@ -6814,7 +6836,7 @@ class scaleport(extraserialport):
     def readWeight(self, scale_weight:Optional[float]=None) -> Tuple[float,float,float]:
         if scale_weight is not None:
             return scale_weight,-1,-1
-        if self.device is not None and self.device != 'None' and self.device != '' and self.device != 'acaia':
+        if self.device is not None and self.device not in {'None', '', 'acaia'}:
             device_fct = self.devicefunctionlist[self.device]
             if device_fct is not None:
                 wei,den,moi = device_fct()
@@ -6922,7 +6944,7 @@ class colorport(extraserialport):
 
     # returns color as int or -1 if something went wrong
     def readColor(self) -> int:
-        if self.device is not None and self.device != 'None' and self.device != '':
+        if self.device is not None and self.device not in {'None', ''}:
             device_fct = self.devicefunctionlist[self.device]
             if device_fct is not None:
                 return int(round(device_fct()[0]))

@@ -42,6 +42,7 @@ application_name: Final[str] = 'Artisan'
 application_viewer_name: Final[str] = 'ArtisanViewer'
 application_organization_name: Final[str] = 'artisan-scope'
 application_organization_domain: Final[str] = 'artisan-scope.org'
+application_desktop_file_name: Final[str] = 'org.artisan_scope.artisan'
 
 
 try:
@@ -432,13 +433,13 @@ def getDirectory(filename: str, ext: Optional[str] = None, share: bool = False) 
 
 # converts QColor ARGB names to a standard/MPL hex color strings with alpha values at the end
 def argb_colorname2rgba_colorname(c:str) -> str:
-    if len(c) == 9 and c[0] == '#' and c[1:].isdigit():
+    if len(c) == 9 and c[0] == '#':
         return f'#{c[3:9]}{c[1:3]}'
     return c
 
 # converts standard/MPL hex color strings to QColor ARGB names with alpha at the begin
 def rgba_colorname2argb_colorname(c:str) -> str:
-    if len(c) == 9 and c[0] == '#' and c[1:].isdigit():
+    if len(c) == 9 and c[0] == '#':
         return f'#{c[7:9]}{c[1:7]}'
     return c
 
@@ -670,7 +671,7 @@ def convertVolume(v:float, i:int, o:int) -> float:
 
 # takes a weight, its weight unit index, and a weight unit target index (decides over metric vs imperial)
 # and returns a string rendering the weight with unit, potentially adjusted by its magnitude
-def render_weight(amount:float, weight_unit_index:int, target_unit_idx:int) -> str:
+def render_weight(amount:float, weight_unit_index:int, target_unit_idx:int, right_to_left_lang:bool = False) -> str:
     w = convertWeight(
         amount, weight_unit_index, target_unit_idx
     )  # @UndefinedVariable
@@ -719,7 +720,7 @@ def render_weight(amount:float, weight_unit_index:int, target_unit_idx:int) -> s
             # lb => lbs if |w|>1
             target_unit = f'{target_unit}s'
     w = int(round(w)) if w > 99 else float2float(w, 1) # @UndefinedVariable # we keep one decimal
-    return f'{w:g}{target_unit}'.lower()
+    return (f'{target_unit.lower()}{w:g}' if right_to_left_lang else f'{w:g}{target_unit.lower()}')
 
 
 # typing tools
@@ -732,6 +733,9 @@ def is_float_list(xs: List[Any]) -> TypeGuard[List[float]]:
 
 
 # locale tools
+
+def right_to_left(locale:str) -> bool:
+    return locale in {'ar', 'fa', 'he'}
 
 #def locale2full_local(locale:str) -> str:
 #    locale_map:Dict[str,str] = {

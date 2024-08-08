@@ -103,7 +103,7 @@ def content() -> str:
     tbl_AUC.add_row(['AUCvalue',QApplication.translate('HelpDlg','the current AUC value. -1 if none available.')])
     strlist.append(tbl_AUC.get_html_string(attributes={'width':'100%','border':'1','padding':'1','border-collapse':'collapse'}))
     strlist.append('<br/><br/><b>')
-    strlist.append(QApplication.translate('HelpDlg','PREDICITONS'))
+    strlist.append(QApplication.translate('HelpDlg','PREDICTIONS'))
     strlist.append('</b>')
     tbl_Predictions = prettytable.PrettyTable()
     tbl_Predictions.field_names = [QApplication.translate('HelpDlg','Symbol'),QApplication.translate('HelpDlg','Description')]

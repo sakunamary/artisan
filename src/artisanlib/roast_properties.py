@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from plus.stock import Blend # noqa: F401  # pylint: disable=unused-import
     from PyQt6.QtWidgets import QLayout, QAbstractItemView, QCompleter # pylint: disable=unused-import
     from PyQt6.QtGui import QClipboard, QCloseEvent, QKeyEvent, QMouseEvent # pylint: disable=unused-import
-    from PyQt6.QtCore import QObject # pylint: disable=unused-import
+    from PyQt6.QtCore import QObject, QMetaObject # pylint: disable=unused-import
 
 
 # import artisan.plus modules
@@ -41,7 +41,7 @@ import plus.blend
 
 #from artisanlib.suppress_errors import suppress_stdout_stderr
 from artisanlib.util import (deltaLabelUTF8, stringfromseconds,stringtoseconds, toInt, toFloat, abbrevString,
-        scaleFloat2String, comma2dot, weight_units, weight_units_lower, volume_units, float2floatWeightVolume, float2float,
+        scaleFloat2String, comma2dot, weight_units, render_weight, weight_units_lower, volume_units, float2floatWeightVolume, float2float,
         convertWeight, convertVolume)
 from artisanlib.dialogs import ArtisanDialog, ArtisanResizeablDialog
 from artisanlib.widgets import MyQComboBox, ClickableQLabel, ClickableTextEdit, MyTableWidgetItemNumber
@@ -89,7 +89,7 @@ class volumeCalculatorDlg(ArtisanDialog):
         self.setModal(True)
         self.setWindowTitle(QApplication.translate('Form Caption','Volume Calculator'))
 
-        if self.aw.scale.device is not None and self.aw.scale.device != '' and self.aw.scale.device != 'None':
+        if self.aw.scale.device is not None and self.aw.scale.device not in {'', 'None'}:
             self.scale_connected = True
         else:
             self.scale_connected = False
@@ -327,7 +327,7 @@ class volumeCalculatorDlg(ArtisanDialog):
         self.updateWeightLCD('----')
 
     def updateWeightLCD(self, txt_value:str, txt_unit:str = '') -> None:
-        self.scaleWeight.setText('' if txt_value == '' else txt_value+txt_unit)
+        self.scaleWeight.setText('' if txt_value == '' else txt_value+txt_unit.lower())
         self.aw.qmc.updateLargeScaleLCDs(txt_value)
 
     @pyqtSlot(float)
@@ -1280,7 +1280,6 @@ class editGraphDlg(ArtisanResizeablDialog):
             label_font = self.plus_selected_line.font()
             label_font.setPointSize(label_font.pointSize() -2)
             self.plus_selected_line.setFont(label_font)
-            self.populatePlusCoffeeBlendCombos()
             # layouting
             self.plus_coffees_combo.setMinimumContentsLength(15)
             self.plus_blends_combo.setMinimumContentsLength(10)
@@ -1342,7 +1341,7 @@ class editGraphDlg(ArtisanResizeablDialog):
 
         propGrid.setColumnStretch(5,10)
 
-        if self.aw.scale.device is not None and self.aw.scale.device != '' and self.aw.scale.device != 'None':
+        if self.aw.scale.device is not None and self.aw.scale.device not in {'', 'None'}:
             propGrid.addWidget(self.tareComboBox,1,7)
             propGrid.addLayout(inButtonLayout,1,8)
             propGrid.addLayout(outButtonLayout,1,9)
@@ -1362,7 +1361,7 @@ class editGraphDlg(ArtisanResizeablDialog):
                          (acaia.SERVICE_UUID, [AcaiaBLE.CHAR_UUID, AcaiaBLE.CHAR_UUID_WRITE])],
                         acaia.processData,
                         acaia.sendHeartbeat,
-                        acaia.sendStop,
+                        None, #acaia.sendStop,
                         acaia.reset,
                         [
                             acaia.DEVICE_NAME_LUNAR,
@@ -1424,7 +1423,7 @@ class editGraphDlg(ArtisanResizeablDialog):
 
         if self.aw.color.device is not None and self.aw.color.device != '' and self.aw.color.device not in ['None','Tiny Tonino', 'Classic Tonino']:
             propGrid.addWidget(scanWholeButton,8,6)
-        if self.aw.color.device is not None and self.aw.color.device != '' and self.aw.color.device != 'None':
+        if self.aw.color.device not in (None, '', 'None'):
             propGrid.addWidget(scanGroundButton,8,7)
 
         propGrid.addWidget(ambientSourceLabel,8,8,1,2,Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom)
@@ -1558,6 +1557,8 @@ class editGraphDlg(ArtisanResizeablDialog):
         self.volume_percent()
         self.setLayout(totallayout)
 
+        self.populatePlusCoffeeBlendCombos()
+
         self.titleedit.setFocus()
 
         self.updateTemplateLine()
@@ -1577,14 +1578,17 @@ class editGraphDlg(ArtisanResizeablDialog):
         self.updateWeightLCD('')
 
 #PLUS
+        self.updateStockSignalConnection:Optional[QMetaObject.Connection] = None
+        self.stockWorker:Optional[plus.stock.Worker] = None
         try:
             if self.aw.plus_account is not None:
                 if plus.controller.is_connected():
-                    plus.stock.update()
+                    self.stockWorker= plus.stock.getWorker()
+                    if self.stockWorker is not None:
+                        self.updateStockSignalConnection = self.stockWorker.updatedSignal.connect(self.populatePlusCoffeeBlendCombos)
+                        QTimer.singleShot(10, plus.stock.update)
                 else: # we are in ON mode, but not connected, we connect which triggers a stock update if successful
                     plus.controller.connect(interactive=False)
-                if plus.controller.is_connected():
-                    QTimer.singleShot(1500, self.populatePlusCoffeeBlendCombos)
         except Exception as e:  # pylint: disable=broad-except
             _log.exception(e)
         if platform.system() != 'Windows':
@@ -1634,9 +1638,9 @@ class editGraphDlg(ArtisanResizeablDialog):
 ##
 
     def updateWeightLCD(self, txt_value:str, txt_unit:str = '', total:Optional[float] = None) -> None:
-        self.scaleWeight.setText(txt_value+txt_unit)
+        self.scaleWeight.setText(txt_value+txt_unit.lower())
         total_txt, unit = self.updateScaleWeightAccumulated(total)
-        self.scaleWeightAccumulated.setText(total_txt + unit)
+        self.scaleWeightAccumulated.setText(total_txt + unit.lower())
         if self.aw.largeScaleLCDs_dialog is not None:
             self.aw.largeScaleLCDs_dialog.updateWeightUnitTotal(unit)
         self.aw.qmc.updateLargeScaleLCDs(txt_value, total_txt)
@@ -1658,6 +1662,7 @@ class editGraphDlg(ArtisanResizeablDialog):
             self.aw.qmc.drumspeed_setup = self.setup_ui.lineEditDrumSpeed.text()
             self.populateSetupDefaults()
             self.setupEdited()
+            self.aw.updateScheduleSignal.emit()
 
     @pyqtSlot(bool)
     def SetupDefaults(self, _:bool = False) -> None:
@@ -1680,7 +1685,7 @@ class editGraphDlg(ArtisanResizeablDialog):
     def defineBatchEditor(self) -> None:
         self.batchprefixedit = QLineEdit(self.aw.qmc.roastbatchprefix)
         self.batchcounterSpinBox = QSpinBox()
-        self.batchcounterSpinBox.setRange(0,999999)
+        self.batchcounterSpinBox.setRange(0,65534)
         self.batchcounterSpinBox.setSingleStep(1)
         self.batchcounterSpinBox.setValue(int(self.aw.qmc.roastbatchnr))
         self.batchcounterSpinBox.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
@@ -1767,7 +1772,7 @@ class editGraphDlg(ArtisanResizeablDialog):
         self.scale_weight = None
         self.scale_battery = None
         self.updateWeightLCD('----')
-        if self.ble is not None:
+        if self.ble is not None and not self.disconnecting:
             QTimer.singleShot(200, self.ble.scanDevices)
 
     @pyqtSlot(float)
@@ -1889,11 +1894,19 @@ class editGraphDlg(ArtisanResizeablDialog):
                         if len(self.plus_stores) == 1:
                             self.plus_default_store = plus.stock.getStoreId(self.plus_stores[0])
                         if len(self.plus_stores) < 2:
-                            self.plusStoreslabel.setVisible(False)
-                            self.plus_stores_combo.setVisible(False)
+                            #self.plusStoreslabel.setVisible(False)
+                            if self.plusStoreslabel.isVisible():
+                                self.plusStoreslabel.hide()
+                            #self.plus_stores_combo.setVisible(False)
+                            if self.plus_stores_combo.isVisible():
+                                self.plus_stores_combo.hide()
                         else:
-                            self.plusStoreslabel.setVisible(True)
-                            self.plus_stores_combo.setVisible(True)
+                            #self.plusStoreslabel.setVisible(True)
+                            if not self.plusStoreslabel.isVisible():
+                                self.plusStoreslabel.show()
+                            #self.plus_stores_combo.setVisible(True)
+                            if not self.plus_stores_combo.isVisible():
+                                self.plus_stores_combo.show()
                     except Exception as e:  # pylint: disable=broad-except
                         _log.exception(e)
                     self.plus_stores_combo.blockSignals(True)
@@ -2528,13 +2541,20 @@ class editGraphDlg(ArtisanResizeablDialog):
                 self.updateWeightLCD('')
             except Exception as e: # pylint: disable=broad-except
                 _log.exception(e)
+            try:
+                self.ble.stop_managing_thread()
+            except Exception as e: # pylint: disable=broad-except
+                _log.exception(e)
+            self.ble = None
         settings = QSettings()
         #save window geometry
         settings.setValue('RoastGeometry',self.saveGeometry())
         self.aw.editGraphDlg_activeTab = self.TabWidget.currentIndex()
 #        self.aw.closeEventSettings() # save all app settings
         self.aw.editgraphdialog = None
-        self.aw.updateScheduleSignal.emit()
+        if self.stockWorker is not None and self.updateStockSignalConnection is not None:
+            self.stockWorker.updatedSignal.disconnect(self.updateStockSignalConnection)
+
 
     # triggered via the cancel button
     @pyqtSlot()
@@ -2552,6 +2572,11 @@ class editGraphDlg(ArtisanResizeablDialog):
                 self.updateWeightLCD('')
             except Exception as e: # pylint: disable=broad-except
                 _log.exception(e)
+            try:
+                self.ble.stop_managing_thread()
+            except Exception as e: # pylint: disable=broad-except
+                _log.exception(e)
+            self.ble = None
         settings = QSettings()
         #save window geometry
         settings.setValue('RoastGeometry',self.saveGeometry())
@@ -2601,7 +2626,7 @@ class editGraphDlg(ArtisanResizeablDialog):
             if event.matches(QKeySequence.StandardKey.Copy) and self.TabWidget.currentIndex() == 3: # datatable
                 self.aw.copy_cells_to_clipboard(self.datatable,adjustment=1)
                 self.aw.sendmessage(QApplication.translate('Message','Data table copied to clipboard'))
-            if key == 16777220 and self.aw.scale.device is not None and self.aw.scale.device != '' and self.aw.scale.device != 'None': # ENTER key pressed and scale connected
+            if key == 16777220 and self.aw.scale.device not in (None, '', 'None'): # ENTER key pressed and scale connected
                 if self.weightinedit.hasFocus():
                     self.inWeight(True,overwrite=True) # we don't add to current reading but overwrite
                 elif self.weightoutedit.hasFocus():
@@ -3684,7 +3709,7 @@ class editGraphDlg(ArtisanResizeablDialog):
         if self.setup_ui is not None:
             self.setup_ui.labelOrganizationDefault.setText(self.aw.qmc.organization_setup)
             self.setup_ui.labelOperatorDefault.setText(self.aw.qmc.operator_setup)
-            self.setup_ui.labelMachineSizeDefault.setText(f'{self.aw.qmc.roastertype_setup} {self.aw.qmc.roastersize_setup}kg')
+            self.setup_ui.labelMachineSizeDefault.setText(f'{self.aw.qmc.roastertype_setup} {render_weight(self.aw.qmc.roastersize_setup, 1, weight_units.index(self.aw.qmc.weight[2]))}')
             self.setup_ui.labelHeatingDefault.setText(self.aw.qmc.heating_types[self.aw.qmc.roasterheating_setup])
             self.setup_ui.labelDrumSpeedDefault.setText(self.aw.qmc.drumspeed_setup)
 
@@ -4970,13 +4995,16 @@ class editGraphDlg(ArtisanResizeablDialog):
         self.aw.qmc.density_roasted = (dr0, 'g', 1, 'l')
         #update bean size
         try:
-            self.aw.qmc.beansize_min = int(self.bean_size_min_edit.text())
+            self.aw.qmc.beansize_min = max(0, min(30, int(self.bean_size_min_edit.text())))
         except Exception: # pylint: disable=broad-except
             self.aw.qmc.beansize_min = 0
         try:
-            self.aw.qmc.beansize_max = int(self.bean_size_max_edit.text())
+            self.aw.qmc.beansize_max = max(0, min(30, int(self.bean_size_max_edit.text())))
         except Exception: # pylint: disable=broad-except
             self.aw.qmc.beansize_max = 0
+        if self.aw.qmc.beansize_min > self.aw.qmc.beansize_max:
+            # swap order if needed
+            self.aw.qmc.beansize_min, self.aw.qmc.beansize_max = self.aw.qmc.beansize_max, self.aw.qmc.beansize_min
         #update roastflags
         self.aw.qmc.heavyFC_flag = self.heavyFC.isChecked()
         self.aw.qmc.lowFC_flag = self.lowFC.isChecked()
