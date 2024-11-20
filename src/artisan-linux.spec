@@ -1,7 +1,7 @@
 # -*- mode: python -*-
 
 import os
-from PyInstaller.utils.hooks import get_package_paths
+from PyInstaller.utils.hooks import get_package_paths, collect_submodules
 
 block_cipher = None
 
@@ -20,8 +20,30 @@ if not os.path.isdir(path):
 
 hiddenimports_list=[
     'matplotlib.backends.backend_pdf',
-    'matplotlib.backends.backend_svg'
+    'matplotlib.backends.backend_svg',
+    'babel.numbers'  # should not be needed as it got fixed in pyinstaller 6.11
+] + collect_submodules('dbus_fast')
+
+EXCLUDES = [
+    'PyQt5',
+    'PyQt6.Multimedia',
+    'PyQt6.Network',
+    'PyQt6.PrintSupport',
+    'PyQt6.QtRemoteObjects',
+    'PyQt6.QtSensors',
+    'PyQt6.QtSerialPort',
+    'PyQt6.QtSpatialAudio',
+    'PyQt6.QtTest',
+    'PyQt6.QtTextToSpeech',
+# the following are required by QtWebEngineWidgets and thus by QtWebEngine for the HTML2PDF export
+#    'PyQt6.QtQuick',
+#    'PyQt6.QtQml',
+#    'PyQt6.OpenGL',
+#    'PyQt6.QtWebChannel',
+#    'PyQt6.QtPositioning',
+#    'PyQt6.QtWebEngineQuick'
 ]
+
 
 a = Analysis(['artisan.py'],
     pathex=[path],
@@ -29,7 +51,7 @@ a = Analysis(['artisan.py'],
     datas=[],
     hookspath=[],
     runtime_hooks=[],
-    excludes=['PyQt5'],
+    excludes=EXCLUDES,
     hiddenimports=hiddenimports_list,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

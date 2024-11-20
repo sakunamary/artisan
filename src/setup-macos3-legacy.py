@@ -169,6 +169,8 @@ OPTIONS = {
     'matplotlib_backends': '-', # '-' for imported or explicit "Qt5Agg, PDF, PS, SVG"
     'includes': ['serial'],
     'excludes' :  ['tkinter','curses', # 'sqlite3',
+                'test', # don't bundle the Python tests
+                'setuptools', # not needed
                 ],
     'plist'    : plist}
 
@@ -263,7 +265,7 @@ Qt_modules = [
     'QtPrintSupport',
     'QtNetwork',
     'QtDBus',
-    'QtBluetooth',
+#    'QtBluetooth', # replaced by bleak
     'QtConcurrent', # not on PyQt6
 # needed for QtWebEngine HTML2PDF export:
     'QtWebEngineWidgets',
@@ -286,17 +288,20 @@ qt_plugin_dirs = [
     'printsupport',
     'styles'
 ]
+
 qt_plugin_files = [
-    'libqsvgicon.dylib',
-    'libqgif.dylib',
-    'libqicns.dylib',
-    'libqico.dylib',
+    'libqsvgicon.dylib', # needed to render MPL toolbar as SVG icons (fallback is PNG; built-in support)
+#    'libqgif.dylib',
+#    'libqicns.dylib',
+#    'libqico.dylib',
     'libqjpeg.dylib',
-    'libqmacjp2.dylib',
+#    'libqmacjp2.dylib',
+#    'libqpdf.dylib',
 	'libqsvg.dylib',
-    'libqtga.dylib',
-    'libqwbmp.dylib',
-    'libqwebp.dylib',
+#    'libqtga.dylib',
+#   'libqtiff.dylib',
+#    'libqwbmp.dylib',
+#    'libqwebp.dylib',
     'libqcocoa.dylib',
     'libcocoaprintersupport.dylib',
     'libqmacstyle.dylib'
@@ -398,17 +403,14 @@ try:
 except Exception: # pylint: disable=broad-except
     pass
 try:
-    subprocess.check_call('rm -rf ./Artisan.app/Contents/Resources/lib/python3.9/matplotlib/mpl-data/sample_data',shell = True)
-except Exception: # pylint: disable=broad-except
-    pass
-try:
-    subprocess.check_call('rm -rf ./Artisan.app/Contents/Resources/lib/python3.11/matplotlib/mpl-data/sample_data',shell = True)
+    subprocess.check_call(f'rm -rf ./Artisan.app/Contents/Resources/lib/{python_version}/matplotlib/mpl-data/sample_data',shell = True)
 except Exception: # pylint: disable=broad-except
     pass
 
 print('*** Removing unused files ***')
 for root, dirs, files in os.walk('.'):
     for file in files:
+        # ruff: noqa: SIM114
         if 'debug' in file:
 #            print('Deleting', file)
             os.remove(os.path.join(root,file))

@@ -1,17 +1,76 @@
 Detailed Release History
 ========================
 
+
 ----
-v3.0.1
+v3.0.3
 ------------------
 
 * ADDITIONS
+  - adds symbolic expression `bit(n,x)` which returns the n-th bit of x interpreted as integer
+  - adds (total) correction to cup profiles and enables column drag-and-drop ([Discussion #1690](../../../discussions/1690))
+  - adds option to manually add a roast to an open schedule item assigned by [artisan.plus](https://artisan.plus)
+  - adds option to synchronization of the Artisan PID SV slider with external MODBUS/S7 PIDs
 
 * NEW HARDWARE SUPPORT
+  - adds support for the [induction-based roasting machines Gemma_2IND, Gemma_6-8IND and Gemma_26-30IND](https://artisan-scope.org/machines/sci/) from Sweet Coffee Italia
+  - adds support for various newer [Santoker machines](https://artisan-scope.org/machines/santoker/) communicating via Bluetooth like the Cube10, the Bluetooth enabled X, Q and R Master Series as well as the R Series machines ([Issue #1088](../../../issues/1088) and [Issue #1702](../../../issues/1702))
+  - adds [ColorTrack](https://artisan-scope.org/devices/colortrack/) serial and bluetooth support ([Issue #1680](../../../issues/1680))
+  - adds support for [Primo roasting machines](https://artisan-scope.org/machines/primo/)
+  - adds [Loring](https://artisan-scope.org/machines/loring/) 'auto' setup which picks up CHARGE and DROP events set at the machine
+  - adds control function to [Diedrich DR](https://artisan-scope.org/machines/diedrich/) machine setup and adds [Diedrich CR](https://artisan-scope.org/machines/diedrich/) machine setup
+  - adds support for [Acaia](https://acaia.co/) scales on Windows 11
+  - adds support for [Phidget Stepper Motor Controllers](https://artisan-scope.org/devices/phidgets/#47-stepper-motor-control) ([Discussion #891](../../../discussions/891) and [PR #1715](../../../pull/1715))
+  - adds importer for [Stronghold](https://stronghold.coffee/) profiles exported as XLSX
 
 * CHANGES
+  - automatically start of the scheduler while connected to [artisan.plus](https://artisan.plus) if there are incompleted scheduled items
+  - disable items in coffee popups of the Custom Blend dialog without stock in the selected store or, if no store is selected, without stock in every store
+  - reduces the size of builds by removing unnecessary files
+  - removes the optional delay on reads from serial MODBUS
+  - adds optional delay after connect before sending requests to serial MODBUS to allow to wait for Arduino slaves to complete reboot ([Issue #1694](../../../issues/1694))
+  - upgrades MODBUS communication from sync to async IO
+  - limits the visible length of long popup lists in Devices and Statistics Dialog
+  - keep Hottop connected after OFF in control mode to prevent the shutdown on disconnect ([Issue #1714](../../../issues/1714))
+  - PID RS time is reset on PID ON not on CHARGE as in previous releases
+  - makes columns in CSV ranking report consistent with Excel variant
+
 
 * FIXES
+  - updates Cropster XLS importer ([Issue #1685](../../../issues/1685))
+  - fixes regression which broke SV number switching for Fuji PIDs ([Discussion #1683](../../../discussions/1683))
+  - fixes missing statistic content ([Discussion #1689](../../../discussions/1689))
+  - fixes a regression which prevented loading settings written (slightly broken) by Artisan v3.0 ([Discussion #1692](../../../discussions/1692))
+  - fixes a regression communicating with some serial MODBUS devices resulting from a more strict protocol interpretation by the underlying MODBUS pymodbus lib 3.7 introduced in Artisan v3.0.2 ([Issue #1694](../../../issues/1694))
+  - removes incorrectly reconstructed custom events outside of the CHARGE to DROP period on quitting the designer ([Discussion #1696](../../../discussions/1696))
+  - makes validation of numeric configuration input more robust ([Issue #1700](../../../issues/1700))
+  - ensures that splitter state in Comparator is properly reset on Factory Reset
+  - fixes issue where on save file a PNG was created instead of an PDF Report if "PDF Report" was selected as type under "Save also" in the autosave dialog ([Issue #1718](../../../issues/1718))
+  - fixes a rare redraw issues on using the zoom function
+  - fixes an issue in WebSocket communication where time did not progress with empty `Data Request` ([Issue #1737](../../../issues/1737))
+  - fixes an issue with the Analyzer result panes disappearing under some conditions ([Discussion #1736](../../../discussions/1736))
+  - fixes saving of designer point which could result in failure on loading ([Discussion #1721](../../../discussions/1721))
+
+* REMOVALS
+  - support for the image format BMP has been removed
+
+
+
+----
+v3.0.2 (August 20, 2024)
+------------------
+
+* CHANGES
+  - shift Windows downloads from zip to exe
+  - switches to native ruff-based bidi algorithm
+
+* FIXES
+  - fixes a build issue on Windows and Linux that could prevent the scheduler to start under certain conditions
+  - fixes date rendering for some locales in scheduler and make it more robust
+  - fixes character issue in buttons definition of the Kalaido Legacy machine setup
+  - fixes an auto align axis issue on leaving the analyzer with RESET on profiles with long recording before CHARGE
+  - fixes phases bar and statistic line formatting issues in right-to-left languages
+  - corrects some translations
 
 * REMOVALS
   - removes support for MOBDUS Serial Binary

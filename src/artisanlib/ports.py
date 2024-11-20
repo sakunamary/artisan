@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from PyQt6.QtWidgets import QWidget # pylint: disable=unused-import
     from PyQt6.QtGui import QCloseEvent, QKeyEvent # pylint: disable=unused-import
 
-from artisanlib.util import toFloat, uchr, comma2dot, float2float
+from artisanlib.util import toFloat, uchr, comma2dot, float2float, toInt
 from artisanlib.dialogs import ArtisanDialog, ArtisanResizeablDialog, PortComboBox
 from artisanlib.comm import serialport
 
@@ -165,6 +165,8 @@ class scanModbusDlg(ArtisanDialog):
             # scan and report
             result = 'Register,Value<br>'
             result += '--------------<br>'
+            #### lock shared resources #####
+            self.aw.modbus.COMsemaphore.acquire(1)
             for register in range(min(self.min_register,self.max_register),max(self.min_register,self.max_register)+1):
                 QApplication.processEvents()
                 if self.stop:
@@ -185,8 +187,12 @@ class scanModbusDlg(ArtisanDialog):
                     if res is not None:
                         result += str(register) + '(3),' + str(res) + '<br>'
                         self.modbusEdit.setHtml(result)
+            self.aw.modbus.disconnect()
         except Exception as e: # pylint: disable=broad-except
             _log.exception(e)
+        finally:
+            if self.aw.modbus.COMsemaphore.available() < 1:
+                self.aw.modbus.COMsemaphore.release(1)
         # reconstruct MODBUS setup
         self.aw.modbus.comport = self.port_aw
         self.aw.modbus.baudrate = self.baudrate_aw
@@ -327,6 +333,8 @@ class scanS7Dlg(ArtisanDialog):
             # scan and report
             result = 'Start,Value<br>'
             result += '--------------<br>'
+            #### lock shared resources #####
+            self.aw.s7.COMsemaphore.acquire(1)
             for register in range(min(self.min_register,self.max_register),max(self.min_register,self.max_register)+1,(4 if self.typeFloat else 2)):
                 QApplication.processEvents()
                 if self.stop:
@@ -341,8 +349,12 @@ class scanS7Dlg(ArtisanDialog):
                     result += f'{str(register)}: {str(res)}<br>'
                     self.S7Edit.setHtml(result)
                 time.sleep(0.4)
+            self.aw.s7.disconnect()
         except Exception as e: # pylint: disable=broad-except
             _log.exception(e)
+        finally:
+            if self.aw.s7.COMsemaphore.available() < 1:
+                self.aw.s7.COMsemaphore.release(1)
         # reconstruct S7 setup
         self.aw.s7.host = self.shost_aw
         self.aw.s7.port = self.sport_aw
@@ -518,7 +530,8 @@ class comportDlg(ArtisanResizeablDialog):
             modbus_inputDecode:QComboBox = QComboBox()
             modbus_inputDecode.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             modbus_inputDecode.addItems(modbus_decode)
-            if self.aw.modbus.inputBCDsAsInt[i]:
+            if (self.aw.modbus.inputBCDsAsInt[i] and not self.aw.modbus.inputFloatsAsInt[i] and not self.aw.modbus.inputFloats[i] and
+                    not self.aw.modbus.inputBCDs[i]):
                 modbus_inputDecode.setCurrentIndex(4)
             elif self.aw.modbus.inputFloatsAsInt[i]:
                 if self.aw.modbus.inputSigned[i]:
@@ -562,7 +575,7 @@ class comportDlg(ArtisanResizeablDialog):
         # host (IP or hostname)
         modbus_hostlabel = QLabel(QApplication.translate('Label', 'Host'))
         self.modbus_hostEdit = QLineEdit(str(self.aw.modbus.host))
-        self.modbus_hostEdit.setFixedWidth(100)
+        self.modbus_hostEdit.setFixedWidth(110)
         self.modbus_hostEdit.setAlignment(Qt.AlignmentFlag.AlignRight)
         # port (default 502)
         modbus_portlabel = QLabel(QApplication.translate('Label', 'Port'))
@@ -584,6 +597,11 @@ class comportDlg(ArtisanResizeablDialog):
         self.modbus_SVregister_Edit.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         modbus_multis = ['', '10','100']
+
+        self.modbus_SVwriteLong = QCheckBox('32bit')
+        self.modbus_SVwriteLong.setChecked(self.aw.modbus.SVwriteLong)
+        self.modbus_SVwriteLong.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.modbus_SVwriteLong.setToolTip(QApplication.translate('Tooltip', 'Write SV as 32bit DINT'))
 
         modbus_SVmultiplier_label = QLabel(QApplication.translate('Label', 'SV Factor'))
         self.modbus_SVmultiplier = QComboBox()
@@ -634,6 +652,8 @@ class comportDlg(ArtisanResizeablDialog):
         modbus_pid_registers.addWidget(self.modbus_Dregister_Edit)
 
         modbus_pid_multipliers = QHBoxLayout()
+        modbus_pid_multipliers.addWidget(self.modbus_SVwriteLong)
+        modbus_pid_multipliers.addStretch()
         modbus_pid_multipliers.addWidget(modbus_SVmultiplier_label)
         modbus_pid_multipliers.addWidget(self.modbus_SVmultiplier)
         modbus_pid_multipliers.addStretch()
@@ -680,15 +700,16 @@ class comportDlg(ArtisanResizeablDialog):
 
 
         modbus_Serial_delaylabel = QLabel(QApplication.translate('Label', 'Delay'))
-        modbus_Serial_delaylabel.setToolTip(QApplication.translate('Tooltip', 'Extra delay in Milliseconds between MODBUS Serial commands'))
-        self.modbus_Serial_delayEdit = QLineEdit(str(int(self.aw.modbus.modbus_serial_extra_read_delay*1000)))
-        self.modbus_Serial_delayEdit.setValidator(self.aw.createCLocaleDoubleValidator(0,99,0,self.modbus_Serial_delayEdit))
+        modbus_Serial_delaylabel.setToolTip(QApplication.translate('Tooltip', 'Extra delay after connect in seconds before sending requests (needed by Arduino devices restarting on connect)'))
+        self.modbus_Serial_delayEdit = QLineEdit(str(self.aw.modbus.modbus_serial_connect_delay))
+        self.modbus_Serial_delayEdit.setValidator(self.aw.createCLocaleDoubleValidator(0,3,1,self.modbus_Serial_delayEdit))
         self.modbus_Serial_delayEdit.setFixedWidth(50)
+        self.modbus_Serial_delayEdit.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.modbus_Serial_delayEdit.setToolTip(QApplication.translate('Tooltip', 'Extra delay in Milliseconds between MODBUS Serial commands'))
         modbus_Serial_retries = QLabel(QApplication.translate('Label', 'Retries'))
         self.modbus_Serial_retriesComboBox = QComboBox()
 #        modbus_Serial_retries.setBuddy(self.modbus_Serial_retriesComboBox)
-        self.modbus_Serial_retriesComboBox.addItems([str(n) for n in range(3)])
+        self.modbus_Serial_retriesComboBox.addItems([str(n) for n in range(4)])
         self.modbus_Serial_retriesComboBox.setCurrentIndex(self.aw.modbus.serial_readRetries)
 
         modbus_Serial_grid = QGridLayout()
@@ -710,6 +731,7 @@ class comportDlg(ArtisanResizeablDialog):
         self.modbus_IP_timeoutEdit = QLineEdit(str(self.aw.modbus.IP_timeout))
         self.modbus_IP_timeoutEdit.setValidator(self.aw.createCLocaleDoubleValidator(0,5,1,self.modbus_IP_timeoutEdit))
         self.modbus_IP_timeoutEdit.setFixedWidth(50)
+        self.modbus_IP_timeoutEdit.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.modbus_IP_timeoutEdit.setToolTip(QApplication.translate('Tooltip', 'IP timeout in seconds, not larger than half of the sampling interval'))
         modbus_IP_retries = QLabel(QApplication.translate('Label', 'Retries'))
         self.modbus_IP_retriesComboBox = QComboBox()
@@ -749,12 +771,6 @@ class comportDlg(ArtisanResizeablDialog):
         self.modbus_full_block.setChecked(self.aw.modbus.fetch_max_blocks)
         self.modbus_full_block.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.modbus_full_block.setEnabled(bool(self.aw.modbus.optimizer))
-
-        self.modbus_reset = QCheckBox(QApplication.translate('ComboBox','reset'))
-        self.modbus_reset.setChecked(self.aw.modbus.reset_socket)
-        self.modbus_reset.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.modbus_reset.setToolTip(QApplication.translate('Tooltip','Reset socket connection on error'))
-        self.modbus_reset.setEnabled(False)
 
         ##########################    TAB 4 WIDGETS   SCALE
         scale_devicelabel = QLabel(QApplication.translate('Label', 'Device'))
@@ -980,8 +996,6 @@ class comportDlg(ArtisanResizeablDialog):
         modbus_setup.addWidget(self.modbus_optimize)
         modbus_setup.addSpacing(5)
         modbus_setup.addWidget(self.modbus_full_block)
-        modbus_setup.addSpacing(5)
-        modbus_setup.addWidget(self.modbus_reset)
         modbus_setup.addSpacing(7)
         modbus_setup.addStretch()
         modbus_setup.addWidget(modbus_typelabel)
@@ -1714,23 +1728,23 @@ class comportDlg(ArtisanResizeablDialog):
     def scanS7(self, _:bool = False) -> None:
         scan_S7_dlg = scanS7Dlg(self,self.aw)
         scan_S7_dlg.shost = str(self.s7_hostEdit.text())
-        scan_S7_dlg.sport = int(str(self.s7_portEdit.text()))
-        scan_S7_dlg.srack = int(str(self.s7_rackEdit.text()))
-        scan_S7_dlg.sslot = int(str(self.s7_slotEdit.text()))
+        scan_S7_dlg.sport = toInt(str(self.s7_portEdit.text()))
+        scan_S7_dlg.srack = toInt(str(self.s7_rackEdit.text()))
+        scan_S7_dlg.sslot = toInt(str(self.s7_slotEdit.text()))
         scan_S7_dlg.show()
 
     @pyqtSlot(bool)
     def scanModbus(self, _:bool = False) -> None:
         scan_modbuds_dlg = scanModbusDlg(self,self.aw)
         scan_modbuds_dlg.port = str(self.modbus_comportEdit.getSelection())
-        scan_modbuds_dlg.baudrate = int(str(self.modbus_baudrateComboBox.currentText()))
-        scan_modbuds_dlg.bytesize = int(str(self.modbus_bytesizeComboBox.currentText()))
-        scan_modbuds_dlg.stopbits = int(str(self.modbus_stopbitsComboBox.currentText()))
+        scan_modbuds_dlg.baudrate = toInt(str(self.modbus_baudrateComboBox.currentText()))
+        scan_modbuds_dlg.bytesize = toInt(str(self.modbus_bytesizeComboBox.currentText()))
+        scan_modbuds_dlg.stopbits = toInt(str(self.modbus_stopbitsComboBox.currentText()))
         scan_modbuds_dlg.parity = str(self.modbus_parityComboBox.currentText())
         scan_modbuds_dlg.timeout = float2float(toFloat(comma2dot(str(self.modbus_timeoutEdit.text()))))
         scan_modbuds_dlg.mtype = int(self.modbus_type.currentIndex())
         scan_modbuds_dlg.mhost = str(self.modbus_hostEdit.text())
-        scan_modbuds_dlg.mport = int(str(self.modbus_portEdit.text()))
+        scan_modbuds_dlg.mport = toInt(str(self.modbus_portEdit.text()))
         scan_modbuds_dlg.show()
 
     @pyqtSlot(int)
@@ -1819,13 +1833,13 @@ class comportDlg(ArtisanResizeablDialog):
                         comportComboBox = cast(PortComboBox, self.serialtable.cellWidget(i,1))
                         self.aw.extracomport[i] = str(comportComboBox.getSelection())
                         baudComboBox = cast(QComboBox, self.serialtable.cellWidget(i,2))
-                        self.aw.extrabaudrate[i] = int(str(baudComboBox.currentText()))
+                        self.aw.extrabaudrate[i] = toInt(str(baudComboBox.currentText()))
                         byteComboBox = cast(QComboBox, self.serialtable.cellWidget(i,3))
-                        self.aw.extrabytesize[i] = int(str(byteComboBox.currentText()))
+                        self.aw.extrabytesize[i] = toInt(str(byteComboBox.currentText()))
                         parityComboBox = cast(QComboBox, self.serialtable.cellWidget(i,4))
                         self.aw.extraparity[i] = str(parityComboBox.currentText())
                         stopbitsComboBox = cast(QComboBox, self.serialtable.cellWidget(i,5))
-                        self.aw.extrastopbits[i] = int(str(stopbitsComboBox.currentText()))
+                        self.aw.extrastopbits[i] = toInt(str(stopbitsComboBox.currentText()))
                         timeoutEdit = cast(QLineEdit, self.serialtable.cellWidget(i,6))
                         self.aw.extratimeout[i] = float(str(timeoutEdit.text()))
             #create serial ports for each extra device

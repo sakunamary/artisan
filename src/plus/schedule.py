@@ -30,17 +30,19 @@ import html
 import textwrap
 import platform
 import logging
+from platform import python_version
+from packaging.version import Version
 from uuid import UUID
 try:
     from PyQt6.QtCore import (QRect, Qt, QMimeData, QSettings, pyqtSlot, pyqtSignal, QPoint, QPointF, QLocale, QDate, QDateTime, QSemaphore, QTimer) # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtGui import (QDrag, QPixmap, QPainter, QTextLayout, QTextLine, QColor, QFontMetrics, QCursor, QAction) # @UnusedImport @Reimport  @UnresolvedImport
-    from PyQt6.QtWidgets import (QStackedWidget, QApplication, QWidget, QVBoxLayout, QHBoxLayout, QFrame, QTabWidget,  # @UnusedImport @Reimport  @UnresolvedImport
+    from PyQt6.QtWidgets import (QMessageBox, QStackedWidget, QApplication, QWidget, QVBoxLayout, QHBoxLayout, QFrame, QTabWidget,  # @UnusedImport @Reimport  @UnresolvedImport
             QCheckBox, QGroupBox, QScrollArea, QLabel, QSizePolicy,  # @UnusedImport @Reimport  @UnresolvedImport
             QGraphicsDropShadowEffect, QPlainTextEdit, QLineEdit, QMenu)  # @UnusedImport @Reimport  @UnresolvedImport
 except ImportError:
     from PyQt5.QtCore import (QRect, Qt, QMimeData, QSettings, pyqtSlot, pyqtSignal, QPoint, QPointF, QLocale, QDate, QDateTime, QSemaphore, QTimer) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtGui import (QDrag, QPixmap, QPainter, QTextLayout, QTextLine, QColor, QFontMetrics, QCursor) # type: ignore # @UnusedImport @Reimport @UnresolvedImport
-    from PyQt5.QtWidgets import (QStackedWidget, QApplication, QWidget, QVBoxLayout, QHBoxLayout, QFrame, QTabWidget, # type: ignore # @UnusedImport @Reimport @UnresolvedImport
+    from PyQt5.QtWidgets import (QMessageBox, QStackedWidget, QApplication, QWidget, QVBoxLayout, QHBoxLayout, QFrame, QTabWidget, # type: ignore # @UnusedImport @Reimport @UnresolvedImport
             QCheckBox, QGroupBox, QScrollArea, QLabel, QSizePolicy, QAction,  # @UnusedImport @Reimport @UnresolvedImport
             QGraphicsDropShadowEffect, QPlainTextEdit, QLineEdit, QMenu)  # @UnusedImport @Reimport  @UnresolvedImport
 
@@ -51,7 +53,7 @@ from pydantic import BaseModel, Field, PositiveInt, UUID4, field_validator, mode
 from typing import Final, Tuple, List, Set, Dict, Optional, Any, TypedDict, cast, TextIO, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from artisanlib.types import ProfileData # noqa: F401 # pylint: disable=unused-import
+    from artisanlib.atypes import ProfileData # noqa: F401 # pylint: disable=unused-import
     from artisanlib.main import ApplicationWindow # noqa: F401 # pylint: disable=unused-import
     from PyQt6.QtCore import QObject, QEvent, QRect, QMargins # noqa: F401 # pylint: disable=unused-import
     from PyQt6.QtGui import (QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QCloseEvent,  # noqa: F401 # pylint: disable=unused-import
@@ -419,6 +421,7 @@ def load_completed(plus_account_id:Optional[str]) -> None:
                         previously_completed = [pc for pc in previously_completed if 'roastdate' in pc and epoch2datetime(pc['roastdate']).astimezone().date() == previous_session_date]
                     # we keep all roasts completed today as well as all from the previous roast session
                     completed_roasts_cache = today_completed + previously_completed
+                    completed_roasts_cache.sort(key=lambda cr: cr['roastdate'], reverse=True)
     except FileNotFoundError:
         _log.debug('no completed roast cache file found')
     except Exception as e:  # pylint: disable=broad-except
@@ -657,6 +660,53 @@ def completeditem_beans_description(weight_unit_idx:int, item:CompletedItem) -> 
         return ''
     coffee_blend_label = (f' {html.escape(item.coffee_label)}' if item.coffee_label is not None else (f' {html.escape(item.blend_label)}' if item.blend_label is not None else ''))
     return f'{render_weight(item.batchsize, 1, weight_unit_idx)}{coffee_blend_label}'
+
+
+
+def remove_prefix(s:str, prefix:str) -> str:
+    if Version(python_version()) < Version('3.9.0'):
+        if s.startswith(prefix):
+            return s[len(prefix):]
+        return s
+    return s.removeprefix(prefix) # type:ignore[attr-defined, no-any-return, reportAttributeAccessIssue, unused-ignore] # not known under Python 3.8 which we use for pyright type checking
+
+def remove_suffix(s:str, suffix:str) -> str:
+    if Version(python_version()) < Version('3.9.0'):
+        if s.endswith(suffix):
+            return s[:-len(suffix)]
+        return s
+    return s.removesuffix(suffix) # type:ignore[attr-defined, no-any-return, reportAttributeAccessIssue, unused-ignore] # not known under Python 3.8 which we use for pyright type checking
+
+def locale_format_date_no_year(locale:str, date:datetime.date) -> str:
+    try:
+        # format nicely using babel
+        date_without_year = format_date(date, format='long', locale=locale).replace(format_date(date, 'Y', locale=locale),'').strip()
+        # strip some more characters for certain locales
+        if locale.startswith(('en', 'vi')):
+            date_without_year = date_without_year.rstrip(',')
+        elif locale.startswith(('es', 'pt')):
+            date_without_year = remove_suffix(date_without_year, ' de')
+        elif locale.startswith('zh'):
+            date_without_year = date_without_year.lstrip('\u5E74')
+        elif locale.startswith('ko'):
+            date_without_year = date_without_year.lstrip('\uB144')
+        elif locale.startswith('th'):
+            date_without_year = remove_suffix(date_without_year, '\u0e04.\u0e28.')
+        elif locale.startswith('lv'):
+            date_without_year = remove_prefix(date_without_year, '. gada')
+        elif locale.startswith('hu'):
+            date_without_year = remove_prefix(date_without_year, '. ')
+        elif locale.startswith('ru'):
+            date_without_year = remove_suffix(date_without_year, '\u202f\u0433.')
+        elif locale.startswith('uk'):
+            date_without_year = remove_suffix(date_without_year, '\u202f\u0440.')
+        return date_without_year.strip()
+    except Exception as e: # pylint: disable=broad-except
+        _log.error(e)
+        # format using datetime using system locale
+        date_without_year = date.strftime('%x').replace(date.strftime('%Y'),'')
+        return date_without_year.strip().strip(',').strip('.').strip('-').strip('/').strip()
+
 
 #--------
 
@@ -898,35 +948,38 @@ class NoDragItem(StandardItem):
     def getLeft(self) -> str:
         return f'{self.data.prefix}'
 
-
     def getMiddle(self) -> str:
         return f'{self.data.title}'
 
-
     def getRight(self) -> str:
-        # the datetimes now and roastdate are in UTC, we need to compare the dates w.r.t. the local timezone thus we have to convert both via astimezone()
-        roastdate = self.data.roastdate
-        roastdate_date_local = roastdate.astimezone().date()
-        days_diff = (self.now.astimezone().date() - roastdate_date_local).days
-        task_date_str = ''
-        if days_diff == 0:
-            # for time formatting we use the system locale
-            locale = QLocale()
-            dt = QDateTime.fromSecsSinceEpoch(int(datetime2epoch(roastdate)))
-            task_date_str = locale.toString(dt.time(), QLocale.FormatType.ShortFormat)
-        elif days_diff == 1:
-            task_date_str = QApplication.translate('Plus', 'Yesterday').capitalize()
-        elif days_diff < 7:
-            # for date formatting we use the artisan-language locale
-            locale = QLocale(self.locale_str)
-            task_date_str = locale.toString(QDate(roastdate_date_local.year, roastdate_date_local.month, roastdate_date_local.day), 'dddd').capitalize()
-        else:
-            # date formatted according to the locale without the year
-            task_date_str = format_date(roastdate_date_local, format='long', locale=self.locale_str).replace(format_date(roastdate_date_local, 'Y', locale=self.locale_str),'').strip().rstrip(',')
+        try:
+            # the datetimes now and roastdate are in UTC, we need to compare the dates w.r.t. the local timezone thus we have to convert both via astimezone()
+            roastdate = self.data.roastdate
+            roastdate_date_local = roastdate.astimezone().date()
+            days_diff = (self.now.astimezone().date() - roastdate_date_local).days
+            task_date_str = ''
+            if days_diff == 0:
+                # for time formatting we use the system locale
+                locale = QLocale()
+                dt = QDateTime.fromSecsSinceEpoch(int(datetime2epoch(roastdate)))
+                task_date_str = locale.toString(dt.time(), QLocale.FormatType.ShortFormat)
+            elif days_diff == 1:
+                task_date_str = QApplication.translate('Plus', 'Yesterday').capitalize()
+            elif days_diff < 7:
+                # for date formatting we use the artisan-language locale
+                locale = QLocale(self.locale_str)
+                task_date_str = locale.toString(QDate(roastdate_date_local.year, roastdate_date_local.month, roastdate_date_local.day), 'dddd').capitalize()
+            else:
+                # date formatted according to the locale without the year
+                task_date_str = locale_format_date_no_year(self.locale_str, roastdate_date_local)
 
-        weight = (f'{render_weight(self.data.weight, 1, self.weight_unit_idx)}  ' if self.data.measured else '')
+            weight = (f'{render_weight(self.data.weight, 1, self.weight_unit_idx)}  ' if self.data.measured else '')
 
-        return f'{weight}{task_date_str}'
+            return f'{weight}{task_date_str}'
+        except Exception as e: # pylint: disable=broad-except
+            # if anything goes wrong here we log an exception and return the empty string
+            _log.exception(e)
+            return ''
 
     def select(self) -> None:
         self.setProperty('Selected', True)
@@ -939,6 +992,9 @@ class NoDragItem(StandardItem):
 
 
 class DragItem(StandardItem):
+
+    registerRoast = pyqtSignal() # register current loaded roast profile in the schedule item with the given scheduleID
+
     # today a date in local timezone
     def __init__(self, data:ScheduledItem, aw:'ApplicationWindow', today:datetime.date, user_id: Optional[str], machine: str) -> None:
         self.data:ScheduledItem = data
@@ -958,24 +1014,28 @@ class DragItem(StandardItem):
         self.setGraphicsEffect(self.makeShadow())
 
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.customContextMenuRequested.connect(self.preparedMenu)
+        self.customContextMenuRequested.connect(self.itemMenu)
 
         self.update_widget()
 
     # need to be called if prepared information changes
     def update_widget(self) -> None:
         date_local = self.data.date
-        task_date:str
-        if self.days_diff == 0:
-            task_date = QApplication.translate('Plus', 'Today')
-        elif self.days_diff == 1:
-            task_date = QApplication.translate('Plus', 'Tomorrow')
-        elif self.days_diff < 7:
-            locale = QLocale(self.aw.locale_str)
-            task_date = locale.toString(QDate(date_local.year, date_local.month, date_local.day), 'dddd').capitalize()
-        else:
-            # date formatted according to the locale without the year
-            task_date = format_date(date_local, format='long', locale=self.aw.locale_str).replace(format_date(date_local, 'Y', locale=self.aw.locale_str),'').strip().rstrip(',')
+        task_date:str = ''
+        try:
+            if self.days_diff == 0:
+                task_date = QApplication.translate('Plus', 'Today')
+            elif self.days_diff == 1:
+                task_date = QApplication.translate('Plus', 'Tomorrow')
+            elif self.days_diff < 7:
+                locale = QLocale(self.aw.locale_str)
+                task_date = locale.toString(QDate(date_local.year, date_local.month, date_local.day), 'dddd').capitalize()
+            else:
+                # date formatted according to the locale without the year
+                task_date = locale_format_date_no_year(self.aw.locale_str, date_local)
+        except Exception as e: # pylint: disable=broad-except
+            # if anything goes wrong here we log an exception and use the empty string as task_date
+            _log.exception(e)
 
         user_nickname:Optional[str] = plus.connection.getNickname()
         task_operator = (QApplication.translate('Plus', 'by anybody') if self.data.user is None else
@@ -1044,7 +1104,29 @@ class DragItem(StandardItem):
         self.update_widget()
         self.prepared.emit()
 
-    def preparedMenu(self) -> None:
+    def addLoadedProfileToSelectedScheduleItem(self) -> None:
+        string = QApplication.translate('Message','Register the currently loaded roast profile<br>in the selected entry.<br>This will overwrite some roast properties.')
+        # native dialog
+        if platform.system() == 'Darwin':
+            mbox = QMessageBox() # only without super this one shows the native dialog on macOS under Qt 6.6.2
+            # for native dialogs, text and informativetext need to be plain strings, no RTF incl. HTML instructions like <br>
+            mbox.setText(QApplication.translate('Message','Register Roast'))
+            mbox.setInformativeText(string.replace('<br>',' '))
+            mbox.setWindowModality(Qt.WindowModality.ApplicationModal) # for native dialog it has to be ApplicationModal
+            mbox.setStandardButtons(QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Ok)
+            mbox.setDefaultButton(QMessageBox.StandardButton.Cancel)
+            reply = mbox.exec()
+        else:
+            # non-native dialog
+            reply = QMessageBox.warning(None, #self, # only without super this one shows the native dialog on macOS under Qt 6.6.2 and later
+                            QApplication.translate('Message','Register Roast'),string,
+                            QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Ok, QMessageBox.StandardButton.Cancel)
+
+        if reply == QMessageBox.StandardButton.Ok :
+            self.registerRoast.emit()
+
+
+    def itemMenu(self) -> None:
         self.menu = QMenu()
         if not fully_prepared(self.data):
             allPreparedAction:QAction = QAction(QApplication.translate('Contextual Menu', 'All batches prepared'),self)
@@ -1054,6 +1136,16 @@ class DragItem(StandardItem):
             nonePreparedAction:QAction = QAction(QApplication.translate('Contextual Menu', 'No batch prepared'),self)
             nonePreparedAction.triggered.connect(self.nonePrepared)
             self.menu.addAction(nonePreparedAction)
+        if not self.aw.qmc.flagon and self.aw.curFile is not None and self.aw.qmc.scheduleID is None and self.aw.qmc.roastUUID is not None  and \
+                self.aw.schedule_window is not None and \
+                not self.aw.schedule_window.in_completed(self.aw.qmc.roastUUID) and \
+                self.aw.qmc.roastdate.date().toPyDate() >= self.aw.schedule_window.prev_roast_session_data():
+            # if not sampling and a profile without scheduleID loaded which is not yet registered as completed roast,
+            # and roast date is not before the last roast sessiong
+            # we allow to assign the current profile to the selected schedule item
+            addToItemAction:QAction = QAction(QApplication.translate('Contextual Menu', 'Register roast'),self)
+            addToItemAction.triggered.connect(self.addLoadedProfileToSelectedScheduleItem)
+            self.menu.addAction(addToItemAction)
         self.menu.popup(QCursor.pos())
 
 
@@ -1320,6 +1412,7 @@ class DragWidget(BaseWidget):
     def get_item_data(self) -> List[ScheduledItem]:
         return [item.data for item in self.get_items()]
 
+
 class ScheduleWindow(ArtisanResizeablDialog): # pyright:ignore[reportGeneralTypeIssues]
 
     register_completed_roast = pyqtSignal()
@@ -1334,7 +1427,7 @@ class ScheduleWindow(ArtisanResizeablDialog): # pyright:ignore[reportGeneralType
         self.activeTab:int = activeTab
 
         self.scheduled_items:List[ScheduledItem] = []
-        self.completed_items:List[CompletedItem] = []
+        self.completed_items:List[CompletedItem] = [] # kept sorted; oldest roasts at begin, youngest appended at the end
 
         # holds the currently selected remaining DragItem widget if any
         self.selected_remaining_item:Optional[DragItem] = None
@@ -1993,13 +2086,46 @@ class ScheduleWindow(ArtisanResizeablDialog): # pyright:ignore[reportGeneralType
                         self.selected_completed_item.clicked.emit()
                     else:
                         self.selected_completed_item.selected.emit()
+            elif k == 46 and QApplication.keyboardModifiers() == Qt.KeyboardModifier.ControlModifier: # CMD-.
+                self.closeEvent()
             else:
                 super().keyPressEvent(event)
 
 
-
     @pyqtSlot('QCloseEvent')
-    def closeEvent(self, _:Optional['QCloseEvent'] = None) -> None:
+    def closeEvent(self, evnt:Optional['QCloseEvent'] = None) -> None: # type:ignore[reportIncompatibleMethodOverride, unused-ignore]
+        if self.aw.scheduler_auto_open and len(self.scheduled_items) > 0 and self.aw.plus_account is not None:
+            self.aw.scheduler_auto_open = False
+            string = QApplication.translate('Message','Roasts will not adjust the schedule<br>while the schedule window is closed')
+            # native dialog
+            if platform.system() == 'Darwin':
+                mbox = QMessageBox() # only without super this one shows the native dialog on macOS under Qt 6.6.2
+                # for native dialogs, text and informativetext need to be plain strings, no RTF incl. HTML instructions like <br>
+                mbox.setText(QApplication.translate('Message','Close Scheduler'))
+                mbox.setInformativeText(string.replace('<br>',' '))
+                mbox.setWindowModality(Qt.WindowModality.ApplicationModal) # for native dialog it has to be ApplicationModal
+                mbox.setStandardButtons(QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Close)
+                mbox.setDefaultButton(QMessageBox.StandardButton.Cancel)
+                reply = mbox.exec()
+            else:
+                # non-native dialog
+                reply = QMessageBox.warning(None, #self, # only without super this one shows the native dialog on macOS under Qt 6.6.2 and later
+                                QApplication.translate('Message','Close Scheduler'),string,
+                                QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Close, QMessageBox.StandardButton.Cancel)
+
+            if reply == QMessageBox.StandardButton.Close :
+                self.closeScheduler()
+            elif evnt is not None:
+                evnt.ignore()
+        else:
+            self.closeScheduler()
+
+    @pyqtSlot()
+    def close(self) -> bool:
+        self.closeEvent(None)
+        return True
+
+    def closeScheduler(self) -> None:
         self.aw.scheduled_items_uuids = self.get_scheduled_items_ids()
         # remember Dialog geometry
         settings = QSettings()
@@ -2026,7 +2152,7 @@ class ScheduleWindow(ArtisanResizeablDialog): # pyright:ignore[reportGeneralType
             self.aw.qmc.scheduleID = None
             self.aw.qmc.scheduleDate = None
         self.aw.sendmessage(QApplication.translate('Message','Scheduler stopped'))
-
+        self.accept()
 
     # updates the current schedule items by joining its roast with those received as part of a stock update from the server
     # adding new items at the end
@@ -2098,13 +2224,14 @@ class ScheduleWindow(ArtisanResizeablDialog): # pyright:ignore[reportGeneralType
         return res
 
     # sets the items values as properties of the current roast and links it back to this schedule item
-    def set_roast_properties(self, item:ScheduledItem) -> None:
+    def set_roast_properties(self, item:ScheduledItem, overwrite_nondefault_title:bool=True) -> None:
         self.aw.qmc.scheduleID = item.id
         self.aw.qmc.scheduleDate = item.date.isoformat()
-        self.aw.qmc.title = item.title
-        if not self.aw.qmc.flagstart or self.aw.qmc.title_show_always:
-            self.aw.qmc.setProfileTitle(self.aw.qmc.title)
-            self.aw.qmc.fig.canvas.draw()
+        if overwrite_nondefault_title or self.aw.qmc.title == QApplication.translate('Scope Title', 'Roaster Scope'):
+            self.aw.qmc.title = item.title
+            if not self.aw.qmc.flagstart or self.aw.qmc.title_show_always:
+                self.aw.qmc.setProfileTitle(self.aw.qmc.title)
+                self.aw.qmc.fig.canvas.draw()
         prepared:List[float] = get_prepared(item)
         # we take the next prepared item weight if any, else the planned batch size from the item
         weight_unit_idx:int = weight_units.index(self.aw.qmc.weight[2])
@@ -2237,6 +2364,23 @@ class ScheduleWindow(ArtisanResizeablDialog): # pyright:ignore[reportGeneralType
         if sender is not None and isinstance(sender, DragItem):
             self.select_item(sender)
 
+    @pyqtSlot()
+    def register_roast(self) -> None:
+        sender = self.sender()
+        if sender is not None and isinstance(sender, DragItem):
+            # updates the roast properties from the given ScheduleItem
+            self.set_roast_properties(sender.data, overwrite_nondefault_title=False)
+            self.aw.qmc.safesaveflag = True
+
+            # send updated roast to server
+            plus.controller.updateSyncRecordHashAndSync()
+
+            # register the current loaded roast profile in the
+            # schedule item linked to the given DragItem and add a corresponding
+            # completed roast item
+            self.register_remaining_item(sender)
+
+
     def set_green_weight(self, uuid:str, weight:float) -> None:
         item:Optional[ScheduledItem] = next((si for si in self.scheduled_items if si.id == uuid), None)
         if item is not None:
@@ -2328,13 +2472,14 @@ class ScheduleWindow(ArtisanResizeablDialog): # pyright:ignore[reportGeneralType
             # connect the selection signal
             drag_item.selected.connect(self.remaining_items_selection_changed)
             drag_item.prepared.connect(self.prepared_items_changed)
+            drag_item.registerRoast.connect(self.register_roast)
             # append item to list
             self.drag_remaining.add_item(drag_item)
         if selected_item is not None:
             # reselect the previously selected item
             self.select_item(selected_item)
         else:
-            # otherwise select first item schedule is not empty
+            # otherwise select first item if schedule is not empty
             self.selected_remaining_item = None
             if self.drag_remaining.count() > 0:
                 first_item:Optional[DragItem] = self.drag_remaining.itemAt(0)
@@ -2375,6 +2520,12 @@ class ScheduleWindow(ArtisanResizeablDialog): # pyright:ignore[reportGeneralType
             self.TabWidget.setTabToolTip(0,'')
             # update app badge number
             self.setAppBadge(0)
+            # clear selection and reset scheduleID
+            self.selected_remaining_item = None
+            if self.aw.qmc.timeindex[6] == 0:
+                # if DROP is not set we clear the ScheduleItem UUID/Date
+                self.aw.qmc.scheduleID = None
+                self.aw.qmc.scheduleDate = None
         return len(scheduled_items)
 
     @staticmethod
@@ -2385,9 +2536,9 @@ class ScheduleWindow(ArtisanResizeablDialog): # pyright:ignore[reportGeneralType
         except Exception: # pylint: disable=broad-except
             pass # setBadgeNumber only supported by Qt 6.5 and newer
 
-    # update app badge to be called from outside of the ScheduleWindow if ScheduleWindow is not open, recomputing all data
+    # returns number of open items
     @staticmethod
-    def updateAppBadge(aw:'ApplicationWindow') -> None:
+    def openScheduleItemsCount(aw:'ApplicationWindow') -> int:
         try:
             plus.stock.init()
             schedule:List[plus.stock.ScheduledItem] = plus.stock.getSchedule()
@@ -2399,10 +2550,10 @@ class ScheduleWindow(ArtisanResizeablDialog): # pyright:ignore[reportGeneralType
                 except Exception:  # pylint: disable=broad-except
                     pass # validation fails for outdated items
             today:datetime.date = datetime.datetime.now(datetime.timezone.utc).astimezone().date()
-            ScheduleWindow.setAppBadge(sum(max(0, x.count - len(x.roasts)) for x in scheduled_items if aw.scheduledItemsfilter(today, x)))
+            return sum(max(0, x.count - len(x.roasts)) for x in scheduled_items if aw.scheduledItemsfilter(today, x))
         except Exception as e:  # pylint: disable=broad-except
             _log.exception(e)
-
+            return 0
 
     @pyqtSlot()
     def updateFilters(self) -> None:
@@ -2522,7 +2673,7 @@ class ScheduleWindow(ArtisanResizeablDialog): # pyright:ignore[reportGeneralType
         return changes
 
 
-    # updates the changeable properties of the current loaded profiles roast properties from the given CompletedItem
+    # updates the changeable properties of the currently loaded profiles roast properties from the given CompletedItem
     def updates_roast_properties_from_completed(self, ci:CompletedItem) -> None:
         # roastUUID has to agree and roastdate is fixed
         if ci.roastUUID.hex == self.aw.qmc.roastUUID:
@@ -2647,7 +2798,6 @@ class ScheduleWindow(ArtisanResizeablDialog): # pyright:ignore[reportGeneralType
                         changes['modified_at'] = epoch2ISO8601(time.time())
                         try:
                             plus.controller.connect(clear_on_failure=False, interactive=False)
-#                            _log.info("PRINT change record: %s", changes)
                             r = plus.connection.sendData(plus.config.roast_url, changes, 'POST')
                             r.raise_for_status()
                             # update successfully transmitted, we now also add/update the CompletedItem linked to self.selected_completed_item
@@ -2832,6 +2982,14 @@ class ScheduleWindow(ArtisanResizeablDialog): # pyright:ignore[reportGeneralType
         else:
             self.TabWidget.setTabToolTip(1, '')
 
+    # returns True if there is a completed item with the given roastID
+    def in_completed(self, roastID:str) -> bool:
+        return any(ci.roastUUID.hex == roastID for ci in self.completed_items)
+
+    def prev_roast_session_data(self) -> datetime.date:
+        if self.completed_items:
+            return self.completed_items[-1].roastdate.date()
+        return datetime.datetime.now(datetime.timezone.utc).astimezone().date()
 
     def get_scheduled_items_ids(self) -> List[str]:
         return [si.id for si in self.scheduled_items]
@@ -2918,22 +3076,19 @@ class ScheduleWindow(ArtisanResizeablDialog): # pyright:ignore[reportGeneralType
         return self.aw.apply_weight_loss(default_loss, batchsize)
 
 
-    # register the current completed roast
-    @pyqtSlot()
-    def register_completed_roast_slot(self) -> None:
-        # if there is a non-empty schedule with a selected item
-        if self.selected_remaining_item is not None and self.aw.qmc.roastUUID is not None:
+    def register_remaining_item(self, remaining_item:DragItem) -> None:
+        if self.aw.qmc.roastUUID is not None:
             _log.info('register completed roast %s', self.aw.qmc.roastUUID)
             try:
                 # register roastUUID in (local) currently selected ScheduleItem
                 # add roast to list of completed roasts
-                self.selected_remaining_item.data.roasts.add(UUID(self.aw.qmc.roastUUID, version=4))
+                remaining_item.data.roasts.add(UUID(self.aw.qmc.roastUUID, version=4))
                 # reduce number of prepared batches of the currently selected remaining item
-                take_prepared(self.aw.plus_account_id, self.selected_remaining_item.data)
+                take_prepared(self.aw.plus_account_id, remaining_item.data)
                 # calculate weight estimate
                 weight_unit_idx:int = weight_units.index(self.aw.qmc.weight[2])
                 batchsize:float = convertWeight(self.aw.qmc.weight[0], weight_unit_idx, 1) # batchsize converted to kg
-                weight_estimate = self.weight_estimate(self.selected_remaining_item.data, batchsize) # in kg
+                weight_estimate = self.weight_estimate(remaining_item.data, batchsize) # in kg
 
                 measured:bool
 
@@ -2947,10 +3102,10 @@ class ScheduleWindow(ArtisanResizeablDialog): # pyright:ignore[reportGeneralType
                     weight = convertWeight(self.aw.qmc.weight[1], weight_unit_idx, 1)    # resulting weight converted to kg
 
                 completed_item:CompletedItemDict = {
-                    'scheduleID': self.selected_remaining_item.data.id,
-                    'scheduleDate': self.selected_remaining_item.data.date.isoformat(),
-                    'count': self.selected_remaining_item.data.count,
-                    'sequence_id': len(self.selected_remaining_item.data.roasts),
+                    'scheduleID': remaining_item.data.id,
+                    'scheduleDate': remaining_item.data.date.isoformat(),
+                    'count': remaining_item.data.count,
+                    'sequence_id': len(remaining_item.data.roasts),
                     'roastUUID': self.aw.qmc.roastUUID,
                     'roastdate': self.aw.qmc.roastdate.toSecsSinceEpoch(),
                     'title': self.aw.qmc.title,
@@ -2977,6 +3132,13 @@ class ScheduleWindow(ArtisanResizeablDialog): # pyright:ignore[reportGeneralType
             except Exception as e:   # pylint: disable=broad-except
                 _log.error(e)
             self.updateScheduleWindow()
+
+    # register the current completed roast
+    @pyqtSlot()
+    def register_completed_roast_slot(self) -> None:
+        # if there is a non-empty schedule with a selected item
+        if self.selected_remaining_item is not None:
+            self.register_remaining_item(self.selected_remaining_item)
 
     def update_styles(self) -> None:
         if self.aw.app.darkmode:
@@ -3021,8 +3183,15 @@ class ScheduleWindow(ArtisanResizeablDialog): # pyright:ignore[reportGeneralType
             self.completed_items = self.getCompletedItems()             # updates completed items from cache
             self.updateFilters()                                        # update filter widget (user and machine)
 
-            # show empty message if there are no scheduled items or the schedule items scrolling widget if there are
+            # show empty message if there are no scheduled items or the schedule items scrolling widget if there are entries
             if self.scheduled_items == []:
+                # clear selection and reset scheduleID
+                self.selected_remaining_item = None
+                if self.aw.qmc.timeindex[6] == 0:
+                    # if DROP is not set we clear the ScheduleItem UUID/Date
+                    self.aw.qmc.scheduleID = None
+                    self.aw.qmc.scheduleDate = None
+                # show empty schedule message
                 self.remaining_message.setText(QApplication.translate('Plus', 'Schedule empty!{}Plan your schedule on {}').format('<BR><BR>', f'<a href="{schedulerLink()}">{plus.config.app_name}</a><br>'))
                 self.stacked_remaining_widget.setCurrentWidget(self.remaining_message_widget)
                 self.setAppBadge(0)
@@ -3035,7 +3204,7 @@ class ScheduleWindow(ArtisanResizeablDialog): # pyright:ignore[reportGeneralType
                     self.stacked_remaining_widget.setCurrentWidget(self.remaining_message_widget)
 
 
-            # show empty message if there are no completed items or the completed splitter widget if there are
+            # show empty message if there are no completed items or the completed splitter widget if there are entries
             if not self.completed_items:
                 self.completed_stacked_widget.setCurrentWidget(self.completed_message_widget)
             else:

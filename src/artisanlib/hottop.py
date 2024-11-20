@@ -22,7 +22,7 @@ import asyncio
 from typing import Final, Optional, Tuple, Callable, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from artisanlib.types import SerialSettings # pylint: disable=unused-import
+    from artisanlib.atypes import SerialSettings # pylint: disable=unused-import
 
 from artisanlib.async_comm import AsyncComm
 
@@ -77,6 +77,9 @@ class Hottop(AsyncComm):
         return (len(message) == 36 and
             self.HEADER[0:2] == message[0:2] and
             (not self._verify_crc or int(message[35]) == sum(int(c) for c in message[:35]) & 0xFF))
+
+
+    # asyncio read implementation
 
     # https://www.oreilly.com/library/view/using-asyncio-in/9781492075325/ch04.html
     async def read_msg(self, stream: asyncio.StreamReader) -> None:
@@ -156,11 +159,7 @@ class Hottop(AsyncComm):
         return bytes(cmd)
 
     def send_control(self) -> None:
-        if self._loop is not None:
-            msg = self.create_msg()
-            if self._write_queue is not None:
-                asyncio.run_coroutine_threadsafe(self._write_queue.put(msg), self._loop)
-
+        self.send(self.create_msg())
 
     # External Interface
 
@@ -175,6 +174,9 @@ class Hottop(AsyncComm):
             self._control_active = False
             return True
         return False
+
+    def hasHottopControl(self) -> bool:
+        return self._control_active
 
     def getState(self) -> Tuple[float, float, int, int]:
         return self._bt, self._et, self._heater, self._main_fan

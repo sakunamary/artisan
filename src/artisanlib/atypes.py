@@ -139,6 +139,7 @@ class ProfileData(TypedDict, total=False):
     viewerMode: bool
     timeindex: List[int]
     flavors: List[float]
+    flavors_total_correction: float
     flavorlabels: List[str]
     flavorstartangle: float
     flavoraspect: float
@@ -197,6 +198,7 @@ class ProfileData(TypedDict, total=False):
     specialeventsvalue: List[float]
     specialeventsStrings: List[str]
     default_etypes: List[bool]
+    default_etypes_set: List[int]
     etypes: List[str]
     cuppingnotes: str
     roastingnotes: str
@@ -334,6 +336,7 @@ class ExtraDeviceSettings(TypedDict):
     extramarkers2          : List[str]
     extramarkersizes1      : List[float]
     extramarkersizes2      : List[float]
+    default_etypes_set     : List[int]
     etypes                 : List[str]
 
 Palette = Tuple[

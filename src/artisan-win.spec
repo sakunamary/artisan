@@ -18,6 +18,10 @@
 
 import logging
 import sys
+import subprocess
+import os
+
+from PyInstaller.utils.hooks import copy_metadata, collect_data_files, collect_dynamic_libs
 
 # Set up the logger
 logging.basicConfig(level=logging.INFO)
@@ -26,7 +30,7 @@ logging.basicConfig(level=logging.INFO)
 def copy_file(source_file, destination_file, fatal=True):
     #logging.info("Copying %s",source_file)
     copy_command = f'copy "{source_file}" "{destination_file}"'
-    exit_code = os.system(copy_command)
+    exit_code = subprocess.call(copy_command, stdout=subprocess.DEVNULL, shell=True)
     if exit_code != 0:
         msg = f'Copy operation failed {source_file} {destination_file}'
         logging.error(msg)
@@ -37,7 +41,7 @@ def copy_file(source_file, destination_file, fatal=True):
 def xcopy_files(source_dir, destination_dir, fatal=True):
     #logging.info("Copying %s",source_file)
     xcopy_command = f'xcopy "{source_dir}" "{destination_dir}"  /y /S'
-    exit_code = os.system(xcopy_command)
+    exit_code = subprocess.call(xcopy_command, stdout=subprocess.DEVNULL, shell=True)
     if exit_code != 0:
         msg =f'Xcopy operation failed {source_dir} {destination_dir}'
         logging.error(msg)
@@ -47,7 +51,7 @@ def xcopy_files(source_dir, destination_dir, fatal=True):
 # Function to make dir
 def make_dir(source_dir, fatal=True):
     mkdir_command = f'mkdir "{source_dir}"'
-    exit_code = os.system(mkdir_command)
+    exit_code = subprocess.call(mkdir_command, shell=True)
     if exit_code != 0:
         msg =f'mkdir operation failed {source_dir}'
         logging.error(msg)
@@ -57,7 +61,7 @@ def make_dir(source_dir, fatal=True):
 # Function to remove dir
 def remove_dir(source_dir, fatal=True):
     rmdir_command = f'rmdir /q /s {source_dir}'
-    exit_code = os.system(rmdir_command)
+    exit_code = subprocess.call(rmdir_command, shell=True)
     if exit_code != 0:
         msg =f'rmdir operation failed {source_dir}'
         logging.error(msg)
@@ -72,9 +76,20 @@ def check_file_exists(file_path, fatal=True):
         if fatal:
             sys.exit('Fatal Error')
 
-block_cipher = None
+# Function to delete file
+def del_file(file_path, fatal=True):
+    del_command = f'del /q {file_path}'
+    exit_code = subprocess.call(del_command, shell=True)
+    if exit_code != 0:
+        msg =f'del operation failed {file_path}'
+        logging.error(msg)
+        if fatal:
+            sys.exit('Fatal Error')
 
-import os
+
+###################################
+# Setup the environment
+###################################
 if os.environ.get('APPVEYOR'):
     ARTISAN_SRC = r'C:\projects\artisan\src'
     PYTHON = os.environ.get('PYTHON_PATH')
@@ -87,18 +102,13 @@ else:
     sys.exit('Fatal Error')
 
 NAME = 'artisan'
-
-logging.info("** ARTISAN_LEGACY: %s", ARTISAN_LEGACY)
-logging.info("** QT_TRANSL: %s",QT_TRANSL)
-
-##
 TARGET = 'dist\\' + NAME + '\\'
 PYTHON_PACKAGES = PYTHON + r'\Lib\site-packages'
 PYQT_QT = PYTHON_PACKAGES + r'\PyQt' + PYQT + r'\Qt'
 PYQT_QT_BIN = PYQT_QT + r'\bin'
 PYQT_QT_TRANSLATIONS = QT_TRANSL
 YOCTO_BIN = PYTHON_PACKAGES + r'\yoctopuce\cdll'
-SNAP7_BIN = r'C:\Windows'
+SNAP7_BIN = PYTHON_PACKAGES + r'\snap7\lib'
 
 from PyInstaller.utils.hooks import is_module_satisfies
 if is_module_satisfies('scipy >= 1.3.2'):
@@ -106,32 +116,40 @@ if is_module_satisfies('scipy >= 1.3.2'):
 else:
     SCIPY_BIN = PYTHON_PACKAGES + r'\scipy\extra-dll'
 
-#os.system(PYTHON + r'\Scripts\pylupdate5 artisan.pro')
+logging.info("** ARTISAN_LEGACY: %s", ARTISAN_LEGACY)
+logging.info("** QT_TRANSL: %s",QT_TRANSL)
 
+###################################
+# Pyinstaller core
+###################################
 hiddenimports_list=['charset_normalizer.md__mypyc', # part of requests 2.28.2 # see https://github.com/pyinstaller/pyinstaller-hooks-contrib/issues/534
                             'matplotlib.backends.backend_pdf',
                             'matplotlib.backends.backend_svg',
-#                            'numpy.f2py',
                             'scipy.spatial.transform._rotation_groups',
                             'scipy.special.cython_special',
                             'scipy._lib.messagestream',
                             'pywintypes',
                             'win32cred',
-                            'win32timezone'
+                            'win32timezone',
+                            'babel.numbers'  # should not be needed as it got fixed in pyinstaller 6.11
                             ]
 # Add the hidden imports not required by legacy Windows.
 if not ARTISAN_LEGACY=='True':
-    logging.info(">>>>> Appending hidden imports")
     hiddenimports_list[len(hiddenimports_list):] = [
                             'PyQt6.QtWebChannel',
-                            'PyQt6.QtWebEngineCore'
+                            'PyQt6.QtWebEngineCore',
+                            'importlib_resources',
+                            'winrt.windows.foundation.collections'
                             ]
 
+datas = collect_data_files('bleak', subdir=r'backends\winrt')
+binaries = collect_dynamic_libs('bleak')
+block_cipher = None
 
 a = Analysis(['artisan.py'],
              pathex=[PYQT_QT_BIN, ARTISAN_SRC, SCIPY_BIN],
-             binaries=[],
-             datas=[],
+             binaries=binaries,
+             datas=datas, # + copy_metadata('tzdata')
              hookspath=[],
              runtime_hooks=[],
              excludes=[],
@@ -162,12 +180,16 @@ coll = COLLECT(exe,
                name=NAME)
 
 
-# assumes the Microsoft Visual C++ 2015 Redistributable Package (x64), vc_redist.x64.exe, is located above the source directory
+###################################
+# copy additional needed files
+###################################
+logging.info(">>>>> Copying additional needed files")
+
+# requires the Microsoft Visual C++ 2015 Redistributable Package (x64), vc_redist.x64.exe, to be located above the source directory
 copy_file(r'..\vc_redist.x64.exe', TARGET)
 
 copy_file('README.txt',TARGET)
 copy_file(r'..\LICENSE', TARGET + r'\LICENSE.txt')
-#os.system('copy qt-win.conf ' + TARGET + 'qt.conf')
 make_dir(TARGET + 'Wheels')
 make_dir(TARGET + r'Wheels\Cupping')
 make_dir(TARGET + r'Wheels\Other')
@@ -221,17 +243,13 @@ if not ARTISAN_LEGACY=='True':
         copy_file(QT_TRANSL + '\\' + tr, TARGET + 'translations',False)
 
 
-# this directory no longer exists
-#remove_dir(TARGET + 'mpl-data\sample_data',False)
-
 # YOCTO HACK BEGIN: manually copy over the dlls
 make_dir(TARGET + r'_internal\yoctopuce\cdll')
-copy_file(YOCTO_BIN + r'\yapi.dll', TARGET + r'_internal\yoctopuce\cdll')
 copy_file(YOCTO_BIN + r'\yapi64.dll', TARGET + r'_internal\yoctopuce\cdll')
 # YOCTO HACK END
 
 # copy Snap7 lib
-copy_file(SNAP7_BIN + r'\snap7.dll', TARGET)
+copy_file(SNAP7_BIN + r'\snap7.dll', TARGET + r'_internal')
 
 for fn in [
     'artisan.png',
@@ -275,7 +293,7 @@ for fn in [
     r'includes\site.webmanifest',
     r'includes\logging.yaml',
     ]:
-  copy_file(fn, TARGET)
+    copy_file(fn, TARGET)
 
 make_dir(TARGET + 'Machines')
 xcopy_files(r'includes\Machines', TARGET + 'Machines')
@@ -285,3 +303,158 @@ xcopy_files(r'includes\Themes', TARGET + 'Themes')
 
 make_dir(TARGET + 'Icons')
 xcopy_files(r'includes\Icons', TARGET + 'Icons')
+
+
+###################################
+# Remove unneeded files and folders
+###################################
+# remove unused translations of unused Qt modules
+rootdir = f'{TARGET}_internal'
+SUPPORTED_LANGUAGES = ['ar', 'da', 'de','el','en','es','fa','fi','fr','gd', 'he','hu','id','it','ja','ko','lv', 'nl','no','pl','pt_BR','pt','sk', 'sv','th','tr','uk','vi','zh_CN','zh_TW']
+
+qt_trans_prefix_keep = {
+    'qtbase',
+    'qt'
+}
+qt_trans_file_keep = {
+    'en-US.pak'
+}
+qt_trans_prefix_delete = {
+    'qt_help'
+}
+
+logging.info(">>>>> Removing unneeded Qt translation files")
+for qt_dir in [r'PyQt5\Qt5\translations', r'PyQt6\Qt6\translations']:
+    qt = rootdir + '\\' + qt_dir
+    for root, _, files in os.walk(qt):
+        for file in files:
+            if (any(file.startswith(f'{x}_') for x in qt_trans_prefix_delete) or
+                    not ( (any(file.startswith(f'{x}_') for x in qt_trans_prefix_keep) and any(file.endswith(f'_{x}.qm') for x in SUPPORTED_LANGUAGES)) or
+                         any(file == f'{x}' for x in qt_trans_file_keep))):
+                file_path = os.path.join(root, file)
+                del_file(file_path, True)
+                #logging.info(file_path)
+
+logging.info(">>>>> Removing unneeded language support from babel")
+for root, _, files in os.walk(rootdir + r'\babel\locale-data'):
+    for file in files:
+        if file.endswith('.dat') and (('_' not in file and file.split('.')[0] not in SUPPORTED_LANGUAGES) or
+                ('_' in file and file.split('.')[0] not in SUPPORTED_LANGUAGES)):
+            file_path = os.path.join(root, file)
+            del_file(file_path, True)
+            #logging.info(file_path)
+
+# remove unneeded files and folders from Windows (not implemented for legacy)
+if not ARTISAN_LEGACY=='True':
+    logging.info(">>>>> Removing unneeded files")
+    for fn in [
+        r'_internal\PyQt6\Qt6\bin\Qt6Multimedia.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6MultimediaQuick.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6PdfQuick.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6PositioningQuick.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QmlWorkerScript.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6Quick3D.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6Quick3DAssetImport.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6Quick3DAssetUtils.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6Quick3DEffects.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6Quick3DHelpers.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6Quick3DHelpersImpl.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6Quick3DParticles.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6Quick3DPhysics.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6Quick3DPhysicsHelpers.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6Quick3DRuntimeRender.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6Quick3DSpatialAudio.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6Quick3DUtils.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickControls2.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickControls2Basic.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickControls2BasicStyleImpl.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickControls2Fusion.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickControls2FusionStyleImpl.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickControls2Imagine.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickControls2ImagineStyleImpl.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickControls2Impl.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickControls2Material.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickControls2MaterialStyleImpl.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickControls2Universal.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickControls2UniversalStyleImpl.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickDialogs2.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickDialogs2QuickImpl.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickDialogs2Utils.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickLayouts.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickParticles.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickShapes.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickTemplates2.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickTest.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickTimeline.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6QuickTimelineBlendTrees.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6RemoteObjects.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6RemoteObjectsQml.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6Sensors.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6SensorsQuick.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6SerialPort.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6ShaderTools.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6SpatialAudio.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6Test.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6TextToSpeech.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6WebChannelQuick.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6WebEngineQuick.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6WebEngineQuickDelegatesQml.dll',
+        r'_internal\PyQt6\Qt6\bin\Qt6WebSockets.dll',
+        r'_internal\PyQt6\Qt6\plugins\platforms\qminimal.dll',
+        r'_internal\PyQt6\Qt6\plugins\platforms\qoffscreen.dll',
+        r'_internal\PyQt6\Qt6\plugins\imageformats\qicns.dll',
+        r'_internal\PyQt6\Qt6\plugins\imageformats\qtga.dll',
+        r'_internal\PyQt6\Qt6\plugins\imageformats\qtiff.dll',
+        r'_internal\PyQt6\Qt6\plugins\imageformats\qwebp.dll',
+        ]:
+        del_file(f'{TARGET}{fn}', True)
+
+    # The api-ms-win*.dll files are generated on Appveyer CI and are not required
+    for root, _, files in os.walk(TARGET):
+        for file in files:
+            if (file.startswith('api-ms-win')):
+                file_path = os.path.join(root, file)
+                del_file(file_path, True)
+
+    logging.info(">>>>> Removing unneeded folders")
+    for dp in [
+        r'_internal\PyQt6\Qt6\plugins\generic',
+        r'_internal\PyQt6\Qt6\plugins\networkinformation',
+        r'_internal\PyQt6\Qt6\plugins\position',
+        r'_internal\PyQt6\Qt6\plugins\tls',
+        r'_internal\PyQt6\Qt6\qml',
+        r'_internal\matplotlib\mpl-data\sample_data',
+        ]:
+        remove_dir(f'{TARGET}{dp}', True)
+
+
+
+###################################
+# log the size of install folder
+###################################
+def get_size(path):
+    size = 0
+    # If the path is a file, get its size directly
+    if os.path.isfile(path):
+        size += os.path.getsize(path)
+    # If the path is a directory, walk through all files and sum their sizes
+    elif os.path.isdir(path):
+        for dirpath, dirnames, filenames in os.walk(path):
+            for filename in filenames:
+                file_path = os.path.join(dirpath, filename)
+                size += os.path.getsize(file_path)
+    return size
+
+def readable_bytes(size_in_bytes):
+    # Converts bytes to readable format
+    for unit in ['Bytes', 'KB', 'MB', 'GB', 'TB']:
+        if size_in_bytes < 1024.0:
+            return f"{size_in_bytes:.2f} {unit}"
+        size_in_bytes /= 1024.0
+
+# Get total size in bytes minus the vc_redist.x64.exe file
+size_bytes = get_size(TARGET) - get_size(TARGET + 'vc_redist.x64.exe')
+logging.info(f'>>>>> Net size of install folder: {readable_bytes(size_bytes)}')
+
+###################################
+

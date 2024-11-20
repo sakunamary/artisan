@@ -58,8 +58,8 @@ notifications_url: Final[str] = api_base_url + '/notifications'
 
 #verify_ssl: Final[bool] = False
 verify_ssl: Final[bool] = True
-connect_timeout: Final[int] = 2  # in seconds
-read_timeout: Final[int] = 4  # in seconds
+connect_timeout: Final[int] = 6  # in seconds
+read_timeout: Final[int] = 6  # in seconds
 min_passwd_len: Final[int] = 4
 min_login_len: Final[int] = 6
 compress_posts: Final[bool] = True

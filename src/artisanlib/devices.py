@@ -26,9 +26,9 @@ from typing import Final, Optional, List, Tuple, cast, TYPE_CHECKING
 if TYPE_CHECKING:
     from artisanlib.main import ApplicationWindow # noqa: F401 # pylint: disable=unused-import
 
-from artisanlib.util import deltaLabelUTF8, setDeviceDebugLogLevel, argb_colorname2rgba_colorname, rgba_colorname2argb_colorname
+from artisanlib.util import deltaLabelUTF8, setDeviceDebugLogLevel, argb_colorname2rgba_colorname, rgba_colorname2argb_colorname, toInt
 from artisanlib.dialogs import ArtisanResizeablDialog
-from artisanlib.widgets import MyQComboBox, MyQDoubleSpinBox
+from artisanlib.widgets import MyContentLimitedQComboBox, MyQComboBox, MyQDoubleSpinBox
 
 
 _log: Final[logging.Logger] = logging.getLogger(__name__)
@@ -38,15 +38,15 @@ try:
     from PyQt6.QtGui import (QStandardItemModel, QStandardItem, QColor, QIntValidator, QRegularExpressionValidator) # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt6.QtWidgets import (QApplication, QWidget, QCheckBox, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,  # @UnusedImport @Reimport  @UnresolvedImport
                                  QPushButton, QSpinBox, QTabWidget, QComboBox, QDialogButtonBox, QGridLayout, # @UnusedImport @Reimport  @UnresolvedImport
-                                 QGroupBox, QRadioButton, # @UnusedImport @Reimport  @UnresolvedImport
-                                 QTableWidget, QMessageBox, QHeaderView, QTableWidgetItem) # @UnusedImport @Reimport  @UnresolvedImport
+                                 QGroupBox, QRadioButton, QButtonGroup, # @UnusedImport @Reimport  @UnresolvedImport
+                                 QTableWidget, QMessageBox, QHeaderView, QTableWidgetItem, QSizePolicy) # @UnusedImport @Reimport  @UnresolvedImport
 except ImportError:
     from PyQt5.QtCore import (Qt, pyqtSlot, QSettings, QTimer, QRegularExpression) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtGui import (QStandardItemModel, QStandardItem, QColor, QIntValidator, QRegularExpressionValidator) # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
     from PyQt5.QtWidgets import (QApplication, QWidget, QCheckBox, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, # type: ignore # @UnusedImport @Reimport  @UnresolvedImport
                                  QPushButton, QSpinBox, QTabWidget, QComboBox, QDialogButtonBox, QGridLayout, # @UnusedImport @Reimport  @UnresolvedImport
-                                 QGroupBox, QRadioButton, # @UnusedImport @Reimport  @UnresolvedImport
-                                 QTableWidget, QMessageBox, QHeaderView, QTableWidgetItem) # @UnusedImport @Reimport  @UnresolvedImport
+                                 QGroupBox, QRadioButton, QButtonGroup, # @UnusedImport @Reimport  @UnresolvedImport
+                                 QTableWidget, QMessageBox, QHeaderView, QTableWidgetItem, QSizePolicy) # @UnusedImport @Reimport  @UnresolvedImport
 
 
 class DeviceAssignmentDlg(ArtisanResizeablDialog):
@@ -61,6 +61,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         self.org_phidgetRemoteFlag = self.aw.qmc.phidgetRemoteFlag
         self.org_yoctoRemoteFlag = self.aw.qmc.yoctoRemoteFlag
         self.org_santokerSerial = self.aw.santokerSerial
+        self.org_santokerBLE = self.aw.santokerBLE
         self.org_kaleidoSerial = self.aw.kaleidoSerial
 
         ################ TAB 1   WIDGETS
@@ -122,7 +123,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                     dev.pop(i)              #note: pop() makes the list smaller that's why there are 2 FOR statements
                     break
         self.sorted_devices = sorted(dev)
-        self.devicetypeComboBox = MyQComboBox()
+        self.devicetypeComboBox = MyContentLimitedQComboBox()
 
 ##        self.devicetypeComboBox.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
 ##        self.devicetypeComboBox.view().setTextElideMode(Qt.TextElideMode.ElideNone)
@@ -172,7 +173,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         self.btpidtypeComboBox.setCurrentIndex([y[1] for y in supported_BT_pids].index(self.aw.ser.readBTpid[0])) #pid type is index 0
         label1 = QLabel(QApplication.translate('Label', 'Type'))
         label2 = QLabel(QApplication.translate('Label', 'RS485 Unit ID'))
-        #rs485 possible unit IDs (1-32); unit 0 is master (computer)
+        #rs485 possible unit IDs (1-32); unit 0 is client (computer)
         unitids = list(map(str,list(range(1,33))))
         self.controlpidunitidComboBox = QComboBox()
         self.controlpidunitidComboBox.addItems(unitids)
@@ -1002,6 +1003,9 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         self.yoctoBoxRemoteFlag.stateChanged.connect(self.yoctoBoxRemoteFlagStateChanged)
         yoctoServerIdLabel = QLabel(QApplication.translate('Label','VirtualHub'))
         self.yoctoServerId = QLineEdit(self.aw.qmc.yoctoServerID)
+        self.yoctoServerId.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.yoctoServerId.setMinimumWidth(100)
+        self.yoctoServerId.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.yoctoServerId.setEnabled(self.aw.qmc.yoctoRemoteFlag)
         YoctoEmissivityLabel = QLabel(QApplication.translate('Label','Emissivity'))
         self.yoctoEmissivitySpinBox = MyQDoubleSpinBox()
@@ -1013,6 +1017,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         yoctoServerBox.addWidget(yoctoServerIdLabel)
         yoctoServerBox.addSpacing(10)
         yoctoServerBox.addWidget(self.yoctoServerId)
+        yoctoServerBox.addStretch()
         yoctoServerBox.setContentsMargins(0,0,0,0)
         yoctoServerBox.setSpacing(10)
         yoctoNetworkGrid = QGridLayout()
@@ -1135,9 +1140,25 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         self.santokerPort.setFixedWidth(150)
         self.santokerPort.setValidator(QIntValidator(1, 65535,self.santokerPort))
         self.santokerPort.setEnabled(not self.aw.santokerSerial)
-        self.santokerSerialFlag = QCheckBox()
-        self.santokerSerialFlag.setChecked(not self.aw.santokerSerial)
+
+        self.santokerSerialFlag = QCheckBox(QApplication.translate('Label','Serial'))
+        self.santokerSerialFlag.setChecked(self.aw.santokerSerial and not self.aw.santokerBLE)
         self.santokerSerialFlag.stateChanged.connect(self.santokerSerialStateChanged)
+
+        self.santokerNetworkFlag = QCheckBox(QApplication.translate('Label','WiFi'))
+        self.santokerNetworkFlag.setChecked(not self.aw.santokerSerial and not self.aw.santokerBLE)
+        self.santokerNetworkFlag.stateChanged.connect(self.santokerNetworkStateChanged)
+
+        self.santokerBLEFlag = QCheckBox(QApplication.translate('Label','Bluetooth'))
+        self.santokerBLEFlag.setChecked(self.aw.santokerBLE and not self.aw.santokerSerial)
+        self.santokerBLEFlag.stateChanged.connect(self.santokerBLEStateChanged)
+
+        # make those flags exclusive
+        self.button_group = QButtonGroup()
+        self.button_group.addButton(self.santokerSerialFlag)
+        self.button_group.addButton(self.santokerNetworkFlag)
+        self.button_group.addButton(self.santokerBLEFlag)
+
         kaleidoHostLabel = QLabel(QApplication.translate('Label','Host'))
         self.kaleidoHost = QLineEdit(self.aw.kaleidoHost)
         self.kaleidoHost.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -1150,7 +1171,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         self.kaleidoPort.setFixedWidth(150)
         self.kaleidoPort.setValidator(QIntValidator(1, 65535,self.kaleidoPort))
         self.kaleidoPort.setEnabled(not self.aw.kaleidoSerial)
-        self.kaleidoSerialFlag = QCheckBox()
+        self.kaleidoSerialFlag = QCheckBox(QApplication.translate('Label','WiFi'))
         self.kaleidoSerialFlag.setChecked(not self.aw.kaleidoSerial)
         self.kaleidoSerialFlag.stateChanged.connect(self.kaleidoSerialStateChanged)
 #        kaleidoPIDLabel = QLabel('PID')
@@ -1168,24 +1189,43 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         self.mugmaPort.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.mugmaPort.setFixedWidth(150)
 
+        colorTrackMeanLabel = QLabel(QApplication.translate('Label','Mean Filter'))
+        self.colorTrackMeanSpinBox = QSpinBox()
+        self.colorTrackMeanSpinBox.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.colorTrackMeanSpinBox.setRange(10,200)
+        self.colorTrackMeanSpinBox.setValue(int(self.aw.colorTrack_mean_window_size))
+        colorTrackMedianLabel = QLabel(QApplication.translate('Label','Median Filter'))
+        self.colorTrackMedianSpinBox = QSpinBox()
+        self.colorTrackMedianSpinBox.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.colorTrackMedianSpinBox.setRange(10,200)
+        self.colorTrackMedianSpinBox.setValue(int(self.aw.colorTrack_median_window_size))
+
         santokerNetworkGrid = QGridLayout()
-        santokerNetworkGrid.addWidget(self.santokerSerialFlag,0,0)
+        santokerNetworkGrid.addWidget(self.santokerNetworkFlag,0,0)
         santokerNetworkGrid.addWidget(santokerHostLabel,0,1)
         santokerNetworkGrid.addWidget(self.santokerHost,0,2)
         santokerNetworkGrid.addWidget(santokerPortLabel,1,1)
         santokerNetworkGrid.addWidget(self.santokerPort,1,2)
         santokerNetworkGrid.setSpacing(20)
-        santokerNetworkGroupBox = QGroupBox('Santoker')
-        santokerNetworkGroupBox.setLayout(santokerNetworkGrid)
+        santokerSerialHBox = QHBoxLayout()
+        santokerSerialHBox.addSpacing(20)
+        santokerSerialHBox.addWidget(self.santokerBLEFlag)
+        santokerSerialHBox.addSpacing(20)
+        santokerSerialHBox.addWidget(self.santokerSerialFlag)
+        santokerSerialHBox.addStretch()
         santokerHBox = QHBoxLayout()
         santokerHBox.addStretch()
-        santokerHBox.addWidget(santokerNetworkGroupBox)
+        santokerHBox.addLayout(santokerNetworkGrid)
         santokerHBox.addStretch()
         santokerVBox = QVBoxLayout()
+        santokerVBox.addLayout(santokerSerialHBox)
         santokerVBox.addLayout(santokerHBox)
         santokerVBox.addStretch()
         santokerVBox.setSpacing(5)
         santokerVBox.setContentsMargins(0,0,0,0)
+
+        santokerNetworkGroupBox = QGroupBox('Santoker')
+        santokerNetworkGroupBox.setLayout(santokerVBox)
 
         kaleidoNetworkGrid = QGridLayout()
         kaleidoNetworkGrid.addWidget(self.kaleidoSerialFlag,0,0)
@@ -1199,7 +1239,6 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         kaleidoNetworkGroupBox = QGroupBox('Kaleido')
         kaleidoNetworkGroupBox.setLayout(kaleidoNetworkGrid)
         kaleidoHBox = QHBoxLayout()
-        kaleidoHBox.addStretch()
         kaleidoHBox.addWidget(kaleidoNetworkGroupBox)
         kaleidoHBox.addStretch()
         kaleidoVBox = QVBoxLayout()
@@ -1217,14 +1256,28 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         mugmaNetworkGroupBox = QGroupBox('Mugma')
         mugmaNetworkGroupBox.setLayout(mugmaNetworkGrid)
         mugmaHBox = QHBoxLayout()
-        mugmaHBox.addStretch()
         mugmaHBox.addWidget(mugmaNetworkGroupBox)
         mugmaHBox.addStretch()
         mugmaVBox = QVBoxLayout()
         mugmaVBox.addLayout(mugmaHBox)
-        mugmaVBox.addStretch()
-        mugmaVBox.setSpacing(5)
         mugmaVBox.setContentsMargins(0,0,0,0)
+
+        colorTrackNetworkGrid = QGridLayout()
+        colorTrackNetworkGrid.addWidget(colorTrackMeanLabel,0,1)
+        colorTrackNetworkGrid.addWidget(self.colorTrackMeanSpinBox,0,2)
+        colorTrackNetworkGrid.addWidget(colorTrackMedianLabel,1,1)
+        colorTrackNetworkGrid.addWidget(self.colorTrackMedianSpinBox,1,2)
+        colorTrackNetworkGrid.setSpacing(20)
+        colorTrackNetworkGroupBox = QGroupBox('ColorTrack')
+        colorTrackNetworkGroupBox.setLayout(colorTrackNetworkGrid)
+        colorTrackHBox = QHBoxLayout()
+        colorTrackHBox.addWidget(colorTrackNetworkGroupBox)
+        colorTrackHBox.addStretch()
+        colorTrackVBox = QVBoxLayout()
+        colorTrackVBox.addLayout(colorTrackHBox)
+        colorTrackVBox.addStretch()
+        colorTrackVBox.setSpacing(5)
+        colorTrackVBox.setContentsMargins(0,0,0,0)
 
         # create pid box
         PIDgrid = QGridLayout()
@@ -1374,12 +1427,16 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         tab6Layout.setContentsMargins(2,10,2,5)
         #LAYOUT TAB 7 (Santoker)
         tab7VLayout = QVBoxLayout()
-        tab7VLayout.addLayout(santokerVBox)
+        tab7VLayout.addWidget(santokerNetworkGroupBox)
         tab7VLayout.addLayout(kaleidoVBox)
         tab7VLayout.addStretch()
+        tab7V2Layout = QVBoxLayout()
+        tab7V2Layout.addLayout(mugmaVBox)
+        tab7V2Layout.addLayout(colorTrackVBox)
+        tab7V2Layout.addStretch()
         tab7Layout = QHBoxLayout()
         tab7Layout.addLayout(tab7VLayout)
-        tab7Layout.addLayout(mugmaVBox)
+        tab7Layout.addLayout(tab7V2Layout)
         tab7Layout.addStretch()
         tab7Layout.setContentsMargins(2,10,2,5)
         #main tab widget
@@ -1447,10 +1504,24 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         self.phidgetBoxRemoteOnlyFlag.setEnabled(self.aw.qmc.phidgetRemoteFlag)
 
     @pyqtSlot(int)
-    def santokerSerialStateChanged(self, _:int) -> None:
-        self.aw.santokerSerial = not self.aw.santokerSerial
+    def santokerSerialStateChanged(self, i:int) -> None:
+        self.aw.santokerSerial = bool(i)
+        if self.aw.santokerSerial:
+            self.aw.santokerBLE = False
+
+    @pyqtSlot(int)
+    def santokerNetworkStateChanged(self, i:int) -> None:
+        self.aw.santokerSerial = not bool(i)
+        if not self.aw.santokerSerial:
+            self.aw.santokerBLE = False
         self.santokerHost.setEnabled(not self.aw.santokerSerial)
         self.santokerPort.setEnabled(not self.aw.santokerSerial)
+
+    @pyqtSlot(int)
+    def santokerBLEStateChanged(self, i:int) -> None:
+        self.aw.santokerBLE = bool(i)
+        if self.aw.santokerBLE:
+            self.aw.santokerSerial = False
 
     @pyqtSlot(int)
     def kaleidoSerialStateChanged(self, _:int) -> None:
@@ -1611,6 +1682,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
             if vheader is not None:
                 vheader.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
 
+            fixed_size_sections = [7,8,9,10,11,12,13,14]
             if nddevices:
                 dev = self.aw.qmc.devices[:]             #deep copy
                 limit = len(dev)
@@ -1623,7 +1695,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                 for i in range(nddevices):
                     try:
                         # 0: device type
-                        typeComboBox =  MyQComboBox()
+                        typeComboBox =  MyContentLimitedQComboBox()
 #                        typeComboBox.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContentsOnFirstShow) # default
                         typeComboBox.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
 #                        typeComboBox.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
@@ -1639,14 +1711,14 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                         color1Button = QPushButton(self.aw.qmc.extradevicecolor1[i])
                         color1Button.clicked.connect(self.setextracolor1)
                         textcolor = self.aw.labelBorW(self.aw.qmc.extradevicecolor1[i])
-                        color1Button.setStyleSheet(f'selection-background-color: transparent; border: none; outline: none; background-color: rgba{ImageColor.getcolor(self.aw.qmc.extradevicecolor1[i], "RGBA")}; color: {textcolor}')
+                        color1Button.setStyleSheet(f"selection-background-color: transparent; border: none; outline: none; background-color: rgba{ImageColor.getcolor(self.aw.qmc.extradevicecolor1[i], 'RGBA')}; color: {textcolor}")
                         color1Button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
                         # 2: color 2
                         color2Button = QPushButton(self.aw.qmc.extradevicecolor2[i])
                         color2Button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
                         color2Button.clicked.connect(self.setextracolor2)
                         textcolor = self.aw.labelBorW(self.aw.qmc.extradevicecolor2[i])
-                        color2Button.setStyleSheet(f'selection-background-color: transparent; border: none; outline: none; background-color: rgba{ImageColor.getcolor(self.aw.qmc.extradevicecolor2[i], "RGBA")}; color: {textcolor}')
+                        color2Button.setStyleSheet(f"selection-background-color: transparent; border: none; outline: none; background-color: rgba{ImageColor.getcolor(self.aw.qmc.extradevicecolor2[i], 'RGBA')}; color: {textcolor}")
                         # 3+4: name 1 + 2
                         name1edit = QLineEdit(self.aw.qmc.extraname1[i])
                         name2edit = QLineEdit(self.aw.qmc.extraname2[i])
@@ -1742,7 +1814,6 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
 
                     except Exception as e: # pylint: disable=broad-except
                         _log.exception(e)
-                fixed_size_sections = [7,8,9,10,11,12,13,14]
                 header = self.devicetable.horizontalHeader()
                 if header is not None:
                     header.setStretchLastSection(False)
@@ -1750,20 +1821,22 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                     for i in fixed_size_sections:
                         header.setSectionResizeMode(i, QHeaderView.ResizeMode.Fixed)
                         header.resizeSection(i, header.sectionSize(i) + 5)
-                if not self.aw.qmc.devicetablecolumnwidths:
-                    self.devicetable.setColumnWidth(0, 100)
-                    self.devicetable.setColumnWidth(3, 100)
-                    self.devicetable.setColumnWidth(4, 100)
-                    self.devicetable.setColumnWidth(5, 40)
-                    self.devicetable.setColumnWidth(6, 40)
-                else:
-                    # remember the columnwidth
-                    for i, _ in enumerate(self.aw.qmc.devicetablecolumnwidths):
-                        if i not in fixed_size_sections:
-                            try:
-                                self.devicetable.setColumnWidth(i, self.aw.qmc.devicetablecolumnwidths[i])
-                            except Exception: # pylint: disable=broad-except
-                                pass
+            if not self.aw.qmc.devicetablecolumnwidths:
+                self.devicetable.setColumnWidth(0, 230)
+                self.devicetable.setColumnWidth(1, 80)
+                self.devicetable.setColumnWidth(2, 80)
+                self.devicetable.setColumnWidth(3, 80)
+                self.devicetable.setColumnWidth(4, 80)
+                self.devicetable.setColumnWidth(5, 40)
+                self.devicetable.setColumnWidth(6, 40)
+            else:
+                # remember the columnwidth
+                for i, _ in enumerate(self.aw.qmc.devicetablecolumnwidths):
+                    if i not in fixed_size_sections:
+                        try:
+                            self.devicetable.setColumnWidth(i, self.aw.qmc.devicetablecolumnwidths[i])
+                        except Exception: # pylint: disable=broad-except
+                            pass
         except Exception as e: # pylint: disable=broad-except
             _t, _e, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message', 'Exception:') + ' createDeviceTable(): {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
@@ -2264,7 +2337,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                     # set LCD label color
                     self.aw.setLabelColor(self.aw.extraLCDlabel1[i],colorname)
                     color1Button = cast(QPushButton, self.devicetable.cellWidget(i,1))
-                    color1Button.setStyleSheet(f'border: none; outline: none; background-color: rgba{ImageColor.getcolor(self.aw.qmc.extradevicecolor1[i], "RGBA")}; color: { self.aw.labelBorW(self.aw.qmc.extradevicecolor1[i])}')
+                    color1Button.setStyleSheet(f"border: none; outline: none; background-color: rgba{ImageColor.getcolor(self.aw.qmc.extradevicecolor1[i], 'RGBA')}; color: { self.aw.labelBorW(self.aw.qmc.extradevicecolor1[i])}")
                     color1Button.setText(colorname)
                     self.aw.checkColors([(self.aw.qmc.extraname1[i], self.aw.qmc.extradevicecolor1[i], QApplication.translate('Label','Background'), self.aw.qmc.palette['background'])])
                     self.aw.checkColors([(self.aw.qmc.extraname1[i], self.aw.qmc.extradevicecolor1[i], QApplication.translate('Label','Legend bkgnd'), self.aw.qmc.palette['background'])])
@@ -2278,7 +2351,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                     # set LCD label color
                     self.aw.setLabelColor(self.aw.extraLCDlabel2[i],colorname)
                     color2Button = cast(QPushButton, self.devicetable.cellWidget(i,2))
-                    color2Button.setStyleSheet(f'border: none; outline: none; background-color: rgba{ImageColor.getcolor(self.aw.qmc.extradevicecolor2[i], "RGBA")}; color: {self.aw.labelBorW(self.aw.qmc.extradevicecolor2[i])}')
+                    color2Button.setStyleSheet(f"border: none; outline: none; background-color: rgba{ImageColor.getcolor(self.aw.qmc.extradevicecolor2[i], 'RGBA')}; color: {self.aw.labelBorW(self.aw.qmc.extradevicecolor2[i])}")
                     color2Button.setText(colorname)
                     self.aw.checkColors([(self.aw.qmc.extraname2[i], self.aw.qmc.extradevicecolor2[i], QApplication.translate('Label','Background'), self.aw.qmc.palette['background'])])
                     self.aw.checkColors([(self.aw.qmc.extraname2[i], self.aw.qmc.extradevicecolor2[i], QApplication.translate('Label','Legend bkgnd'),self.aw.qmc.palette['background'])])
@@ -2302,6 +2375,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
         self.aw.qmc.phidgetRemoteFlag = self.org_phidgetRemoteFlag
         self.aw.qmc.yoctoRemoteFlag = self.org_yoctoRemoteFlag
         self.aw.santokerSerial = self.org_santokerSerial
+        self.aw.santokerBLE = self.org_santokerBLE
         self.aw.kaleidoSerial = self.org_kaleidoSerial
         self.reject()
 
@@ -2347,7 +2421,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                 elif str(self.controlpidtypeComboBox.currentText()) == 'Fuji PXF':
                     self.aw.ser.controlETpid[0] = 4
                     str1 = 'Fuji PXF'
-                self.aw.ser.controlETpid[1] =  int(str(self.controlpidunitidComboBox.currentText()))
+                self.aw.ser.controlETpid[1] =  toInt(str(self.controlpidunitidComboBox.currentText()))
                 #if str(self.btpidtypeComboBox.currentText()) == 'Fuji PXG':
                 self.aw.ser.readBTpid[0] = 0
                 str2 = 'Fuji PXG'
@@ -2363,7 +2437,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                 elif str(self.btpidtypeComboBox.currentText()) == 'Fuji PXF':
                     self.aw.ser.readBTpid[0] = 4
                     str2 = 'Fuji PXF'
-                self.aw.ser.readBTpid[1] =  int(str(self.btpidunitidComboBox.currentText()))
+                self.aw.ser.readBTpid[1] =  toInt(str(self.btpidunitidComboBox.currentText()))
                 if self.showFujiLCDs.isChecked():
                     self.aw.ser.showFujiLCDs = True
                 else:
@@ -3089,7 +3163,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                 ####  DEVICE 135 is +Santoker Power/Fan but +DEVICE cannot be set as main device
                 ##########################
                 ##########################
-                ####  DEVICE 136 is +Santoker Drum but +DEVICE cannot be set as main device
+                ####  DEVICE 136 is +Santoker Drum  but +DEVICE cannot be set as main device
                 ##########################
                 ##########################
                 ####  DEVICE 137 is Phidget DAQ1500
@@ -3184,7 +3258,7 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                 ##########################
                 ####  DEVICE 161 is +Omega HH309 34 but +DEVICE cannot be set as main device
                 ##########################
-                elif meter == 'Digi-Sense 20250-07' and self.aw.qmc.device != 161:
+                elif meter == 'Digi-Sense 20250-07' and self.aw.qmc.device != 161: # noqa: SIM114
                     self.aw.qmc.device = 17
                     #self.aw.ser.comport = "COM4"
                     self.aw.ser.baudrate = 9600
@@ -3224,6 +3298,30 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                 ##########################
                 ##########################
                 ####  DEVICE 169 is +TMP1202_2 (a second TMP1202 configuration)
+                ##########################
+                ##########################
+                ####  DEVICE 170 is ColorTrack Serial
+                elif meter == 'ColorTrack Serial':
+                    self.aw.qmc.device = 170
+                    message = QApplication.translate('Message','Device set to {0}').format(meter)
+                ##########################
+                ##########################
+                ####  DEVICE 171 is Santoker BT/ET
+                elif meter == 'Santoker R BT/ET':
+                    self.aw.qmc.device = 171
+                    message = QApplication.translate('Message','Device set to {0}').format(meter)
+                ##########################
+                ##########################
+                ####  DEVICE 172 is +Santoker IR/Board  but +DEVICE cannot be set as main device
+                ##########################
+                ##########################
+                ####  DEVICE 173 is +Santoker DelatBT/DeltaET  but +DEVICE cannot be set as main device
+                ##########################
+                ##########################
+                ####  DEVICE 174 is ColorTrack BT
+                elif meter == 'ColorTrack BT':
+                    self.aw.qmc.device = 174
+                    message = QApplication.translate('Message','Device set to {0}').format(meter)
                 ##########################
 
 
@@ -3414,7 +3512,12 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                 1, # 166
                 1, # 167
                 1, # 168
-                1  # 169
+                1, # 169
+                3, # 170
+                1, # 171
+                1, # 172
+                1, # 173
+                1  # 174
                 ]
             #init serial settings of extra devices
             for i, _ in enumerate(self.aw.qmc.extradevices):
@@ -3545,6 +3648,8 @@ class DeviceAssignmentDlg(ArtisanResizeablDialog):
                 self.aw.mugmaPort = int(self.mugmaPort.text())
             except Exception: # pylint: disable=broad-except
                 pass
+            self.aw.colorTrack_mean_window_size = self.colorTrackMeanSpinBox.value()
+            self.aw.colorTrack_median_window_size = self.colorTrackMedianSpinBox.value()
             for i in range(8):
                 self.aw.qmc.phidget1018_async[i] = self.asyncCheckBoxes[i].isChecked()
                 self.aw.qmc.phidget1018_ratio[i] = self.ratioCheckBoxes[i].isChecked()

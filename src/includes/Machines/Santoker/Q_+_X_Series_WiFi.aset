@@ -1,12 +1,15 @@
 [General]
 Delay=1000
-roastertype_setup=Santoker Q Series
+roastertype_setup=Santoker Q + X Series WiFi
+roasterheating_setup=3
 
 [Device]
 id=134
 santokerHost=10.10.100.254
 santokerPort=20001
-santokerSerial=true
+santokerSerial=false
+santokerBLE=false
+Controlbuttonflag=true
 
 [events]
 markTP=false
@@ -64,6 +67,18 @@ buttonpalette_label=
 buttonpalette_shortcuts=true
 buttonpalettemaxlen=14, 14, 14, 14, 14, 14, 14, 14, 14, 14
 button size=1
+extraeventbuttoncolor=#ad0427, #ad0427, #808080, #45a6cf, #45a6cf, #808080, #49b260, #49b260
+extraeventbuttontextcolor=white, white, white, white, white, white, white, white
+extraeventsactions=6, 6, 0, 6, 6, 0, 6, 6
+extraeventsactionstrings="santoker(fa,{})", "santoker(fa,{})", , "santoker(ca,{})", "santoker(ca,{})", , "santoker(c0,{})", "santoker(c0,{})"
+extraeventsbuttonsflags=0, 1, 1
+extraeventsdescriptions=, , , , , , , 
+extraeventslabels=-10%\n\\t, +10%\n\\t, , -10%\n\\t, +10%\n\\t, , -10%\n\\t, +10%\n\\t
+extraeventstypes=8, 8, 4, 5, 5, 4, 6, 6
+extraeventsvalues=-2, 2, 0, -2, 2, 0, -2, 2
+extraeventsvisibility=1, 1, 0, 1, 1, 0, 0, 0
+marklastbuttonpressed=true
+showextrabuttontooltips=false
 
 [Sliders]
 ModeTempSliders=C
@@ -80,3 +95,24 @@ slidermax=100, 100, 100, 100
 slidermin=0, 0, 0, 0
 slideroffsets=0, 0, 0, 0
 slidervisibilities=1, 0, 0, 1
+
+[ArduinoPID]
+derivative_filter=1
+dutyMax=100
+dutyMin=-100
+dutySteps=1
+invertControl=false
+pOnE=true
+pidKd=40
+pidKi=0.01
+pidKp=2
+pidNegativeTarget=0
+pidPositiveTarget=4
+pidSource=1
+positiveTargetMax=100
+positiveTargetMin=0
+positiveTargetRangeLimit=false
+svLookahead=5
+svSlider=false
+svSliderMax=230
+svSliderMin=0

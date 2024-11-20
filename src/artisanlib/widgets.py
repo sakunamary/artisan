@@ -48,6 +48,18 @@ class MyQComboBox(QComboBox): # pylint: disable=too-few-public-methods  # pyrigh
         if self.hasFocus():
             super().wheelEvent(event)
 
+class MyContentLimitedQComboBox(MyQComboBox): # pylint: disable=too-few-public-methods  # pyright: ignore [reportGeneralTypeIssues]# Argument to class must be a base class
+    def __init__(self, parent:Optional['QWidget'] = None, **kwargs:Dict[Any,Any]) -> None:
+        super().__init__(parent, **kwargs)
+        # setting max number visible limit
+        self.setMaxVisibleItems(20)
+        # ensure Qt style for this widget
+        self.setStyleSheet('combobox-popup: 0;')
+        # add scroll barspacer
+        view = self.view()
+        if view is not None:
+            view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
 class MyQDoubleSpinBox(QDoubleSpinBox):  # pyright: ignore [reportGeneralTypeIssues] # Argument to class must be a base class
     def __init__(self, parent:Optional['QWidget'] = None, **kwargs:Dict[str,Any]) -> None:
         super().__init__(parent, **kwargs)

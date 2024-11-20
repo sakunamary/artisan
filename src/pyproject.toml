@@ -135,6 +135,7 @@ disable='''
         too-many-locals,
         too-many-boolean-expressions,
         too-many-nested-blocks,
+        too-many-positional-arguments,
         cyclic-import,
         duplicate-code,
 '''
@@ -241,8 +242,7 @@ enable='''c-extension-no-member,'''
 [tool.mypy]
 files = ["artisanlib/*.py", "plus/*.py"]
 exclude = ['build', 'dist', 'uic', 'misc']
-python_version = "3.9"
-# "3.8" throws "matplotlib/backends/backend_agg.py:393: error: Parenthesized context managers are only supported in Python 3.9 and greater"
+python_version = "3.8"
 
 # Ensure full coverage
 check_untyped_defs = true
@@ -250,7 +250,7 @@ disallow_incomplete_defs = true
 disallow_untyped_calls = true
 disallow_untyped_defs = true
 disallow_untyped_decorators = true
-disallow_any_unimported = true
+disallow_any_unimported = false # raises about 100 errors with numpy >= 2.1
 
 # Restrict dynamic typing
 disallow_any_generics = true
@@ -301,10 +301,10 @@ output-format = "pylint" # one of: text, json, junit, grouped, github, gitlab, p
 line-length = 80
 
 # Never enforce `E501` (line length violations).
-lint.ignore = ["E402", "E501", "E741", "PLR0913", "PLR2004", "COM812", "PLR0912", "PLR0915", "PLW0603", "PLR0911", "SIM105", "SIM114", "PLR2044"]
+lint.ignore = ["E501", "E741", "E402", "PLR0912", "PLR0913", "PLR0915", "SIM105", "PLR2044", "PLR2004", "PLW0603", "PLR0911", "COM812"]
 
 # Exclude a variety of commonly ignored directories.
-exclude = ["dist", "build", "proto", ".pytype", ".mypy_cache", ".git"]
+exclude = ["dist", "build", "proto", ".pytype", ".mypy_cache", ".git", ".venv", ".venv_universal", ".venv_arm"]
 
 # Assume Python 3.8.
 target-version = "py38"
@@ -337,6 +337,7 @@ pythonPlatform = "All"
 #reportUnknownArgumentType = false
 #reportGeneralTypeIssues = false
 useLibraryCodeForTypes = false
+reportInvalidTypeForm = false # since numpy 2.1 more than 150 errors are reported
 
 
 ## pytest conf

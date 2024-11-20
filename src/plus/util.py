@@ -44,7 +44,7 @@ import numpy
 from typing import Final, Optional, Union, Any, Dict, List, Tuple, TYPE_CHECKING  #for Python >= 3.9: can remove 'List' since type hints can now use the generic 'list'
 
 if TYPE_CHECKING:
-    from artisanlib.types import ProfileData, ComputedProfileInformation # pylint: disable=unused-import
+    from artisanlib.atypes import ProfileData, ComputedProfileInformation # pylint: disable=unused-import
     from PyQt6.QtWidgets import QMessageBox # pylint: disable=unused-import
 
 _log: Final[logging.Logger] = logging.getLogger(__name__)
@@ -329,8 +329,8 @@ def addRoRTemp2dict(dict_source:Union['ProfileData', 'ComputedProfileInformation
 
 # returns extends dict_target by item with key_target holding the
 # dict_source[key_source] value if key_source in dict_source and not empty
-def add2dict(dict_source:'ProfileData', key_source:str, dict_target:Dict[str, Any], key_target:str) -> None:
-    if key_source in dict_source and dict_source[key_source]:  # type:ignore # TypedDict key must be a string literal; expected one of
+def add2dict(dict_source:'ProfileData', key_source:str, dict_target:Dict[str, Any], key_target:str, if_non_empty:bool = True) -> None:
+    if key_source in dict_source and (not if_non_empty or dict_source[key_source]):  # type:ignore # TypedDict key must be a string literal; expected one of
         dict_target[key_target] = dict_source[key_source]  # type:ignore # TypedDict key must be a string literal; expected one of
 
 

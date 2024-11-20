@@ -15,8 +15,8 @@
 # AUTHOR
 # Dave Baxter, Marko Luther 2023
 
-#set -ex
-set -e  # reduced logging
+#set -ex # extended logging
+set -e  # exit as soon as any line in the script fails
 
 
 export LD_LIBRARY_PATH=$LD_LIBTRARY_PATH:/usr/local/lib
@@ -64,23 +64,6 @@ rm -rf dist/artisan.d
 
 # copy translations
 mkdir dist/translations
-
-
-for lan in ar, da, de, en, el, es, fa, fi, fr, gd, he, hu, id, it, ja, ko, lv, nl, no, pl, pt_BR, pt, sk, sv, th, tr, uk, vi, zh_CN, zh_TW; do
-     QTBASE_FILE=$QT_PATH/translations/qtbase_${lan}.qm
-     QT_FILE=$QT_PATH/translations/qt_${lan}.qm
-#     QTCONNECTIVITY_FILE=$QT_PATH/translations/qtconnectivity_${lan}.qm
-     if [ -e ${QTBASE_FILE} ]
-          then cp ${QTBASE_FILE} dist/translations
-     fi
-     if [ -e ${QT_FILE} ]
-          then cp ${QT_FILE} dist/translations
-     fi
-#     if [ -e ${QTCONNECTIVITY_FILE} ]
-#          then cp ${QTCONNECTIVITY_FILE} dist/translations
-#     fi
-done
-
 cp translations/*.qm dist/translations
 
 # copy data (mpl-data is now copied to matplotlib/mpl-data by pyinstaller)
@@ -144,33 +127,86 @@ mkdir dist/Icons
 find includes/Icons -name '.*.aset' -exec rm -r {} \;
 cp -R includes/Icons/* dist/Icons
 
-# remove automatically collected PyQt6 libs that are not used to save space
-# with pyinstaller 6.0 it seems not to needed any longer to remove unused Qt libs:
-#keep_qt_modules="libQt6Core libQt6Gui libQt6Widgets libQt6Svg libQt6PrintSupport
-# libQt6Network libQt6DBus libQt6Bluetooth libQt6Concurrent libQt6WebEngineWidgets
-# libQt6WebEngineCore libQt6WebEngine libQt6Quick libQt6QuickWidgets libQt6Qml
-# libQt6QmlModels libQt6WebChannel libQt6Positioning libQt6OpenGL libQt6WaylandClient"
-#
-#for qtlib in dist/_internal/libQt6*.so.*; do
-#    match=0
-#    for item in ${keep_qt_modules}; do
-#        if [ ${qtlib} = dist/_internal/${item}.so.* ]; then
-#            match=1
-#            break
-#        fi
-#    done
-#    if [ $match = 0 ]; then
-##        rm -f ${qtlib}
-#        echo ${qtlib}
-#    fi
-#done
+
+# remove unused Qt modules
+
+keep_qt_modules="libQt6Bluetooth libQt6Concurrent libQt6Core libQt6DBus libQt6Gui libQt6Network
+ libQt6OpenGL libQt6Positioning libQt6PrintSupport libQt6Qml libQt6QmlModels libQt6Quick libQt6QuickWidgets
+ libQt6Svg libQt6WaylandClient libQt6WaylandEglClientHwIntegration libQt6WebChannel libQt6WebEngineCore
+ libQt6WebEngineWidgets libQt6Widgets libQt6WlShellIntegration libQt6XcbQpa"
+
+for qtlib in $(find dist/_internal/PyQt6/Qt6/lib -type f -name "libQt6*.so.*"); do
+    qtlib_filename="${qtlib##*/}"
+    match=0
+    for item in ${keep_qt_modules}; do
+        if [ ${qtlib_filename} = "${item}.so.6" ]; then
+            match=1
+            break
+        fi
+    done
+    if [ $match = 0 ]; then
+        rm -f ${qtlib}
+    fi
+done
 
 # remove Qt5 libs
 rm -rf dist/_internal/libQt5*
 rm -rf dist/_internal/PyQt5
 
-rm -rf dist/_internal/PyQt6/Qt6/translations
-rm -rf dist/_internal/PyQt6/Qt6/qml/QtQuick3D
+
+# remove unused Qt plugins
+
+qt_imageformats="libqwebp libqtiff libqgif libqwbmp libqtga"
+for x in ${qt_imageformats}; do
+    rm -rf "dist/_internal/PyQt6/Qt6/plugins/imageformats/${x}.so"
+done
+
+
+SUPPORTED_LANGUAGES="ar da de el en es fa fi fr gd he hu id it ja ko lv nl no pl pt_BR pt sk sv th tr uk vi zh_CN zh_TW"
+
+# remove unused Qt translations
+
+# the following produces a (harmless) warning log entry on generating PDF reports as locales cannot be found
+rm -rf dist/_internal/PyQt6/Qt6/translations/qtwebengine_locales
+
+for qttrans in $(find dist/_internal/PyQt6/Qt6/translations -type f -name "*.qm"); do
+    qttrans_filename="${qttrans##*/}"
+    match=0
+    for lang in ${SUPPORTED_LANGUAGES}; do
+        if [ ${qttrans_filename} = "qtbase_${lang}.qm" ] || [ ${qttrans_filename} = "qt_${lang}.qm" ] ; then
+            match=1
+            break
+        fi
+    done
+    if [ $match = 0 ]; then
+        rm -f ${qttrans}
+    fi
+done
+
+
+# remove unused QML files
+
+sudo rm -rf dist/_internal/PyQt6/Qt6/qml
+echo Qt QML files removed
+
+# remove unused babel translations
+
+for babeltrans in $(find dist/_internal/babel/locale-data -type f -name "*.dat"); do
+    babeltrans_filename="${babeltrans##*/}"
+    match=0
+    for lang in ${SUPPORTED_LANGUAGES}; do
+        if [ ${babeltrans_filename} = "${lang}.dat" ] ; then
+            match=1
+            break
+        fi
+    done
+    if [ $match = 0 ]; then
+        rm -f ${babeltrans}
+    fi
+done
+
+# remove matplotlib sample data
+rm -rf dist/_internal/matplotlib/mpl-data/sample_data
 
 # remove automatically collected libs that might break things on some installations (eg. Ubuntu 16.04)
 # so it is better to rely on the system installed once

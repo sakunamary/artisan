@@ -19,12 +19,12 @@ import sys
 import math
 import platform
 import logging
-from typing import Final, Optional, List, Tuple, Dict, Callable, cast, Any, TYPE_CHECKING
+from typing import Final, Optional, List, Set, Tuple, Dict, Callable, cast, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from artisanlib.main import ApplicationWindow # noqa: F401 # pylint: disable=unused-import
-    from artisanlib.types import RecentRoast, BTU
-    from artisanlib.ble import BleInterface # noqa: F401 # pylint: disable=unused-import
+    from artisanlib.atypes import RecentRoast, BTU
+    from artisanlib.acaia import Acaia # noqa: F401 # pylint: disable=unused-import
     from plus.stock import Blend # noqa: F401  # pylint: disable=unused-import
     from PyQt6.QtWidgets import QLayout, QAbstractItemView, QCompleter # pylint: disable=unused-import
     from PyQt6.QtGui import QClipboard, QCloseEvent, QKeyEvent, QMouseEvent # pylint: disable=unused-import
@@ -115,10 +115,11 @@ class volumeCalculatorDlg(ArtisanDialog):
         # Scale Weight
         self.scale_weight = self.parent_dialog.scale_weight
         self.scaleWeight = QLabel() # displays the current reading - tare of the connected scale
-        if self.parent_dialog.ble is not None:
+        if self.parent_dialog.acaia is not None:
             self.update_scale_weight()
-            self.parent_dialog.ble.weightChanged.connect(self.ble_weight_changed)
-            self.parent_dialog.ble.deviceDisconnected.connect(self.ble_scan_failed)
+            self.parent_dialog.acaia.weight_changed_signal.connect(self.acaia_weight_changed)
+            self.parent_dialog.acaia.battery_changed_signal.connect(self.acaia_battery_changed)
+            self.parent_dialog.acaia.disconnected_signal.connect(self.acaia_disconnected)
         # Scale Battery
         self.scale_battery = self.parent_dialog.scale_battery
 
@@ -321,7 +322,7 @@ class volumeCalculatorDlg(ArtisanDialog):
             self.aw.largeScaleLCDs_dialog.updateWeightUnit('g')
 
     @pyqtSlot()
-    def ble_scan_failed(self) -> None:
+    def acaia_disconnected(self) -> None:
         self.scale_weight = None
         self.scale_battery = None
         self.updateWeightLCD('----')
@@ -330,11 +331,14 @@ class volumeCalculatorDlg(ArtisanDialog):
         self.scaleWeight.setText('' if txt_value == '' else txt_value+txt_unit.lower())
         self.aw.qmc.updateLargeScaleLCDs(txt_value)
 
-    @pyqtSlot(float)
-    def ble_weight_changed(self, w:float) -> None:
-        if w is not None:
-            self.scale_weight = w
-            self.update_scale_weight()
+    @pyqtSlot(int)
+    def acaia_battery_changed(self, b:int) -> None:
+        self.scale_battery = b
+
+    @pyqtSlot(int)
+    def acaia_weight_changed(self, w:int) -> None:
+        self.scale_weight = w
+        self.update_scale_weight()
 
     @pyqtSlot(float)
     def update_scale_weight(self, weight:Optional[float] = None) -> None:
@@ -342,7 +346,7 @@ class volumeCalculatorDlg(ArtisanDialog):
             if weight is not None:
                 self.scale_weight = weight
             if self.scale_weight is not None and self.tare is not None:
-                self.updateWeightLCD(f'{self.scale_weight - self.tare:.1f}','g')
+                self.updateWeightLCD(f'{self.scale_weight - self.tare:.0f}','g')
             else:
                 self.updateWeightLCD('----')
         except Exception as e: # pylint: disable=broad-except # the dialog might have been closed already and thus the qlabel might not exist anymore
@@ -361,6 +365,8 @@ class volumeCalculatorDlg(ArtisanDialog):
                         self.coffeeinweightEdit.setText(f'{float2float(v):g}')
                     elif self.coffeeoutweightEdit.hasFocus():
                         self.coffeeoutweightEdit.setText(f'{float2float(v):g}')
+            else:
+                super().keyPressEvent(event)
 
     def widgetWeight(self, widget:QLineEdit) -> None:
         w = self.retrieveWeight()
@@ -411,11 +417,16 @@ class volumeCalculatorDlg(ArtisanDialog):
                 self.coffeeinvolume.setText('')
                 self.inVolume = None
             else:
-                self.inVolume = convertVolume(
-                    convertWeight(self.weightIn,self.weightunit,0) * float(comma2dot(self.unitvolumeEdit.text())) / float(comma2dot(self.coffeeinweightEdit.text())),
-                    5,
-                    self.volumeunit)
-                self.coffeeinvolume.setText(f'{float2floatWeightVolume(self.inVolume):g}')
+                inWeight:float = float(comma2dot(self.coffeeinweightEdit.text()))
+                if inWeight == 0:
+                    self.coffeeinvolume.setText('')
+                    self.inVolume = None
+                else:
+                    self.inVolume = convertVolume(
+                        convertWeight(self.weightIn,self.weightunit,0) * float(comma2dot(self.unitvolumeEdit.text())) / inWeight,
+                        5,
+                        self.volumeunit)
+                    self.coffeeinvolume.setText(f'{float2floatWeightVolume(self.inVolume):g}')
         except Exception as e: # pylint: disable=broad-except
             _log.exception(e)
             self.inVolume = None
@@ -429,8 +440,16 @@ class volumeCalculatorDlg(ArtisanDialog):
                 self.coffeeoutvolume.setText('')
                 self.outVolume = None
             else:
-                self.outVolume = convertVolume(convertWeight(self.weightOut,self.weightunit,0) * float(comma2dot(str(self.unitvolumeEdit.text()))) / float(comma2dot(str(self.coffeeoutweightEdit.text()))),5,self.volumeunit)
-                self.coffeeoutvolume.setText(f'{float2floatWeightVolume(self.outVolume):g}')
+                outWeight:float = float(comma2dot(str(self.coffeeoutweightEdit.text())))
+                if outWeight == 0:
+                    self.coffeeoutvolume.setText('')
+                    self.outVolume = None
+                else:
+                    self.outVolume = convertVolume(
+                        convertWeight(self.weightOut,self.weightunit,0) * float(comma2dot(str(self.unitvolumeEdit.text()))) / outWeight,
+                        5,
+                        self.volumeunit)
+                    self.coffeeoutvolume.setText(f'{float2floatWeightVolume(self.outVolume):g}')
         except Exception as e: # pylint: disable=broad-except
             _log.exception(e)
             self.outVolume = None
@@ -580,7 +599,7 @@ class editGraphDlg(ArtisanResizeablDialog):
 
         self.perKgRoastMode = False # if true only the amount during the roast and not the full batch (incl. preheat and BBP) are displayed), toggled by click on the result widget
 
-        self.ble:'Optional[BleInterface]' = None # the BLE interface # noqa: UP037
+        self.acaia:'Optional[Acaia]' = None # the BLE interface # noqa: UP037
         self.scale_weight:Optional[float] = None # weight received from a connected scale
         self.scale_battery:Optional[int] = None # battery level of the connected scale in %
         self.scale_set:Optional[float] = None # set weight for accumulation in g
@@ -1129,7 +1148,7 @@ class editGraphDlg(ArtisanResizeablDialog):
 
         # connect the ArtisanDialog standard OK/Cancel buttons
         self.dialogbuttons.accepted.connect(self.accept)
-        self.dialogbuttons.rejected.connect(self.cancel_dialog)
+        self.dialogbuttons.rejected.connect(self.closeEvent)
 
         # container tare
         self.tareComboBox = QComboBox()
@@ -1348,36 +1367,19 @@ class editGraphDlg(ArtisanResizeablDialog):
 
 
             if self.aw.scale.device == 'acaia' and not (platform.system() == 'Windows' and math.floor(toFloat(platform.release())) < 10):
-                # QtBluetooth is not well supported under Windows versions before Windows 10
+                # BLE is not well supported under Windows versions before Windows 10
                 try:
-#                    with suppress_stdout_stderr():
-                    # if selected scale is the Acaia, start the BLE interface
-                    from artisanlib.ble import BleInterface # noqa: F811
-                    from artisanlib.acaia import AcaiaBLE
-                    acaia = AcaiaBLE()
-
-                    self.ble = BleInterface(
-                        [(acaia.SERVICE_UUID_LEGACY, [AcaiaBLE.CHAR_UUID_LEGACY]),
-                         (acaia.SERVICE_UUID, [AcaiaBLE.CHAR_UUID, AcaiaBLE.CHAR_UUID_WRITE])],
-                        acaia.processData,
-                        acaia.sendHeartbeat,
-                        None, #acaia.sendStop,
-                        acaia.reset,
-                        [
-                            acaia.DEVICE_NAME_LUNAR,
-                            acaia.DEVICE_NAME_PEARL,
-                            acaia.DEVICE_NAME_PEARL2021,
-                            acaia.DEVICE_NAME_PEARLS,
-                            acaia.DEVICE_NAME_LUNAR2021,
-                            acaia.DEVICE_NAME_PYXIS
-                        ]
-                        )
+                    from artisanlib.acaia import Acaia
+                    self.acaia = Acaia(
+                        connected_handler=lambda : self.aw.sendmessageSignal.emit(QApplication.translate('Message', '{} connected').format('Acaia'),True,None),
+                        disconnected_handler=lambda : self.aw.sendmessageSignal.emit(QApplication.translate('Message', '{} disconnected').format('Acaia'),True,None))
+                    self.acaia.weight_changed_signal.connect(self.ble_weight_changed)
+                    self.acaia.battery_changed_signal.connect(self.ble_battery_changed)
+                    self.acaia.disconnected_signal.connect(self.ble_disconnected)
                     # start BLE loop
-                    self.ble.deviceDisconnected.connect(self.ble_scan_failed)
-                    self.ble.weightChanged.connect(self.ble_weight_changed)
-                    self.ble.batteryChanged.connect(self.ble_battery_changed)
+                    self.acaia.start()
+
                     self.updateWeightLCD('----')
-                    self.ble.scanDevices()
                 except Exception as e:  # pylint: disable=broad-except
                     _log.exception(e)
             elif self.aw.scale.device in {'KERN NDE','Shore 930'}:
@@ -1622,7 +1624,15 @@ class editGraphDlg(ArtisanResizeablDialog):
                     plus.blend.Component(coffee_tuples[0][1], 0.5),
                     plus.blend.Component(coffee_tuples[1][1], 0.5)
                 ])
-            res, total_weight = plus.blend.openCustomBlendDialog(self, self.aw, inWeight, self.aw.qmc.weight[2], coffees, blend)
+            # only entries of coffees with stock in the selected store or in all stores if no store is selected) should be enabled in blend component coffee popups
+            coffee_hr_ids_with_stock_in_store:Set[str] = set()
+            if self.plus_coffees is not None:
+                coffee_hr_ids_with_stock_in_store = {plus.stock.getCoffeeId(c) for c in self.plus_coffees if
+                    # if there are multiple stores defined and non is selected, only coffees with stock in all stores are enabled in the blend component coffee popups
+                    self.plus_stores is None or len(self.plus_stores) < 2 or self.plus_stores_combo.currentIndex() != 0 or len(plus.stock.getCoffeeCoffeeStocks(c)) == len(self.plus_stores)}
+
+            res, total_weight = plus.blend.openCustomBlendDialog(self, self.aw, inWeight, self.aw.qmc.weight[2],
+                    coffees, blend, coffee_hr_ids_with_stock_in_store)
             if res: # not canceled
                 self.aw.qmc.plus_custom_blend = res
                 self.populatePlusCoffeeBlendCombos() # we update the blend menu to reflect the current custom blend
@@ -1764,19 +1774,13 @@ class editGraphDlg(ArtisanResizeablDialog):
         return v_formatted, unit
 
     @pyqtSlot()
-    def ble_scan_failed(self) -> None:
-#        import datetime
-#        ts = libtime.time()
-#        st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-#        _log.debug("ble_scan_failed: %s", st)
+    def ble_disconnected(self) -> None:
         self.scale_weight = None
         self.scale_battery = None
         self.updateWeightLCD('----')
-        if self.ble is not None and not self.disconnecting:
-            QTimer.singleShot(200, self.ble.scanDevices)
 
-    @pyqtSlot(float)
-    def ble_weight_changed(self, w:float) -> None:
+    @pyqtSlot(int)
+    def ble_weight_changed(self, w:int) -> None:
         if w is not None:
             self.scale_weight = w
             self.update_scale_weight()
@@ -1800,7 +1804,8 @@ class editGraphDlg(ArtisanResizeablDialog):
             unit = weight_units.index(self.aw.qmc.weight[2])
             if unit == 0: # g selected
                 # metric
-                v_formatted = f'{v:.0f}' if v > 1000 else f'{v:.1f}'
+                #v_formatted = f'{v:.0f}' if v > 1000 else f'{v:.1f}'
+                v_formatted = f'{v:.0f}' # never show decimals for g
             elif unit == 1: # kg selected
                 # metric (always keep the accuracy to the g
                 v_formatted = f'{v/1000:.3f}'
@@ -1841,7 +1846,7 @@ class editGraphDlg(ArtisanResizeablDialog):
                 for i, ll in sorted(zip(self.plus_blend_selected_spec['ingredients'],self.plus_blend_selected_spec_labels), key=lambda tup:tup[0]['ratio'],reverse = True)[:4]:
                     if line:
                         line = line + ', '
-                    c = f'<a href="{plus.util.coffeeLink(i["coffee"])}"{dark_mode_link_color}>{abbrevString(ll, 18)}</a>'
+                    c = f"<a href=\"{plus.util.coffeeLink(i['coffee'])}\"{dark_mode_link_color}>{abbrevString(ll, 18)}</a>"
                     line = line + str(int(round(i['ratio']*100))) + '% ' + c
             if line and len(line)>0 and self.plus_store_selected is not None and self.plus_store_selected_label is not None:
                 line = line + f'  (<a href="{plus.util.storeLink(self.plus_store_selected)}"{dark_mode_link_color}>{self.plus_store_selected_label}</a>)'
@@ -2524,64 +2529,14 @@ class editGraphDlg(ArtisanResizeablDialog):
             _, _, exc_tb = sys.exc_info()
             self.aw.qmc.adderror((QApplication.translate('Error Message', 'Exception:') + ' addRecentRoast(): {0}').format(str(e)),getattr(exc_tb, 'tb_lineno', '?'))
 
-    # triggered if dialog is closed via its windows close box
-    # and called from accept if dialog is closed via OK
+
+
+    # called on CANCEL or WINDOW_CLOSE; reverts state and calls clean_up_and_close()
+    @pyqtSlot()
     @pyqtSlot('QCloseEvent')
     def closeEvent(self, _:Optional['QCloseEvent'] = None) -> None:
-        self.disconnecting = True
-        if self.ble is not None:
-            try:
-                self.ble.batteryChanged.disconnect()
-                self.ble.weightChanged.disconnect()
-                self.ble.deviceDisconnected.disconnect()
-            except Exception as e: # pylint: disable=broad-except
-                _log.exception(e)
-            try:
-                self.ble.disconnectDevice()
-                self.updateWeightLCD('')
-            except Exception as e: # pylint: disable=broad-except
-                _log.exception(e)
-            try:
-                self.ble.stop_managing_thread()
-            except Exception as e: # pylint: disable=broad-except
-                _log.exception(e)
-            self.ble = None
-        settings = QSettings()
-        #save window geometry
-        settings.setValue('RoastGeometry',self.saveGeometry())
-        self.aw.editGraphDlg_activeTab = self.TabWidget.currentIndex()
-#        self.aw.closeEventSettings() # save all app settings
-        self.aw.editgraphdialog = None
-        if self.stockWorker is not None and self.updateStockSignalConnection is not None:
-            self.stockWorker.updatedSignal.disconnect(self.updateStockSignalConnection)
 
-
-    # triggered via the cancel button
-    @pyqtSlot()
-    def cancel_dialog(self) -> None:
-        self.disconnecting = True
-        if self.ble is not None:
-            try:
-                self.ble.batteryChanged.disconnect()
-                self.ble.weightChanged.disconnect()
-                self.ble.deviceDisconnected.disconnect()
-            except Exception as e: # pylint: disable=broad-except
-                _log.exception(e)
-            try:
-                self.ble.disconnectDevice()
-                self.updateWeightLCD('')
-            except Exception as e: # pylint: disable=broad-except
-                _log.exception(e)
-            try:
-                self.ble.stop_managing_thread()
-            except Exception as e: # pylint: disable=broad-except
-                _log.exception(e)
-            self.ble = None
-        settings = QSettings()
-        #save window geometry
-        settings.setValue('RoastGeometry',self.saveGeometry())
-        self.aw.editGraphDlg_activeTab = self.TabWidget.currentIndex()
-
+        # restore
         self.restoreAllEnergySettings()
 
         self.aw.qmc.beans = self.org_beans
@@ -2607,9 +2562,34 @@ class editGraphDlg(ArtisanResizeablDialog):
 
         self.aw.qmc.roastpropertiesAutoOpenFlag = self.org_roastpropertiesAutoOpenFlag
         self.aw.qmc.roastpropertiesAutoOpenDropFlag = self.org_roastpropertiesAutoOpenDropFlag
-        self.aw.editgraphdialog = None
 
-        self.reject()
+        self.clean_up()
+        super().reject()
+
+
+    # called on CANCEL and WindowClose from closeEvent(), and on OK from accept()
+    def clean_up(self) -> None:
+        self.disconnecting = True
+        if self.acaia is not None:
+            try:
+                self.acaia.battery_changed_signal.disconnect()
+                self.acaia.weight_changed_signal.disconnect()
+                self.acaia.disconnected_signal.disconnect()
+            except Exception as e: # pylint: disable=broad-except
+                _log.exception(e)
+            try:
+                self.acaia.stop()
+                self.updateWeightLCD('')
+            except Exception as e: # pylint: disable=broad-except
+                _log.exception(e)
+            self.acaia = None
+        settings = QSettings()
+        #save window geometry
+        settings.setValue('RoastGeometry',self.saveGeometry())
+        self.aw.editGraphDlg_activeTab = self.TabWidget.currentIndex()
+        self.aw.editgraphdialog = None
+        if self.stockWorker is not None and self.updateStockSignalConnection is not None:
+            self.stockWorker.updatedSignal.disconnect(self.updateStockSignalConnection)
 
     # calcs volume (in ml) from density (in g/l) and weight (in g)
     @staticmethod
@@ -2631,14 +2611,16 @@ class editGraphDlg(ArtisanResizeablDialog):
                     self.inWeight(True,overwrite=True) # we don't add to current reading but overwrite
                 elif self.weightoutedit.hasFocus():
                     self.outWeight(True,overwrite=True) # we don't add to current reading but overwrite
-            if key == 76 and control_modifier and self.TabWidget.currentIndex() == 0: #ctrl L on Roast tab => open volume calculator
+            elif key == 76 and control_modifier and self.TabWidget.currentIndex() == 0: #ctrl L on Roast tab => open volume calculator
                 self.volumeCalculatorTimer(True)
-            if key == 73 and control_modifier and self.TabWidget.currentIndex() == 0: #ctrl I on Roast tab => send scale weight to in-weight field
+            elif key == 73 and control_modifier and self.TabWidget.currentIndex() == 0: #ctrl I on Roast tab => send scale weight to in-weight field
                 self.inWeight(True)
-            if key == 79 and control_modifier and self.TabWidget.currentIndex() == 0: #ctrl O on Roast tab => send scale weight to out-weight field
+            elif key == 79 and control_modifier and self.TabWidget.currentIndex() == 0: #ctrl O on Roast tab => send scale weight to out-weight field
                 self.outWeight(True)
-            if key == 80 and control_modifier and self.TabWidget.currentIndex() == 0: #ctrl P on Roast tab => send scale weight to in-weight field
+            elif key == 80 and control_modifier and self.TabWidget.currentIndex() == 0: #ctrl P on Roast tab => send scale weight to in-weight field
                 self.resetScaleSet()
+            else:
+                super().keyPressEvent(event)
 
     @pyqtSlot(int)
     def tareChanged(self, i:int) -> None:
@@ -2694,9 +2676,7 @@ class editGraphDlg(ArtisanResizeablDialog):
 
     @pyqtSlot(int)
     def tabSwitched(self, i:int) -> None:
-        if i == 0: # Roast (always initialized in __init__())
-            self.saveEventTable()
-        elif i == 1: # Notes (always initialized in __init__())
+        if i in {0,1}: # Roast (always initialized in __init__()) # Notes (always initialized in __init__())
             self.saveEventTable()
         elif i == 2: # Events (only initialized on first opening that tab)
             self.createEventTable()
@@ -3651,7 +3631,10 @@ class editGraphDlg(ArtisanResizeablDialog):
 
     @staticmethod
     def validateText2Seconds(s:str) -> int:
-        return stringtoseconds(s) if len(s) > 0 else 0
+        try:
+            return stringtoseconds(s) if len(s) > 0 else 0
+        except Exception:  # pylint: disable=broad-except
+            return 0
 
     @staticmethod
     def validateSeconds2Text(seconds:float) -> str:
@@ -5128,7 +5111,8 @@ class editGraphDlg(ArtisanResizeablDialog):
                 plus.queue.addRoast()
             except Exception as e: # pylint: disable=broad-except
                 _log.exception(e)
-        self.close()
+        self.clean_up()
+        super().accept()
 
     def getMeasuredvalues(self, title:str, func_updatefields:Callable[[],None],
             fields:List[QLineEdit], loadEnergy:List[float], func_updateduration:Callable[[],None],
