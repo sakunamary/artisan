@@ -5241,19 +5241,25 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
 
     def establish_etypes(self) -> None:
         # update ET/BT LCD label substitutions
-        ETname = self.qmc.device_name_subst(self.ETname)
-        BTname = self.qmc.device_name_subst(self.BTname)
-        self.label2.setText(f'<big><b>{ETname}</b></big>')
-        self.label3.setText(f'<big><b>{BTname}</b></big>')
+        self.label2.setText(f'<big><b>{self.ETname}</b></big>'.format(self.qmc.etypes[0],self.qmc.etypes[1],self.qmc.etypes[2],self.qmc.etypes[3]))
+        self.label3.setText(f'<big><b>{self.BTname}</b></big>'.format(self.qmc.etypes[0],self.qmc.etypes[1],self.qmc.etypes[2],self.qmc.etypes[3]))
         # update ET/BT Delta LCD label substitutions
-        self.label4.setText(f'{deltaLabelBigPrefix}{ETname}</b></big>')
-        self.label5.setText(f'{deltaLabelBigPrefix}{BTname}</b></big>')
+        self.label4.setText(f'{deltaLabelBigPrefix}{self.ETname}</b></big>'.format(self.qmc.etypes[0],self.qmc.etypes[1],self.qmc.etypes[2],self.qmc.etypes[3]))
+        self.label5.setText(f'{deltaLabelBigPrefix}{self.BTname}</b></big>'.format(self.qmc.etypes[0],self.qmc.etypes[1],self.qmc.etypes[2],self.qmc.etypes[3]))
         # update extra LCD label substitutions
         for i in range(len(self.qmc.extradevices)):
             if i < len(self.qmc.extraname1):
-                self.extraLCDlabel1[i].setText('<b>' + self.qmc.device_name_subst(self.qmc.extraname1[i]) + '</b>')
+                l1 = '<b>' + self.qmc.extraname1[i] + '</b>'
+                try:
+                    self.extraLCDlabel1[i].setText(l1.format(self.qmc.etypes[0],self.qmc.etypes[1],self.qmc.etypes[2],self.qmc.etypes[3]))
+                except Exception: # pylint: disable=broad-except
+                    self.extraLCDlabel1[i].setText(l1)
             if i < len(self.qmc.extraname2):
-                self.extraLCDlabel2[i].setText('<b>' + self.qmc.device_name_subst(self.qmc.extraname2[i]) + '</b>')
+                l2 = '<b>' + self.qmc.extraname2[i] + '</b>'
+                try:
+                    self.extraLCDlabel2[i].setText(l2.format(self.qmc.etypes[0],self.qmc.etypes[1],self.qmc.etypes[2],self.qmc.etypes[3]))
+                except Exception: # pylint: disable=broad-except
+                    self.extraLCDlabel2[i].setText(l2)
         self.settooltip()
 
     def populateListMenu(self, resourceName:str, ext:str, triggered:Callable[[bool], None], menu:QMenu, addMenu:bool = True,
@@ -5402,8 +5408,6 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
                         if res2 is not None and res2:
                             res = res2
                             self.modbus.host = host
-                        else:
-                            res = False
                     elif self.qmc.device == 79 or 79 in self.qmc.extradevices: # S7
                         # as default we offer the current settings S7 host, or if this is set to its default as after a factory reset (self.s7.default_host) we take the one from the machine setup
                         defaultS7Host:str = (self.s7.host if org_s7_host == self.s7.default_host else org_s7_host)
@@ -5413,8 +5417,6 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
                         if res2 is not None and res2:
                             res = res2
                             self.s7.host = host
-                        else:
-                            res = False
                     elif self.qmc.device == 111 or 111 in self.qmc.extradevices: # WebSocket
                         # as default we offer the current settings WebSocket host, or if this is set to its default as after a factory reset (self.ws.default_host) we take the one from the machine setup
                         defaultWSHost:str = (self.ws.host if org_ws_host == self.ws.default_host else org_ws_host)
@@ -5424,8 +5426,6 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
                         if res2 is not None and res2:
                             res = res2
                             self.ws.host = host
-                        else:
-                            res = False
                     elif self.qmc.device == 138 and not self.kaleidoSerial: # Kaleido Network
                         # as default we offer the current settings kaleido host, or if this is set to its default as after a factory reset (self.kaleido_default_host) we take the one from the machine setup
                         defaultKaleidoHost:str = (self.kaleidoHost if org_kaleido_host == self.kaleido_default_host else org_kaleido_host)
@@ -5435,8 +5435,6 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
                         if res2 is not None and res2:
                             res = res2
                             self.kaleidoHost = host
-                        else:
-                            res = False
                     elif self.qmc.device == 164: # Mugma
                         # as default we offer the current settings mugma host, or if this is set to its default as after a factory reset (self.mugma_default_host) we take the one from the machine setup
                         defaultMugmaHost:str = (self.mugmaHost if org_mugma_host == self.mugma_default_host else org_mugma_host)
@@ -5446,8 +5444,6 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
                         if res2 is not None and res2:
                             res = res2
                             self.mugmaHost = host
-                        else:
-                            res = False
                     elif (self.qmc.device in {0, 9, 19, 53, 101, 115, 126} or ((self.qmc.device == 29 or 29 in self.qmc.extradevices) and self.modbus.type in {0, 1, 2}) or
                             (self.qmc.device == 134 and self.santokerSerial and not self.santokerBLE) or
                             (self.qmc.device == 138 and self.kaleidoSerial)): # Fuji, Center301, TC4, Hottop, Behmor or MODBUS serial, HB/ARC
@@ -5517,36 +5513,22 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
                                 if self.qmc.roastersize_setup in heating_ratings:
                                     ratings = heating_ratings[self.qmc.roastersize_setup]
                                     if 'loadlabels' in ratings and len(ratings['loadlabels']) == 4:
-                                        self.qmc.loadlabels_setup = [str(lb) for lb in ratings['loadlabels']]
+                                        self.qmc.loadlabels_setup = ratings['loadlabels']
                                     if 'loadratings' in ratings and len(ratings['loadratings']) == 4:
-                                        self.qmc.loadratings_setup = [float(lr) for lr in ratings['loadratings']]
+                                        self.qmc.loadratings_setup = ratings['loadratings']
                                     if 'ratingunits' in ratings and len(ratings['ratingunits']) == 4:
-                                        self.qmc.ratingunits_setup = [int(lu) for lu in ratings['ratingunits']]
+                                        self.qmc.ratingunits_setup = ratings['ratingunits']
                                     if 'sourcetypes' in ratings and len(ratings['sourcetypes']) == 4:
-                                        self.qmc.sourcetypes_setup = [int(st) for st in ratings['sourcetypes']]
+                                        self.qmc.sourcetypes_setup = ratings['sourcetypes']
                                     if 'load_etypes' in ratings and len(ratings['load_etypes']) == 4:
-                                        self.qmc.load_etypes_setup = [int(let) for let in ratings['load_etypes']]
+                                        self.qmc.load_etypes_setup = ratings['load_etypes']
                                     if 'presssure_percents' in ratings and len(ratings['presssure_percents']) == 4:
-                                        self.qmc.presssure_percents_setup = [bool(pp) for pp in ratings['presssure_percents']]
+                                        self.qmc.presssure_percents_setup = ratings['presssure_percents']
                                     if 'loadevent_zeropcts' in ratings and len(ratings['loadevent_zeropcts']) == 4:
-                                        self.qmc.loadevent_zeropcts_setup = [int(lzp) for lzp in ratings['loadevent_zeropcts']]
+                                        self.qmc.loadevent_zeropcts_setup = ratings['loadevent_zeropcts']
                                     if 'loadevent_hundpcts' in ratings and len(ratings['loadevent_hundpcts']) == 4:
-                                        self.qmc.loadevent_hundpcts_setup = [int(lhp) for lhp in ratings['loadevent_hundpcts']]
-                                    if 'preheatDuration' in ratings and len(ratings['preheatenergies']) == 1:
-                                        self.qmc.preheatDuration_setup = int(ratings['preheatDuration'][0])
-                                    if 'preheatenergies' in ratings and len(ratings['preheatenergies']) == 4:
-                                        self.qmc.preheatenergies_setup = [float(phe) for phe in ratings['preheatenergies']]
-                                    if 'betweenbatchDuration' in ratings and len(ratings['betweenbatchDuration']) == 1:
-                                        self.qmc.betweenbatchDuration_setup = int(ratings['betweenbatchDuration'][0])
-                                    if 'betweenbatchenergies' in ratings and len(ratings['betweenbatchenergies']) == 4:
-                                        self.qmc.betweenbatchenergies_setup = [float(bbe) for bbe in ratings['betweenbatchenergies']]
-                                    if 'coolingDuration' in ratings and len(ratings['coolingDuration']) == 1:
-                                        self.qmc.coolingDuration_setup = int(ratings['coolingDuration'][0])
-                                    if 'coolingenergies' in ratings and len(ratings['coolingenergies']) == 4:
-                                        self.qmc.coolingenergies_setup = [float(ce) for ce in ratings['coolingenergies']]
-
+                                        self.qmc.loadevent_hundpcts_setup = ratings['loadevent_hundpcts']
                                     self.qmc.restoreEnergyLoadDefaults()
-                                    self.qmc.restoreEnergyProtocolDefaults()
                                     self.sendmessage(QApplication.translate('Message','Energy loads configured for {0} {1}kg').format(label,self.qmc.roastersize_setup))
                             self.sendmessage(QApplication.translate('Message','Artisan configured for {0}').format(label))
                             _log.info('Artisan configured for %s',label)
@@ -10989,13 +10971,23 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
             if i < self.nLCDS:
                 self.extraLCDframe1[i].setVisible(bool(self.extraLCDvisibility1[i]))
                 if i < len(self.qmc.extraname1):
-                    l1 = '<b>' + self.qmc.device_name_subst(self.qmc.extraname1[i]) + '</b>'
+                    l1 = '<b>' + self.qmc.extraname1[i] + '</b>'
+                    try:
+                        l1 = l1.format(self.qmc.etypes[0],self.qmc.etypes[1],self.qmc.etypes[2],self.qmc.etypes[3])
+                    except Exception: # pylint: disable=broad-except
+                        # substitution might fail if the label contains brackets like in "t{FCS}"
+                        pass
                     self.extraLCDlabel1[i].setText(l1)
                     self.setLabelColor(self.extraLCDlabel1[i],self.qmc.extradevicecolor1[i])
                 self.extraLCD1[i].setStyleSheet(f"QLCDNumber {{ border-radius:4; color: {rgba_colorname2argb_colorname(self.lcdpaletteF['sv'])}; background-color: {rgba_colorname2argb_colorname(self.lcdpaletteB['sv'])};}}")
                 self.extraLCDframe2[i].setVisible(bool(self.extraLCDvisibility2[i]))
                 if i < len(self.qmc.extraname2):
-                    l2 = '<b>' + self.qmc.device_name_subst(self.qmc.extraname2[i]) + '</b>'
+                    l2 = '<b>' + self.qmc.extraname2[i] + '</b>'
+                    try:
+                        l2 = l2.format(self.qmc.etypes[0],self.qmc.etypes[1],self.qmc.etypes[2],self.qmc.etypes[3])
+                    except Exception: # pylint: disable=broad-except
+                        # substitution might fail if the label contains brackets like in "t{FCS}"
+                        pass
                     self.extraLCDlabel2[i].setText(l2)
                     self.setLabelColor(self.extraLCDlabel2[i],self.qmc.extradevicecolor2[i])
                 self.extraLCD2[i].setStyleSheet(f"QLCDNumber {{ border-radius:4; color: {rgba_colorname2argb_colorname(self.lcdpaletteF['sv'])}; background-color: {rgba_colorname2argb_colorname(self.lcdpaletteB['sv'])};}}")
@@ -12245,7 +12237,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
     @pyqtSlot(bool)
     def miniEventRecord(self, _:bool) -> None:
         lenevents = self.eNumberSpinBox.value()
-        if lenevents and len(self.qmc.specialevents) < lenevents-1:
+        if lenevents:
             if self.qmc.timeindex[0] > -1:
                 newtime = self.qmc.time2index(self.qmc.timex[self.qmc.timeindex[0]]+ stringtoseconds(str(self.etimeline.text())))
             else:
@@ -12998,32 +12990,8 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
                 tb = profile['timex']
                 t1 = profile['temp1']
                 t2 = profile['temp2']
-                # ensure that timex, temp1 and temp2 are all of the same (minimal-)length
-                data_len:int = min(len(tb), len(t1), len(t2))
-                tb = tb[:data_len]
-                t1 = t1[:data_len]
-                t2 = t2[:data_len]
-
-                timex = profile['extratimex']
                 t1x = profile['extratemp1']
                 t2x = profile['extratemp2']
-                # ensure that number of extra device data is consistent
-                number_extra_devices = min(len(timex), len(t1x), len(t2x))
-                timex = timex[:number_extra_devices]
-                t1x = t1x[:number_extra_devices]
-                t2x = t2x[:number_extra_devices]
-                # ensure that the extra device data is of length data_len
-                for c in range(number_extra_devices):
-                    timex[c] = timex[c][:data_len]
-                    t1x[c] = t1x[c][:data_len]
-                    t2x[c] = t2x[c][:data_len]
-                    if len(timex[c]) != data_len:
-                        timex[c] = tb[:]
-                    if len(t1x[c]) != data_len:
-                        t1x[c] = [-1]*data_len
-                    if len(t2x[c]) != data_len:
-                        t2x[c] = [-1]*data_len
-
 
                 # reset the movebackground cache:
                 self.qmc.backgroundprofile_moved_x = 0
@@ -13055,6 +13023,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
 
                 names1x = [decodeLocalStrict(x) for x in profile['extraname1']]
                 names2x = [decodeLocalStrict(x) for x in profile['extraname2']]
+                timex = profile['extratimex']
                 self.qmc.temp1B,self.qmc.temp2B,self.qmc.timeB, self.qmc.temp1BX, self.qmc.temp2BX = t1,t2,tb,t1x,t2x
                 self.qmc.abs_timeB = tb.copy()  #invariant copy of timeB
                 self.qmc.extratimexB = timex
@@ -13156,7 +13125,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
                 if 'etypes' in profile:
                     self.qmc.Betypes = self.get_profile_etypes(self.qmc.backgroundprofile)
                 if 'timeindex' in profile:
-                    self.qmc.timeindexB = [max(0,min(v,data_len-1)) if i>0 else max(-1,min(v,data_len-1)) for i,v in enumerate(profile['timeindex'])]          #if new profile found with variable timeindex
+                    self.qmc.timeindexB = [max(0,v) if i>0 else max(-1,v) for i,v in enumerate(profile['timeindex'])]          #if new profile found with variable timeindex
                     if self.qmc.phasesfromBackgroundflag:
                         # adjust phases by DryEnd and FCs events from background profile
                         if self.qmc.timeindexB[1] and len(self.qmc.timeindexB) > 1 and len(self.qmc.temp2B) > self.qmc.timeindexB[1]:
@@ -15139,27 +15108,16 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
                 self.qmc.cuppingnotes = decodeLocalStrict(profile['cuppingnotes'])
             else:
                 self.qmc.cuppingnotes = ''
-
             if 'timex' in profile:
                 self.qmc.timex = profile['timex']
-            if 'temp1' in profile:
-                self.qmc.temp1 = profile['temp1']
-            if 'temp2' in profile:
-                self.qmc.temp2 = profile['temp2']
-
-            # ensure that timex, temp1 and temp2 are all of the same (minimal-)length
-            data_len:int = min(len(self.qmc.timex), len(self.qmc.temp1), len(self.qmc.temp2))
-            self.qmc.timex = self.qmc.timex[:data_len]
-            self.qmc.temp1 = self.qmc.temp1[:data_len]
-            self.qmc.temp2 = self.qmc.temp2[:data_len]
 
             # ensure that extra timex and temp lists are as long as the main timex
             for i, _ in enumerate(self.qmc.extratimex):
-                if not isinstance(self.qmc.extratimex[i], list) or len(self.qmc.extratimex[i]) != data_len:
-                    self.qmc.extratimex[i] = self.qmc.timex[:]
-                if not isinstance(self.qmc.extratemp1[i], list) or len(self.qmc.extratemp1[i]) != data_len:
+                if not isinstance(self.qmc.extratimex[i], list) or len(self.qmc.extratimex[i]) != len(self.qmc.timex):
+                    self.qmc.extratimex[i] = self.qmc.timex
+                if not isinstance(self.qmc.extratemp1[i], list) or len(self.qmc.extratemp1[i]) != len(self.qmc.timex):
                     self.qmc.extratemp1[i] = [-1]*len(self.qmc.timex)
-                if not isinstance(self.qmc.extratemp2[i], list) or len(self.qmc.extratemp2[i]) != data_len:
+                if not isinstance(self.qmc.extratemp2[i], list) or len(self.qmc.extratemp2[i]) != len(self.qmc.timex):
                     self.qmc.extratemp2[i] = [-1]*len(self.qmc.timex)
 
             # alarms
@@ -15170,6 +15128,10 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
             self.qmc.extraNoneTempHint2 = profile.get('extraNoneTempHint2', [])
 
             m = str(profile['mode']) if 'mode' in profile else self.qmc.mode
+            if 'temp1' in profile:
+                self.qmc.temp1 = profile['temp1']
+            if 'temp2' in profile:
+                self.qmc.temp2 = profile['temp2']
             if 'ambientTemp' in profile:
                 self.qmc.ambientTemp = profile['ambientTemp']
             self.qmc.greens_temp = profile.get('greens_temp', 0.0)
@@ -15292,9 +15254,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
             self.loadBbpFromProfile(profile)
 
             if 'timeindex' in profile:
-                # ensure that no timeindex points outside of timex
-                self.qmc.timeindex = [max(0,min(v,data_len-1)) if i>0 else max(-1,min(v,data_len-1)) for i,v in enumerate(profile['timeindex'])]
-
+                self.qmc.timeindex = [max(0,v) if i>0 else max(-1,v) for i,v in enumerate(profile['timeindex'])]
                 if self.qmc.locktimex:
                     if self.qmc.timeindex[0] != -1:
                         self.qmc.startofx = self.qmc.timex[self.qmc.timeindex[0]] + self.qmc.locktimex_start
@@ -16708,7 +16668,6 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
     #loads the settings at the start of application. See the oppposite closeEventSettings()
     def settingsLoad(self, filename:Optional[str] = None, theme:bool = False, machine:bool = False, redraw:bool = True) -> bool: # pyright: ignore [reportGeneralTypeIssues] # Code is too complex to analyze; reduce complexity by refactoring into subroutines or reducing
         res = False
-
         try:
             updateBatchCounter = True
             if filename is not None:
@@ -17529,16 +17488,14 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
             self.qmc.graphfont = toInt(settings.value('graphfont',self.qmc.graphfont))
             if settings.contains('ETname'):
                 self.ETname = settings.value('ETname')
-                ETname_subst = self.qmc.device_name_subst(self.ETname)
-                self.label2.setText(f'<big><b>{ETname_subst}</b></big>')
-                self.label4.setText(f'{deltaLabelBigPrefix}{ETname_subst}</b></big>')
+                self.label2.setText(f'<big><b>{self.ETname}</b></big>'.format(self.qmc.etypes[0],self.qmc.etypes[1],self.qmc.etypes[2],self.qmc.etypes[3]))
+                self.label4.setText(f'{deltaLabelBigPrefix}{self.ETname}</b></big>'.format(self.qmc.etypes[0],self.qmc.etypes[1],self.qmc.etypes[2],self.qmc.etypes[3]))
             else:
                 self.ETname = QApplication.translate('Label', 'ET')
             if settings.contains('BTname'):
                 self.BTname = settings.value('BTname')
-                BTname_subst = self.qmc.device_name_subst(self.BTname)
-                self.label3.setText(f'<big><b>{BTname_subst}</b></big>')
-                self.label5.setText(f'{deltaLabelBigPrefix}{BTname_subst}</b></big>')
+                self.label3.setText(f'<big><b>{self.BTname}</b></big>'.format(self.qmc.etypes[0],self.qmc.etypes[1],self.qmc.etypes[2],self.qmc.etypes[3]))
+                self.label5.setText(f'{deltaLabelBigPrefix}{self.BTname}</b></big>'.format(self.qmc.etypes[0],self.qmc.etypes[1],self.qmc.etypes[2],self.qmc.etypes[3]))
             else:
                 self.BTname = QApplication.translate('Label', 'BT')
             settings.endGroup()
@@ -21888,8 +21845,7 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
                     self.html_loader = QWebEngineView(profile) # pyright:ignore[reportPossiblyUnboundVariable]
                 except Exception: # pylint: disable=broad-except
                     self.html_loader = QWebEngineView() # pyright:ignore[reportPossiblyUnboundVariable]
-                if self.html_loader is not None:
-                    self.html_loader.setZoomFactor(1)
+                self.html_loader.setZoomFactor(1)
             if self.pdf_page_layout is None:
                 # lazy imports
                 try:
@@ -23166,10 +23122,6 @@ class ApplicationWindow(QMainWindow):  # pyright: ignore [reportGeneralTypeIssue
                 self.color.timeout = float2float(toFloat(comma2dot(str(dialog.color_timeoutEdit.text()))))
             except Exception as e: # pylint: disable=broad-except
                 _log.exception(e)
-
-        self.qmc.intChannel.cache_clear() # device type and thus int channels might have been changed
-        self.qmc.clearLCDs()
-
 #        # deleteLater() will not work here as the dialog is still bound via the parent
 #        dialog.deleteLater() # now we explicitly allow the dialog an its widgets to be GCed
 #        # the following will immediately release the memory despite this parent link

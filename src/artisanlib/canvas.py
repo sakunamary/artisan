@@ -2431,7 +2431,7 @@ class tgraphcanvas(FigureCanvas):
     @pyqtSlot(int, bool)
     def showEvents(self, event_type: int, state: bool) -> None:
         event_type -= 1
-        if len(self.showEtypes) > event_type >= 0 and self.showEtypes[event_type] != state:
+        if len(self.showEtypes) > event_type > 0 and self.showEtypes[event_type] != state:
             self.showEtypes[event_type] = state
             self.redraw(recomputeAllDeltas=False,re_smooth_foreground=False)
 
@@ -2588,13 +2588,6 @@ class tgraphcanvas(FigureCanvas):
 
         self.block_update = False
 
-    def device_name_subst(self, device_name:str) -> str:
-        try:
-            return device_name.format(self.etypes[0],self.etypes[1],self.etypes[2],self.etypes[3],self.mode)
-        except Exception: # pylint: disable=broad-except
-            # substitution might fail if the label contains brackets like in "t{FCS}"
-            return device_name
-
     def get_etype_default(self, i:int, default_etypes_set:Optional[List[int]] = None) -> str:
         etypes_set = (self.default_etypes_set if default_etypes_set is None else default_etypes_set)
         return (self.alt_etypesdefault[i] if etypes_set[i] else self.etypesdefault[i])
@@ -2620,12 +2613,6 @@ class tgraphcanvas(FigureCanvas):
         if prefix and i < 4:
             return 'Background'+self.Betypes[i]
         return self.Betypes[i]
-
-    # returns the first letter as abbrev of the etype name if any
-    # NOTE: that event type names should never be the empty string, but older Artisan versions allowed for this!
-    @staticmethod
-    def etypeAbbrev(etype_name:str) -> str:
-        return etype_name[:1]
 
     def ambientTempSourceAvg(self) -> Optional[float]:
         res:Optional[float] = None
@@ -3406,22 +3393,56 @@ class tgraphcanvas(FigureCanvas):
                 no_math_formula_defined = bool(self.extramathexpression1[n] == '')
             if c == 1:
                 no_math_formula_defined = bool(self.extramathexpression2[n] == '')
-            # MODBUS channels
-            for idx, dev_type in enumerate([29,33,55,109,150]): # MODBUS, MODBUS_34, MODBUS_56, MODBUS_78, MODBUS_910
-                if self.extradevices[n] == dev_type:
-                    return ((self.aw.modbus.inputFloatsAsInt[idx*2 + c] or self.aw.modbus.inputBCDsAsInt[idx*2 + c] or not self.aw.modbus.inputFloats[idx*2 + c]) and
-                        self.aw.modbus.inputDivs[idx*2 + c] == 0 and
-                        (self.aw.modbus.inputModes[idx*2 + c] == '' or self.aw.modbus.inputModes[idx*2 + c] == self.aw.qmc.mode) and
+            if self.extradevices[n] == 29: # MODBUS
+                if c == 0:
+                    return ((self.aw.modbus.inputFloatsAsInt[0] or self.aw.modbus.inputBCDsAsInt[0] or not self.aw.modbus.inputFloats[0]) and
+                        self.aw.modbus.inputDivs[0] == 0 and
+                        self.aw.modbus.inputModes[0] == '' and
                         no_math_formula_defined)
-            # S7 channels
-            for idx, dev_type in enumerate([70,80,81,82,110,151]): # S7, S7_34, S7_56, S7_78, S7_910, S7_1112
-                if self.extradevices[n] == dev_type:
-                    return (self.aw.s7.type[idx*2 + c] != 1 and
-                            (self.aw.s7.mode[idx*2 + c] == 0 or (self.aw.s7.mode[idx*2 + c] == 1 and
-                                self.aw.qmc.mode == 'C') or (self.aw.s7.mode[idx*2 + c] == 2 and self.aw.qmc.mode == 'F')) and
-                            (self.aw.s7.div[idx*2 + c] == 0 or self.aw.s7.type[idx*2 + c] == 2) and
-                            no_math_formula_defined)
-            # others
+                return ((self.aw.modbus.inputFloatsAsInt[1] or self.aw.modbus.inputBCDsAsInt[1] or not self.aw.modbus.inputFloats[1]) and
+                    self.aw.modbus.inputDivs[1] == 0 and
+                    self.aw.modbus.inputModes[1] == '' and
+                    no_math_formula_defined)
+            if self.extradevices[n] == 33: # MODBUS_34
+                if c == 0:
+                    return ((self.aw.modbus.inputFloatsAsInt[2] or self.aw.modbus.inputBCDsAsInt[2] or not self.aw.modbus.inputFloats[2]) and
+                        self.aw.modbus.inputDivs[2] == 0 and
+                        self.aw.modbus.inputModes[2] == '' and
+                        no_math_formula_defined)
+                return ((self.aw.modbus.inputFloatsAsInt[3] or self.aw.modbus.inputBCDsAsInt[3] or not self.aw.modbus.inputFloats[3]) and
+                    self.aw.modbus.inputDivs[3] == 0 and
+                    self.aw.modbus.inputModes[3] == '' and
+                    no_math_formula_defined)
+            if self.extradevices[n] == 55: # MODBUS_56
+                if c == 0:
+                    return ((self.aw.modbus.inputFloatsAsInt[4] or self.aw.modbus.inputBCDsAsInt[4] or not self.aw.modbus.inputFloats[4]) and
+                        self.aw.modbus.inputDivs[4] == 0 and
+                        self.aw.modbus.inputModes[4] == '' and
+                        no_math_formula_defined)
+                return ((self.aw.modbus.inputFloatsAsInt[5] or self.aw.modbus.inputBCDsAsInt[5] or not self.aw.modbus.inputFloats[5]) and
+                    self.aw.modbus.inputDivs[5] == 0 and
+                    self.aw.modbus.inputModes[5] == '' and
+                    no_math_formula_defined)
+            if self.extradevices[n] == 109: # MODBUS_78
+                if c == 0:
+                    return ((self.aw.modbus.inputFloatsAsInt[6] or self.aw.modbus.inputBCDsAsInt[6] or not self.aw.modbus.inputFloats[6]) and
+                        self.aw.modbus.inputDivs[6] == 0 and
+                        self.aw.modbus.inputModes[6] == '' and
+                        no_math_formula_defined)
+                return ((self.aw.modbus.inputFloatsAsInt[7] or self.aw.modbus.inputBCDsAsInt[7] or not self.aw.modbus.inputFloats[7]) and
+                    self.aw.modbus.inputDivs[7] == 0 and
+                    self.aw.modbus.inputModes[7] == '' and
+                    no_math_formula_defined)
+            if self.extradevices[n] == 70: # S7
+                return self.aw.s7.type[0+c] != 1 and self.aw.s7.mode[0+c] == 0 and (self.aw.s7.div[0+c] == 0 or self.aw.s7.type[0+c] == 2) and no_math_formula_defined
+            if self.extradevices[n] == 80: # S7_34
+                return self.aw.s7.type[2+c] != 1 and self.aw.s7.mode[2+c] == 0 and (self.aw.s7.div[2+c] == 0 or self.aw.s7.type[2+c] == 2) and no_math_formula_defined
+            if self.extradevices[n] == 81: # S7_56
+                return self.aw.s7.type[4+c] != 1 and self.aw.s7.mode[4+c] == 0 and (self.aw.s7.div[4+c] == 0 or self.aw.s7.type[4+c] == 2) and no_math_formula_defined
+            if self.extradevices[n] == 82: # S7_78
+                return self.aw.s7.type[6+c] != 1 and self.aw.s7.mode[6+c] == 0 and (self.aw.s7.div[6+c] == 0 or self.aw.s7.type[6+c] == 2) and no_math_formula_defined
+            if self.extradevices[n] == 110: # S7_910
+                return self.aw.s7.type[8+c] != 1 and self.aw.s7.mode[8+c] == 0 and (self.aw.s7.div[8+c] == 0 or self.aw.s7.type[8+c] == 2) and no_math_formula_defined
             if self.extradevices[n] in {54, 90, 91, 135, 136, 140, 141, 165}: # Hottop Heater/Fan, Slider 12, Slider 34, Santoker Power / Fan, Kaleido Fan/Drum, Kaleido Heater/AH, Mugma Heater/Fan
                 return True
             if self.extradevices[n] == 136 and c == 0: # Santoker Drum
@@ -4550,7 +4571,7 @@ class tgraphcanvas(FigureCanvas):
                                                 # keep the RoR axis constant
                                                 zlim = self.delta_ax.get_ylim()
                                                 zlim_offset = (zlim[1] - zlim[0]) / 2.
-                                                tempd = float(self.delta_ax.transData.inverted().transform((0,self.ax.transData.transform((0,temp))[1]))[1])
+                                                tempd = (self.delta_ax.transData.inverted().transform((0,self.ax.transData.transform((0,temp))[1]))[1])
                                                 zlim_new = (tempd - zlim_offset, tempd + zlim_offset)
                                                 self.delta_ax.set_ylim(zlim_new)
                                             self.ax_background = None
@@ -4579,6 +4600,7 @@ class tgraphcanvas(FigureCanvas):
                                             zlim = self.delta_ax.get_ylim()
                                             zlim_offset = (zlim[1] - zlim[0]) / 2.
                                             zlim_new = (ror - zlim_offset, ror + zlim_offset)
+                                            self.delta_ax.set_ylim(zlim_new)
                                             self.ax_background = None
 
                         ##### updated canvas
@@ -6872,6 +6894,9 @@ class tgraphcanvas(FigureCanvas):
             if self.crossmarker:
                 self.togglecrosslines()
 
+            if self.aw is not None:
+                self.aw.updatePlusStatus()
+
         except Exception as ex: # pylint: disable=broad-except
             _log.exception(ex)
             _, _, exc_tb = sys.exc_info()
@@ -6908,9 +6933,6 @@ class tgraphcanvas(FigureCanvas):
             self.endofx = 60
 
         self.aw.qmc.timealign(redraw=False)
-
-        if self.aw is not None:
-            self.aw.updatePlusStatus()
 
         ### REDRAW  ##
         if redraw:
@@ -8209,8 +8231,14 @@ class tgraphcanvas(FigureCanvas):
                     extraname1_subst = self.extraname1[:]
                     extraname2_subst = self.extraname2[:]
                     for i in range(len(self.extratimex)):
-                        extraname1_subst[i] = self.device_name_subst(extraname1_subst[i])
-                        extraname2_subst[i] = self.device_name_subst(extraname2_subst[i])
+                        try:
+                            extraname1_subst[i] = extraname1_subst[i].format(self.etypes[0],self.etypes[1],self.etypes[2],self.etypes[3])
+                        except Exception: # pylint: disable=broad-except
+                            pass
+                        try:
+                            extraname2_subst[i] = extraname2_subst[i].format(self.etypes[0],self.etypes[1],self.etypes[2],self.etypes[3])
+                        except Exception: # pylint: disable=broad-except
+                            pass
 
                     if self.flagstart or self.ygrid == 0:
                         y_label = self.ax.set_ylabel('')
@@ -9040,7 +9068,7 @@ class tgraphcanvas(FigureCanvas):
                                     if self.backgroundEtypes[i] == 4 or self.eventsGraphflag in {0, 3, 4}:
                                         if self.backgroundEtypes[i] < 4 and (not self.renderEventsDescr or len(self.backgroundEStrings[i].strip()) == 0):
                                             Betype = self.Betypesf(self.backgroundEtypes[i])
-                                            firstletter = self.etypeAbbrev(Betype)
+                                            firstletter = str(Betype[0])
                                             secondletter = self.eventsvaluesShort(self.backgroundEvalues[i])
                                             if self.aw.eventslidertemp[self.backgroundEtypes[i]]:
                                                 thirdletter = self.mode # postfix
@@ -9212,10 +9240,10 @@ class tgraphcanvas(FigureCanvas):
 
                         if self.eventsGraphflag == 1 and Nevents:
 
-                            char1 = self.etypeAbbrev(self.etypes[0])
-                            char2 = self.etypeAbbrev(self.etypes[1])
-                            char3 = self.etypeAbbrev(self.etypes[2])
-                            char4 = self.etypeAbbrev(self.etypes[3])
+                            char1 = self.etypes[0][0]
+                            char2 = self.etypes[1][0]
+                            char3 = self.etypes[2][0]
+                            char4 = self.etypes[3][0]
 
                             if self.mode == 'F':
                                 row = {char1:self.phases[0]-20,char2:self.phases[0]-40,char3:self.phases[0]-60,char4:self.phases[0]-80}
@@ -9268,7 +9296,7 @@ class tgraphcanvas(FigureCanvas):
                                         if not(self.flagstart or self.foregroundShowFullflag or (charge_idx <= event_idx <= drop_idx) or (self.autotimex and self.autotimexMode != 0 and event_idx < charge_idx)):
                                             continue
 
-                                        firstletter = self.etypeAbbrev(self.etypes[self.specialeventstype[i]])
+                                        firstletter = self.etypes[self.specialeventstype[i]][0]
                                         secondletter = self.eventsvaluesShort(self.specialeventsvalue[i])
 
                                         #some times ET is not drawn (ET = 0) when using device NONE
@@ -9642,7 +9670,7 @@ class tgraphcanvas(FigureCanvas):
                                     if self.specialeventstype[i] == 4 or self.eventsGraphflag in {0, 3, 4}:
                                         if self.specialeventstype[i] < 4 and (not self.renderEventsDescr or len(self.specialeventsStrings[i].strip()) == 0):
                                             etype = self.etypesf(self.specialeventstype[i])
-                                            firstletter = self.etypeAbbrev(etype)
+                                            firstletter = str(etype[0])
                                             secondletter = self.eventsvaluesShort(self.specialeventsvalue[i])
                                             if self.aw.eventslidertemp[self.specialeventstype[i]]:
                                                 thirdletter = self.mode # postfix
@@ -9967,7 +9995,7 @@ class tgraphcanvas(FigureCanvas):
                                 if not l1.startswith('_'):
                                     self.handles.append(self.extratemp1lines[idx1])
                                     try:
-                                        self.labels.append(self.aw.arabicReshape(l1.format(self.etypes[0],self.etypes[1],self.etypes[2],self.etypes[3],self.mode)))
+                                        self.labels.append(self.aw.arabicReshape(l1.format(self.etypes[0],self.etypes[1],self.etypes[2],self.etypes[3])))
                                     except Exception: # pylint: disable=broad-except
                                         # a key error can occur triggered by the format if curley braces are used without reference
                                         self.labels.append(self.aw.arabicReshape(l1))
@@ -9978,7 +10006,7 @@ class tgraphcanvas(FigureCanvas):
                                 if not l2.startswith('_'):
                                     self.handles.append(self.extratemp2lines[idx2])
                                     try:
-                                        self.labels.append(self.aw.arabicReshape(l2.format(self.etypes[0],self.etypes[1],self.etypes[2],self.etypes[3],self.mode)))
+                                        self.labels.append(self.aw.arabicReshape(l2.format(self.etypes[0],self.etypes[1],self.etypes[2],self.etypes[3])))
                                     except Exception: # pylint: disable=broad-except
                                         # a key error can occur triggered by the format if curley braces are used without reference
                                         self.labels.append(self.aw.arabicReshape(l2))
@@ -10490,23 +10518,21 @@ class tgraphcanvas(FigureCanvas):
             coord_axes_middle_Display = self.ax.transAxes.transform((.5,.5))
             coord_axes_upperright_Display = self.ax.transAxes.transform((1.,1.))
             coord_axes_lowerleft_Display = self.ax.transAxes.transform((0.,0.))
-            coord_axes_height_pixels = float(coord_axes_upperright_Display[1]) - float(coord_axes_lowerleft_Display[1])
-            coord_axes_width_pixels = float(coord_axes_upperright_Display[0]) - float(coord_axes_lowerleft_Display[0])
+            coord_axes_height_pixels = coord_axes_upperright_Display[1] - coord_axes_lowerleft_Display[1]
+            coord_axes_width_pixels = coord_axes_upperright_Display[0] - coord_axes_lowerleft_Display[0]
             coord_axes_aspect = coord_axes_height_pixels / coord_axes_width_pixels
             if img_aspect >= coord_axes_aspect:
                 scale = min(1., coord_axes_height_pixels / img_height_pixels)
             else:
                 scale = min(1., coord_axes_width_pixels / img_width_pixels)
 
-            corner_pixels:List[float] = [0.,0.,0.,0.]
+            corner_pixels = [0.,0.,0.,0.]
             corner_pixels[0] = coord_axes_middle_Display[0] - (scale * img_width_pixels / 2)
             corner_pixels[1] = coord_axes_middle_Display[1] - (scale * img_height_pixels / 2)
             corner_pixels[2] = corner_pixels[0] + scale * img_width_pixels
             corner_pixels[3] = corner_pixels[1] + scale * img_height_pixels
-            transformed_point1 = self.ax.transData.inverted().transform_point((corner_pixels[0],corner_pixels[1]))
-            transformed_point2 = self.ax.transData.inverted().transform_point((corner_pixels[2],corner_pixels[3]))
-            ll_corner_axes:List[float] = [float(transformed_point1[0]), float(transformed_point1[1])]
-            ur_corner_axes:List[float] = [float(transformed_point2[0]), float(transformed_point2[1])]
+            ll_corner_axes:List[float] = self.ax.transData.inverted().transform_point((corner_pixels[0],corner_pixels[1])).tolist()
+            ur_corner_axes:List[float] = self.ax.transData.inverted().transform_point((corner_pixels[2],corner_pixels[3])).tolist()
             extent = (ll_corner_axes[0], ur_corner_axes[0], ll_corner_axes[1], ur_corner_axes[1])
             if self.ai is not None:
                 try:
@@ -11514,7 +11540,7 @@ class tgraphcanvas(FigureCanvas):
             self.updateFlavorChartData()
             if self.ax1 is not None and self.flavorchart_angles is not None:
                 try:
-                    ticks_loc = [float(tick) for tick in self.ax1.get_yticks()]
+                    ticks_loc = self.ax1.get_yticks().tolist()
                     self.ax1.yaxis.set_major_locator(ticker.FixedLocator(ticks_loc))
                 except Exception: # pylint: disable=broad-except
                     pass
@@ -11911,17 +11937,15 @@ class tgraphcanvas(FigureCanvas):
             if self.phidgetRemoteFlag:
                 try:
                     self.addPhidgetServer()
-                    _log.info('phidgetServer added')
-                except Exception as e: # pylint: disable=broad-except
-                    _log.exception(e)
+                    _log.info('phidgetServer started')
+                except Exception: # pylint: disable=broad-except
                     if self.device in self.phidgetDevices:
-                        self.adderror(QApplication.translate('Error Message',"Exception: phidgetServer couldn't be added. Verify that the Phidget driver is correctly installed!"))
+                        self.adderror(QApplication.translate('Error Message',"Exception: PhidgetManager couldn't be started. Verify that the Phidget driver is correctly installed!"))
             if self.phidgetManager is None:
                 try:
                     self.phidgetManager = PhidgetManager()
                     _log.info('phidgetManager started')
-                except Exception as e: # pylint: disable=broad-except
-                    _log.exception(e)
+                except Exception: # pylint: disable=broad-except
                     if self.device in self.phidgetDevices:
                         self.adderror(QApplication.translate('Error Message',"Exception: PhidgetManager couldn't be started. Verify that the Phidget driver is correctly installed!"))
 
@@ -12300,8 +12324,6 @@ class tgraphcanvas(FigureCanvas):
 
             if self.flagKeepON and len(self.timex) > 10:
                 QTimer.singleShot(300, self.onMonitorSignal.emit)
-
-            self.aw.updatePlusStatusSignal.emit() # update plus icon (roast might not have been uploaded yet)
 
         except Exception as ex: # pylint: disable=broad-except
             _log.exception(ex)
@@ -12777,15 +12799,11 @@ class tgraphcanvas(FigureCanvas):
     def OffRecorder(self, autosave:bool = True, enableButton:bool = True) -> None:
         _log.info('MODE: STOP RECORDING')
         try:
-            # mark DROP if not yet set (and DROP not undone), at least 7min roast time and CHARGE is set and either autoDROP is active or DROP button is hidden
-            if self.timeindex[6] == 0 and self.timeindex[0] != -1 and self.autoDROPenabled and (self.autoDropFlag or not self.buttonvisibility[6]):
+            # mark DROP if not yet set, at least 7min roast time and CHARGE is set and either autoDROP is active or DROP button is hidden
+            if self.timeindex[6] == 0 and self.timeindex[0] != -1 and (self.autoDropFlag or not self.buttonvisibility[6]):
                 start = self.timex[self.timeindex[0]]
                 if (len(self.timex)>0 and self.timex[-1] - start) > 7*60: # only after 7min into the roast
                     self.markDrop()
-            if self.timeindex[6] == 0 and self.autoDROPenabled:
-                # if DROP is still not set (and was never set before, eg. autoDROP is still enabled), we reset the scheduleID not
-                # to have this still incomplete roast be associated with any scheduleItem (rule: a roast without a DROP is never automatically registered as scheduleItem)
-                self.scheduleID = None
             self.cacheforBbp()  # save items for bbp
             self.aw.enableSaveActions()
             self.aw.resetCurveVisibilities()
@@ -14155,7 +14173,7 @@ class tgraphcanvas(FigureCanvas):
                         if self.eventsshowflag != 0 and self.showEtypes[etype] and self.ax is not None:
                             index = self.specialevents[-1]
                             if etype < 4  and (not self.renderEventsDescr or len(self.specialeventsStrings[-1].strip()) == 0):
-                                firstletter = self.etypeAbbrev(self.etypesf(etype))
+                                firstletter = self.etypesf(etype)[0]
                                 secondletter = self.eventsvaluesShort(sevalue)
                                 if self.aw.eventslidertemp[etype]:
                                     thirdletter = self.mode # postfix
@@ -14357,7 +14375,7 @@ class tgraphcanvas(FigureCanvas):
                         fontprop_small = self.aw.mpl_fontproperties.copy()
                         fontsize = 'xx-small'
                         fontprop_small.set_size(fontsize)
-                        firstletter = self.etypeAbbrev(self.etypesf(self.specialeventstype[-1]))
+                        firstletter = self.etypesf(self.specialeventstype[-1])[0]
                         secondletter = self.eventsvaluesShort(self.specialeventsvalue[-1])
 
                         if self.eventsGraphflag == 0:
@@ -17349,7 +17367,7 @@ class tgraphcanvas(FigureCanvas):
 
                 # fixing yticks with matplotlib.ticker "FixedLocator"
                 try:
-                    ticks_loc = [float(tick) for tick in self.ax2.get_yticks()]
+                    ticks_loc = self.ax2.get_yticks().tolist()
                     self.ax2.yaxis.set_major_locator(ticker.FixedLocator(ticks_loc))
                 except Exception: # pylint: disable=broad-except
                     pass
@@ -17567,8 +17585,8 @@ class tgraphcanvas(FigureCanvas):
                         deltaX = stringfromseconds(x - self.baseX)
                         deltaY = str(float2float(y - self.baseY,1))
                         RoR = str(float2float(60 * (y - self.baseY) / (x - self.baseX),1))
-                        deltaRoR:float = (float(self.delta_ax.transData.inverted().transform((0,self.ax.transData.transform((0,y))[1]))[1])
-                                    - float(self.delta_ax.transData.inverted().transform((0,self.ax.transData.transform((0,self.baseY))[1]))[1]))
+                        deltaRoR = (self.delta_ax.transData.inverted().transform((0,self.ax.transData.transform((0,y))[1]))[1]
+                                    - self.delta_ax.transData.inverted().transform((0,self.ax.transData.transform((0,self.baseY))[1]))[1])
                         #RoRoR is always in C/min/min
                         if self.mode == 'F':
                             deltaRoR = RoRfromFtoCstrict(deltaRoR)
