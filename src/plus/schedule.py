@@ -1141,8 +1141,11 @@ class DragItem(StandardItem):
                 not self.aw.schedule_window.in_completed(self.aw.qmc.roastUUID) and \
                 self.aw.qmc.roastdate.date().toPyDate() >= self.aw.schedule_window.prev_roast_session_data():
             # if not sampling and a profile without scheduleID loaded which is not yet registered as completed roast,
-            # and roast date is not before the last roast sessiong
+            # and roast date is not before the last roast session
             # we allow to assign the current profile to the selected schedule item
+            # NOTE: that in contrast to the automatic assignment which does not allow incomplete roasts without a DROP to be registered
+            #   to prevent recorded snippet to confuse the roast session,
+            #   a roast without DROP can still be registered manually
             addToItemAction:QAction = QAction(QApplication.translate('Contextual Menu', 'Register roast'),self)
             addToItemAction.triggered.connect(self.addLoadedProfileToSelectedScheduleItem)
             self.menu.addAction(addToItemAction)
@@ -2253,7 +2256,12 @@ class ScheduleWindow(ArtisanResizeablDialog): # pyright:ignore[reportGeneralType
             self.aw.qmc.plus_store_label = plus.stock.getStoreLabel(store_item)
             if item.coffee is not None:
                 coffee = plus.stock.getCoffee(item.coffee)
-                if coffee is not None:
+                if coffee is None:
+                    # coffee not in stock, we keep at least the coffee hr_id
+                    self.aw.qmc.plus_coffee = item.coffee
+                    self.aw.qmc.plus_coffee_label = ''
+                    self.aw.qmc.beans = ''
+                else:
                     self.aw.qmc.plus_coffee = item.coffee
                     self.aw.qmc.plus_coffee_label = plus.stock.coffeeLabel(coffee)
                     self.aw.qmc.beans = plus.stock.coffee2beans(coffee)

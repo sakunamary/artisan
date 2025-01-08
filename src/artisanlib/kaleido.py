@@ -169,7 +169,7 @@ class KaleidoPort:
 
     # asyncio
 
-    # returns the current state of the given var or None (for sid/TU) and -1 (otherwise) if the state is unknown
+    # returns the current state of the given var or None (for sid/TU/SC/CL/SN) and -1 (otherwise) if the state is unknown
     async def get_state_async(self, var:str) -> Optional[Union[str,int,float]]:
         return self.get_state(var)
 
@@ -469,12 +469,26 @@ class KaleidoPort:
             except Exception as e: # pylint: disable=broad-except
                 _log.error(e)
             finally:
+                if self._write_queue is not None:
+                    try:
+                        while not self._write_queue.empty():
+                            self._write_queue.get_nowait()
+                            self._write_queue.task_done()
+                    except Exception as e: # pylint: disable=broad-except
+                        _log.error(e)
                 if writer is not None:
                     try:
                         writer.close()
+                        await asyncio.wait_for(writer.wait_closed(), timeout=0.3)
+                    except Exception as e: # pylint: disable=broad-except
+                        _log.error(e)
+                if writer is not None and writer.transport is not None:
+                    try:
+                        writer.transport.close()
                     except Exception as e: # pylint: disable=broad-except
                         _log.error(e)
 
+            # the following is not reached on stop()
             self.resetReadings()
             if disconnected_handler is not None:
                 try:

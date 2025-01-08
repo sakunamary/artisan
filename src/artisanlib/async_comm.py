@@ -206,6 +206,7 @@ class AsyncComm:
         writer = asyncio.StreamWriter(transport, protocol, reader, loop)
         return reader, writer
 
+
     # to be overwritten by the subclass
 
     def reset_readings(self) -> None:
@@ -298,6 +299,7 @@ class AsyncComm:
                 if writer is not None:
                     try:
                         writer.close()
+                        await asyncio.wait_for(writer.wait_closed(), timeout=0.3)
                     except Exception as e: # pylint: disable=broad-except
                         _log.error(e)
 

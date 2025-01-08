@@ -1,21 +1,37 @@
 Detailed Release History
 ========================
 
+----
+v3.1.1
+------------------
+
+* NEW HARDWARE SUPPORT
+  - adds support for the [DCC1100 and DCC1120 Brushless DC Motor controllers and the DCC1020 DC Motor controller](https://artisan-scope.org/devices/phidgets/#45-dc-motor-control) ([Discussion #1750](../../../discussions/1750))
+
+* CHANGES
+  - the Phidget driver is now bundled with the Artisan app and does no longer need to be installed separately (but for some legacy USB HID devices, like the original 1046 and 1048, which still need the kernel extension of the driver package installed in the system)
+  - indicates artisan.plus connection loss more reliable
+
+* FIXES
+  - ensure complete reset to defaults in energy tab loads tab
+  - makes loading of (broken) profiles with inconsistent data length more robust
+  - prevents exceptions caused by empty event type names ([Discussion #1745](../../../discussions/1745))
+
 
 ----
-v3.0.3
+v3.1.0 (November 22, 2024)
 ------------------
 
 * ADDITIONS
-  - adds symbolic expression `bit(n,x)` which returns the n-th bit of x interpreted as integer
   - adds (total) correction to cup profiles and enables column drag-and-drop ([Discussion #1690](../../../discussions/1690))
   - adds option to manually add a roast to an open schedule item assigned by [artisan.plus](https://artisan.plus)
   - adds option to synchronization of the Artisan PID SV slider with external MODBUS/S7 PIDs
+  - adds symbolic expression `bit(n,x)` which returns the n-th bit of x interpreted as integer
 
 * NEW HARDWARE SUPPORT
-  - adds support for the [induction-based roasting machines Gemma_2IND, Gemma_6-8IND and Gemma_26-30IND](https://artisan-scope.org/machines/sci/) from Sweet Coffee Italia
+  - adds support for the [induction heated roasting machines Gemma_2IND, Gemma_6-8IND and Gemma_26-30IND](https://artisan-scope.org/machines/sci/) from Sweet Coffee Italia
   - adds support for various newer [Santoker machines](https://artisan-scope.org/machines/santoker/) communicating via Bluetooth like the Cube10, the Bluetooth enabled X, Q and R Master Series as well as the R Series machines ([Issue #1088](../../../issues/1088) and [Issue #1702](../../../issues/1702))
-  - adds [ColorTrack](https://artisan-scope.org/devices/colortrack/) serial and bluetooth support ([Issue #1680](../../../issues/1680))
+  - adds experimental support for [ColorTrack](https://artisan-scope.org/devices/colortrack/) via serial and bluetooth ([Issue #1680](../../../issues/1680))
   - adds support for [Primo roasting machines](https://artisan-scope.org/machines/primo/)
   - adds [Loring](https://artisan-scope.org/machines/loring/) 'auto' setup which picks up CHARGE and DROP events set at the machine
   - adds control function to [Diedrich DR](https://artisan-scope.org/machines/diedrich/) machine setup and adds [Diedrich CR](https://artisan-scope.org/machines/diedrich/) machine setup
@@ -27,9 +43,7 @@ v3.0.3
   - automatically start of the scheduler while connected to [artisan.plus](https://artisan.plus) if there are incompleted scheduled items
   - disable items in coffee popups of the Custom Blend dialog without stock in the selected store or, if no store is selected, without stock in every store
   - reduces the size of builds by removing unnecessary files
-  - removes the optional delay on reads from serial MODBUS
-  - adds optional delay after connect before sending requests to serial MODBUS to allow to wait for Arduino slaves to complete reboot ([Issue #1694](../../../issues/1694))
-  - upgrades MODBUS communication from sync to async IO
+  - upgrades MODBUS communication from sync to async IO ([Issue #1694](../../../issues/1694))
   - limits the visible length of long popup lists in Devices and Statistics Dialog
   - keep Hottop connected after OFF in control mode to prevent the shutdown on disconnect ([Issue #1714](../../../issues/1714))
   - PID RS time is reset on PID ON not on CHARGE as in previous releases
@@ -50,6 +64,7 @@ v3.0.3
   - fixes an issue in WebSocket communication where time did not progress with empty `Data Request` ([Issue #1737](../../../issues/1737))
   - fixes an issue with the Analyzer result panes disappearing under some conditions ([Discussion #1736](../../../discussions/1736))
   - fixes saving of designer point which could result in failure on loading ([Discussion #1721](../../../discussions/1721))
+  - fixes Artisan Command `showEvents(1,x)` ([Discussion #1741](../../../discussions/1741))
 
 * REMOVALS
   - support for the image format BMP has been removed
@@ -684,7 +699,7 @@ v2.4.2 (October 2, 2020)
      - adds burner control to [San Franciscan](https://www.sanfranroaster.com/) setup
      - adds Toper USB setup next to the network MODBUS/TCP variant to connect to  [Toper TKM-SX](https://artisan-scope.org/machines/toper/) roasters
      - adds support for the new [Probat Sample Roaster and P Series III roasters](https://artisan-scope.org/machines/probat/)
-     - adds [support for machines of more than 40 additional brands](https://artisan-scope.org/machines/index): [Ambex](https://artisan-scope.org/machines/ambex/), [ARC S/800](https://artisan-scope.org/machines/arc/), [Bella TW](https://artisan-scope.org/machines/bellatw/), [Berto One and D](https://artisan-scope.org/machines/berto/), [Bideli](https://artisan-scope.org/machines/bideli/), [Blueking BK](https://artisan-scope.org/machines/blueking/), [Brambati PLC](https://artisan-scope.org/machines/brambati/), [Dätgen DR/DW](https://artisan-scope.org/machines/datgen/), [Dongyi BR/BY/DY](https://artisan-scope.org/machines/dongyi/), [Easyster](https://artisan-scope.org/machines/easyster/), [Froco PLC](https://artisan-scope.org/machines/froco/), [Garanti GKPX](https://artisan-scope.org/machines/garanti/), [Golden Roasters GR](https://artisan-scope.org/machines/goldenroasters/), [Hartanzah Roaster](https://artisan-scope.org/machines/hartanzah/), [HB-Roaster](https://artisan-scope.org/machines/hb/), [Hive Roaster](https://artisan-scope.org/machines/hive/), [IP Xenakis iRm_Series incl. full control](https://artisan-scope.org/machines/ipxenakis/), [KapoK](https://artisan-scope.org/machines/kapok/), [Kuban Supreme setup incl. full control](https://artisan-scope.org/machines/kuban/), [Lilla PLC](https://artisan-scope.org/machines/lilla/), [Mill City Roasters MCR Series](https://artisan-scope.org/machines/mcr/), [NOR Coffee Roaster](https://artisan-scope.org/machines/nor/), [Nordic](https://artisan-scope.org/machines/nordic/), [Opp Roaster](https://artisan-scope.org/machines/opp/), [Öztürk](https://artisan-scope.org/machines/ozturk/), [Petroncini](https://artisan-scope.org/machines/petroncini/), [Roaster & Roaster](https://artisan-scope.org/machines/roasterandroaster/), [Rasco Mac](https://artisan-scope.org/machines/rascomac/), [Rolltech EL](https://artisan-scope.org/machines/rolltech/), [Santoker](https://artisan-scope.org/machines/santoker/), [Tesla](https://artisan-scope.org/machines/tesla/), [Tostabar Genius](https://artisan-scope.org/machines/tostabar/), [TRINITAS T2 and T7](https://artisan-scope.org/machines/trinitas/), [Trobrat](https://artisan-scope.org/machines/trobrat/), [Typhoon](https://artisan-scope.org/machines/typhoon/), [VNT](https://artisan-scope.org/machines/vnt/), [Vortecs](https://artisan-scope.org/machines/vortecs/), [Wintop](https://artisan-scope.org/machines/wintop/), [Yang-Chia Feima](https://artisan-scope.org/machines/yangchia/), and [Yoshan](https://artisan-scope.org/machines/yoshan/)
+     - adds [support for machines of more than 40 additional brands](https://artisan-scope.org/machines/index): [Ambex](https://artisan-scope.org/machines/ambex/), [ARC S/800](https://artisan-scope.org/machines/arc/), [Bella TW](https://artisan-scope.org/machines/bellatw/), [Berto One and D](https://artisan-scope.org/machines/berto/), [Bideli](https://artisan-scope.org/machines/bideli/), [Blueking BK](https://artisan-scope.org/machines/blueking/), [Brambati PLC](https://artisan-scope.org/machines/brambati/), [Dätgen DR/DW](https://artisan-scope.org/machines/datgen/), [Dongyi BR/BY/DY](https://artisan-scope.org/machines/dongyi/), [Easyster](https://artisan-scope.org/machines/easyster/), [Froco PLC](https://artisan-scope.org/machines/froco/), [Garanti GKPX](https://artisan-scope.org/machines/garanti/), [Golden Roasters GR](https://artisan-scope.org/machines/goldenroasters/), [HB-Roaster](https://artisan-scope.org/machines/hb/), [Hive Roaster](https://artisan-scope.org/machines/hive/), [IP Xenakis iRm_Series incl. full control](https://artisan-scope.org/machines/iRm/), [KapoK](https://artisan-scope.org/machines/kapok/), [Kuban Supreme setup incl. full control](https://artisan-scope.org/machines/kuban/), [Lilla PLC](https://artisan-scope.org/machines/lilla/), [Mill City Roasters MCR Series](https://artisan-scope.org/machines/mcr/), [NOR Coffee Roaster](https://artisan-scope.org/machines/nor/), [Nordic](https://artisan-scope.org/machines/nordic/), [Opp Roaster](https://artisan-scope.org/machines/opp/), [Öztürk](https://artisan-scope.org/machines/ozturk/), [Petroncini](https://artisan-scope.org/machines/petroncini/), [Roaster & Roaster](https://artisan-scope.org/machines/roasterandroaster/), [Rasco Mac](https://artisan-scope.org/machines/rascomac/), [Rolltech EL](https://artisan-scope.org/machines/rolltech/), [Santoker](https://artisan-scope.org/machines/santoker/), [Tesla](https://artisan-scope.org/machines/tesla/), [Tostabar Genius](https://artisan-scope.org/machines/tostabar/), [TRINITAS T2 and T7](https://artisan-scope.org/machines/trinitas/), [Trobrat](https://artisan-scope.org/machines/trobrat/), [Typhoon](https://artisan-scope.org/machines/typhoon/), [VNT](https://artisan-scope.org/machines/vnt/), [Vortecs](https://artisan-scope.org/machines/vortecs/), [Wintop](https://artisan-scope.org/machines/wintop/), [Yang-Chia Feima](https://artisan-scope.org/machines/yangchia/), and [Yoshan](https://artisan-scope.org/machines/yoshan/)
   - adds RoastLog profile importer ([Issue #471](../../../issues/441))
   - adds IKAWA v3 CSV file importer
   - adds import support for new Aillio Bullet R1 JSON format ([Issue #508](../../../issues/508))
